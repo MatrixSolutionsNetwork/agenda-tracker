@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matrix Solutions Network — Digital ID Map</title>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Robust CSV parsing (handles commas/quotes/newlines in Notes) -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0f12;
+      --panel:#0f1418;
+      --panelEdge:#151b21;
+      --text:#e6f3ea;
+      --muted:#8aa39a;
+      --neon:#00ff95;   /* Implemented */
+      --amber:#ffbf47;  /* In Discussion */
+      --cyan:#35d3ff;   /* Pilot */
+      --red:#ff5a67;    /* Abandoned */
+      --neutral:#4b5563;
+    }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text); }
+    #map { height:100%; width:100%; filter:saturate(0.9) contrast(1.05); }
+
+    .titlebar{
+      position:absolute; top:16px; left:50%; transform:translateX(-50%);
+      background:rgba(10,16,13,.85); color:var(--neon);
+      padding:6px 12px; border-radius:10px; border:1px solid #163a2c;
+      font:600 14px ui-sans-serif,system-ui; letter-spacing:.3px; z-index:900;
+      box-shadow:0 6px 18px rgba(0,0,0,.45);
+    }
+    .panel{
+      position:absolute; top:16px; left:16px; z-index:1000;
+      background:linear-gradient(180deg, rgba(21,27,33,.92), rgba(15,20,24,.94));
+      border:1px solid var(--panelEdge); border-radius:14px;
+      box-shadow:0 6px 18px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,255,149,.05);
+      padding:14px 16px; width:320px;
+      font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+    }
+    .panel h2{margin:0 0 10px 0; font-size:15px;}
+    .row{display:flex; align-items:center; gap:8px; margin:6px 0;}
+    .legend .item{display:flex; align-items:center; gap:10px; margin:8px 0;}
+    .swatch{width:12px; height:12px; border-radius:50%; border:1px solid #00000044;}
+    .count{margin-left:auto; font-weight:700; color:var(--muted);}
+    .pill{font-weight:700; padding:2px 8px; border-radius:999px; background:#0a1210; border:1px solid #1b3a2e;}
+    .divider{border:none; border-top:1px solid #182126; margin:10px 0;}
+    .hint{color:var(--muted); font-size:12px;}
+    .leaflet-container a{color:var(--neon)}
+    .leaflet-popup-content-wrapper{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
+    .leaflet-popup-tip{background:#0e1512; border:1px solid #1b3a2e;}
+    .leaflet-tooltip{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
+
+    /* Faint grid vibe */
+    #map::after{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      background-image: linear-gradient(to right, rgba(0,255,149,.04) 1px, transparent 1px),
+                       linear-gradient(to bottom, rgba(0,255,149,.04) 1px, transparent 1px);
+      background-size:60px 60px;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="titlebar">Matrix Solutions Network — Digital ID Map</div>
+
+  <div class="panel">
+    <h2>Status Overview</h2>
+    <div class="legend" id="legend">
+      <div class="item"><span class="swatch" style="background:var(--neon);"></span> Implemented <span class="count" id="c-imp">0</span></div>
+      <div class="item"><span class="swatch" style="background:var(--amber);"></span> In Discussion <span class="count" id="c-disc">0</span></div>
+      <div class="item"><span class="swatch" style="background:var(--cyan);"></span> Pilot <span class="count" id="c-pilot">0</span></div>
+      <div class="item"><span class="swatch" style="background:var(--red);"></span> Abandoned <span class="count" id="c-abnd">0</span></div>
+    </div>
+    <hr class="divider" />
+    <label><input id="toggleShade" type="checkbox" checked> Country shading</label><br/>
+    <label><input id="toggleDots" type="checkbox" checked> Status dots</label>
+    <div class="hint" style="margin-top:8px;">Click a country or dot for details. Data loads from your Google Sheet CSV.</div>
+  </div>
+
+  <script>
+    // ====== CONFIG ======
+    // 1) Put your published Google Sheet CSV URL here:
+    const CSV_URL = "https://docs.google.com/spreadsheets/d/1kFhcnaFeUABDNTY3ePhSgQTS0GH8rTSK2Fg2TB22lNk/edit?usp=sharing";
+
+    // 2) Optional: If your sheet uses different status text, map them here.
+    const STATUS_ALIASES = {
+      "implemented":"Implemented",
+      "in development":"In Discussion",
+      "in discussion":"In Discussion",
+      "pilot":"Pilot",
+      "abandoned":"Abandoned"
+    };
+    // =====================
+
+    // Basemap (dark, no key)
+    const map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 8, minZoom: 2
+    }).addTo(map);
+
+    // Colors
+    const COLORS = {
+      impl: "#00ff95",
+      disc: "#ffbf47",
+      pilot:"#35d3ff",
+      aband:"#ff5a67",
+      neutral:"#4b5563"
+    };
+    const STATUS_STYLE = {
+      "Implemented":   { stroke: tint(COLORS.impl,-30), fill: COLORS.impl, emoji:"✅" },
+      "In Discussion": { stroke: tint(COLORS.disc,-30), fill: COLORS.disc, emoji:"🟡" },
+      "Pilot":         { stroke: tint(COLORS.pilot,-30), fill: COLORS.pilot, emoji:"🧪" },
+      "Abandoned":     { stroke: tint(COLORS.aband,-30), fill: COLORS.aband, emoji:"❌" }
+    };
+
+    // Load data then render
+    loadCsv(CSV_URL).then(DATA => render(DATA)).catch(err => {
+      console.error(err);
+      // Fallback sample so page still renders if CSV not set yet
+      render([
+        {country:"Afghanistan", program:"e-ID Card", status:"Implemented", year:"2018", notes:"~1.7M issued by Jan 2021", lat:34.55, lon:69.21},
+        {country:"United States", program:"Apple Wallet Digital Passport (iOS 26)", status:"Implemented", year:"2024", notes:"Wallet supports passport for domestic travel", lat:38.90, lon:-77.04},
+        {country:"Uruguay", program:"e-ID card", status:"Implemented", year:"2015", notes:"Chip eID; signature + biometrics", lat:-34.90, lon:-56.16},
+        {country:"Ukraine", program:"Diia Digital Passport", status:"Implemented", year:"2020", notes:"Legally recognized digital passport", lat:50.45, lon:30.52},
+        {country:"United Arab Emirates", program:"UAE Pass", status:"Implemented", year:"2018", notes:"11M+ users; 5k+ services", lat:24.45, lon:54.38},
+        {country:"Turkey", program:"e-Devlet Gateway", status:"Implemented", year:"2008", notes:"National e-gov portal with ID auth", lat:39.93, lon:32.86},
+        {country:"Spain", program:"Cl@ve Digital ID System", status:"Implemented", year:"2014", notes:"Unified public service credentials", lat:40.42, lon:-3.70},
+        {country:"South Korea", program:"PASS Mobile ID", status:"Implemented", year:"2020", notes:"Mobile identity at scale", lat:37.57, lon:126.98},
+        {country:"Serbia", program:"Serbia e-ID", status:"Implemented", year:"2019", notes:"Trustworthy e-ID with 2FA", lat:44.81, lon:20.46}
+      ]);
+    });
+
+    async function loadCsv(url){
+      if (!url || url.includes("PASTE_YOUR")) throw new Error("Set CSV_URL to your published Google Sheet CSV link.");
+      const res = await fetch(url, { cache:"no-store" });
+      const text = await res.text();
+      const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+      return parsed.data.map(row => ({
+        country: (row.Country||"").trim(),
+        program: (row.Program||"").trim(),
+        status:  normalizeStatus(row.Status),
+        year:    (row.Year||"").trim(),
+        notes:   (row.Notes||"").trim(),
+        lat:     row.Lat ? +row.Lat : undefined,
+        lon:     row.Lon ? +row.Lon : undefined
+      }));
+    }
+
+    function normalizeStatus(s){
+      const k = (s||"").toString().trim().toLowerCase();
+      return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
+    }
+
+    function render(DATA){
+      // counts
+      const counts = { "Implemented":0, "In Discussion":0, "Pilot":0, "Abandoned":0 };
+      DATA.forEach(d => { if (counts[d.status] !== undefined) counts[d.status]++; });
+      document.getElementById('c-imp').textContent   = counts["Implemented"];
+      document.getElementById('c-disc').textContent  = counts["In Discussion"];
+      document.getElementById('c-pilot').textContent = counts["Pilot"];
+      document.getElementById('c-abnd').textContent  = counts["Abandoned"];
+
+      // country shading
+      let countryLayer;
+      fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+        .then(r => r.json())
+        .then(geo => {
+          const lookup = {};
+          DATA.forEach(d => lookup[d.country.toLowerCase()] = d.status);
+
+          countryLayer = L.geoJSON(geo, {
+            style: f => {
+              const name = f.properties.ADMIN.toLowerCase();
+              const status = lookup[name];
+              if (!status) {
+                return { color: COLORS.neutral, weight: 0.6, fillColor: COLORS.neutral, fillOpacity: 0.06, opacity: 0.4 };
+              }
+              const s = STATUS_STYLE[status];
+              return { color: s.stroke, weight: 0.9, fillColor: s.fill, fillOpacity: 0.22, opacity: 0.9 };
+            },
+            onEachFeature: (feature, layer) => {
+              const n = feature.properties.ADMIN;
+              const rec = DATA.find(d => d.country.toLowerCase() === n.toLowerCase());
+              if (rec) {
+                const s = STATUS_STYLE[rec.status];
+                layer.bindPopup(`
+                  <h3 style="margin:0 0 6px 0;color:${COLORS.impl}">${n}
+                    <span class="pill">${s.emoji} ${rec.status}</span></h3>
+                  <div><strong>Program:</strong> ${escapeHtml(rec.program || "—")}</div>
+                  <div><strong>Since:</strong> ${escapeHtml(rec.year || "—")}</div>
+                  <div class="hint" style="margin-top:6px;">${escapeHtml(rec.notes || "")}</div>
+                `);
+              } else {
+                layer.bindPopup(`<h3 style="margin:0 0 6px 0;">${n}</h3><div class="hint">No record in dataset.</div>`);
+              }
+            }
+          }).addTo(map);
+        });
+
+      // status dots
+      const dots = L.layerGroup().addTo(map);
+      DATA.forEach(d => {
+        // fallback to rough capital coords if not provided
+        const lat = d.lat ?? null, lon = d.lon ?? null;
+        if (lat == null || lon == null) return; // keep simple; optionally add a capitals lookup later
+        const st = STATUS_STYLE[d.status];
+        L.circleMarker([lat, lon], {
+          radius: 6.5, color: tint(st.fill,-30), weight: 1.25, fillColor: st.fill, fillOpacity: 0.95
+        })
+        .bindTooltip(`${d.country}: ${d.status}`, {direction:'top', offset:[0,-6]})
+        .bindPopup(`
+          <h3 style="margin:0 0 6px 0;color:${COLORS.impl}">${d.country}
+            <span class="pill">${st.emoji} ${d.status}</span></h3>
+          <div><strong>Program:</strong> ${escapeHtml(d.program || "—")}</div>
+          <div><strong>Since:</strong> ${escapeHtml(d.year || "—")}</div>
+          <div class="hint" style="margin-top:6px;">${escapeHtml(d.notes || "")}</div>
+        `).addTo(dots);
+      });
+
+      // toggles
+      document.getElementById('toggleShade').addEventListener('change', e => {
+        if (e.target.checked) { map.addLayer(countryLayer); } else { map.removeLayer(countryLayer); }
+      });
+      document.getElementById('toggleDots').addEventListener('change', e => {
+        if (e.target.checked) { map.addLayer(dots); } else { map.removeLayer(dots); }
+      });
+    }
+
+    // utils
+    function tint(hex, amt){
+      const n = parseInt(hex.replace('#',''), 16);
+      let r = (n>>16) + amt, g=((n>>8)&0xff)+amt, b=(n&0xff)+amt;
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
+    }
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+  </script>
+</body>
+</html>
