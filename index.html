@@ -12,8 +12,13 @@
   <!-- CSV parsing -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Pie chart -->
+  <!-- Pie chart + labels -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <!-- Centroids that stay INSIDE polygons -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
 
   <style>
     :root{
@@ -27,7 +32,7 @@
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
     #map{height:100%;width:100%}
 
-    /* ===== Bottom-left toolbar ===== */
+    /* Bottom-left toolbar */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:8px;
@@ -37,7 +42,6 @@
       box-shadow:0 6px 18px rgba(0,0,0,.45);
       user-select:none;
     }
-    #fab:hover{ filter:brightness(1.08); }
     #fab .dot{width:10px;height:10px;border-radius:50%;}
     #fab .d-red{ background:var(--red); }
     #fab .d-org{ background:var(--orange); }
@@ -46,7 +50,7 @@
     /* Drawer */
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
-      width:320px; max-width:90vw; max-height:60vh; overflow:auto;
+      width:340px; max-width:92vw; max-height:62vh; overflow:auto;
       background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
@@ -85,36 +89,60 @@
     <span style="font-size:12px;opacity:.7;">▸</span>
   </div>
 
-  <!-- Drawer with pie + toggles -->
-  <div id="drawer" role="dialog" aria-modal="false" aria-label="Status overview">
+  <!-- Drawer (starts OPEN by default) -->
+  <div id="drawer" class="open" role="dialog" aria-modal="false" aria-label="Status overview">
     <div class="drawer-head">
       <h3 class="drawer-title">Status Overview</h3>
       <button id="drawerClose" class="icon-btn" title="Close">✕</button>
     </div>
 
-    <canvas id="statusPie" width="280" height="180" style="margin-top:8px;"></canvas>
+    <canvas id="statusPie" width="300" height="190" style="margin-top:8px;"></canvas>
 
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
     <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
+
     <div class="hr"></div>
 
+    <!-- Show/Hide dots by status -->
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showImpDots" checked />
+        <span>Show dots — Implemented</span>
+      </label>
+    </div>
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showDevDots" checked />
+        <span>Show dots — In development</span>
+      </label>
+    </div>
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showOthDots" checked />
+        <span>Show dots — Other</span>
+      </label>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Local networks (default ON, neighbors = 4) -->
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="netImp" />
+        <input type="checkbox" id="netImp" checked />
         <span>Local network — Implemented</span>
       </label>
     </div>
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="netDev" />
+        <input type="checkbox" id="netDev" checked />
         <span>Local network — In development</span>
       </label>
     </div>
     <div class="row" style="gap:8px; align-items:center; font-size:12px;">
       <label>Neighbors:</label>
-      <input type="number" id="kNeighbors" min="1" max="3" value="1" style="width:48px;background:#0b1216;border:1px solid #22313a;border-radius:6px;color:#e6f3ea;padding:2px 6px;">
-      <span class="hint">(# of nearest neighbors per dot)</span>
+      <input type="number" id="kNeighbors" min="1" max="6" value="4" style="width:48px;background:#0b1216;border:1px solid #22313a;border-radius:6px;color:#e6f3ea;padding:2px 6px;">
+      <span class="hint">(nearest neighbors per dot)</span>
     </div>
 
     <div id="debug" class="debug"></div>
@@ -200,9 +228,15 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
-    const dotsLayer = L.layerGroup().addTo(map);
-    const linesImpLayer = L.layerGroup();
-    const linesDevLayer = L.layerGroup();
+
+    // Dot layers per status (toggleable)
+    const dotsImpLayer = L.layerGroup().addTo(map);
+    const dotsDevLayer = L.layerGroup().addTo(map);
+    const dotsOthLayer = L.layerGroup().addTo(map);
+
+    // Local network layers
+    const linesImpLayer = L.layerGroup().addTo(map);
+    const linesDevLayer = L.layerGroup().addTo(map);
 
     const dbgEl = document.getElementById('debug');
     const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
@@ -211,15 +245,17 @@
     const fab = document.getElementById('fab');
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
-    function openDrawer(){ drawer.classList.add('open'); }
-    function closeDrawer(){ drawer.classList.remove('open'); }
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
-    drawerClose.addEventListener('click', closeDrawer);
+    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
 
     // controls
     const netImp = document.getElementById('netImp');
     const netDev = document.getElementById('netDev');
     const kNeighborsInput = document.getElementById('kNeighbors');
+
+    const showImpDots = document.getElementById('showImpDots');
+    const showDevDots = document.getElementById('showDevDots');
+    const showOthDots = document.getElementById('showOthDots');
 
     // coord stores
     let implementedCoords = [];
@@ -256,11 +292,38 @@
         return null;
       }
 
-      // build centroids
+      // Robust centroid inside polygon
+      function centroidInside(feature){
+        try {
+          if (feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')){
+            let coords = null;
+            if (feature.geometry.type === 'Polygon'){
+              coords = feature.geometry.coordinates;
+            } else {
+              // pick largest polygon by area
+              let best = null, bestA = -1;
+              for (const poly of feature.geometry.coordinates){
+                const a = turf.area(turf.polygon(poly));
+                if (a>bestA){ bestA=a; best=poly; }
+              }
+              coords = best;
+            }
+            const p = polylabel(coords, 1.0); // [lng,lat]
+            return L.latLng(p[1], p[0]);
+          }
+        } catch(e){}
+        try {
+          const c = turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
+          return L.latLng(c[1], c[0]);
+        } catch(e){}
+        return L.geoJSON(feature).getBounds().getCenter();
+      }
+
+      // build centroids map
       const centroids = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
-        if (nm) centroids[nm] = l.getBounds().getCenter();
+        if (nm) centroids[nm] = centroidInside(l.feature);
       });
 
       // 2) load sheet
@@ -294,10 +357,7 @@
           const isImplemented = /implement/i.test(r.status);
           const isDev = /develop|discussion/i.test(r.status);
 
-          if (isImplemented) implementedCoords.push([pt.lat, pt.lng]);
-          else if (isDev) devCoords.push([pt.lat, pt.lng]);
-
-          L.circleMarker([pt.lat, pt.lng], {
+          const marker = L.circleMarker([pt.lat, pt.lng], {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
           })
           .bindTooltip(`${titleCase(key)}: ${r.status}`, {direction:'top', offset:[0,-6]})
@@ -308,21 +368,30 @@
               ${r.status ? `<div><strong>Status:</strong> ${escapeHtml(r.status)}</div>` : ""}
               ${r.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(r.notes)}</div>` : ""}
             </div>
-          `).addTo(dotsLayer);
+          `);
 
-          const s = r.status.toLowerCase();
-          if (s.includes("implement")) counts.imp++;
-          else if (s.includes("develop") || s.includes("discussion")) counts.dev++;
-          else counts.other++;
+          if (isImplemented){
+            marker.addTo(dotsImpLayer);
+            implementedCoords.push([pt.lat, pt.lng]);
+            counts.imp++;
+          } else if (isDev){
+            marker.addTo(dotsDevLayer);
+            devCoords.push([pt.lat, pt.lng]);
+            counts.dev++;
+          } else {
+            marker.addTo(dotsOthLayer);
+            counts.other++;
+          }
         }
       }
 
-      // 4) update counters + pie chart
+      // 4) update counters + pie chart (with counts & % labels)
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
       document.getElementById('c-oth').textContent = counts.other;
 
       const total = Math.max(1, counts.imp + counts.dev + counts.other);
+      Chart.register(ChartDataLabels);
       new Chart(document.getElementById('statusPie'), {
         type: 'pie',
         data: {
@@ -337,6 +406,13 @@
           responsive: true,
           plugins: {
             legend: { position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            datalabels: {
+              color:'#0b0f12', font:{weight:'700', size:11},
+              formatter: (value, ctx) => {
+                const pct = Math.round((value/total)*100);
+                return `${value} (${pct}%)`;
+              }
+            },
             tooltip: {
               callbacks: {
                 label(ctx){
@@ -349,28 +425,30 @@
         }
       });
 
-      // Hook up toggles
+      // Dots show/hide
+      function refreshDots(){
+        const sI = showImpDots.checked, sD = showDevDots.checked, sO = showOthDots.checked;
+        if (sI && !map.hasLayer(dotsImpLayer)) dotsImpLayer.addTo(map); else if (!sI && map.hasLayer(dotsImpLayer)) map.removeLayer(dotsImpLayer);
+        if (sD && !map.hasLayer(dotsDevLayer)) dotsDevLayer.addTo(map); else if (!sD && map.hasLayer(dotsDevLayer)) map.removeLayer(dotsDevLayer);
+        if (sO && !map.hasLayer(dotsOthLayer)) dotsOthLayer.addTo(map); else if (!sO && map.hasLayer(dotsOthLayer)) map.removeLayer(dotsOthLayer);
+      }
+      showImpDots.addEventListener('change', refreshDots);
+      showDevDots.addEventListener('change', refreshDots);
+      showOthDots.addEventListener('change', refreshDots);
+      refreshDots(); // initial
+
+      // Networks (default ON; neighbors default 4)
       function rebuildNetworks(){
-        const k = Math.max(1, Math.min(3, parseInt(kNeighborsInput.value||'1',10)));
+        const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
         linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
 
         if (netImp.checked) buildLocalNetwork(implementedCoords, getCSS('--red'), linesImpLayer, k, 0.30, 1.2);
         if (netDev.checked) buildLocalNetwork(devCoords, getCSS('--orange'), linesDevLayer, k, 0.25, 1.1);
-
-        if (netImp.checked && !map.hasLayer(linesImpLayer)) linesImpLayer.addTo(map);
-        else if (!netImp.checked && map.hasLayer(linesImpLayer)) map.removeLayer(linesImpLayer);
-
-        if (netDev.checked && !map.hasLayer(linesDevLayer)) linesDevLayer.addTo(map);
-        else if (!netDev.checked && map.hasLayer(linesDevLayer)) map.removeLayer(linesDevLayer);
       }
-
       netImp.addEventListener('change', rebuildNetworks);
       netDev.addEventListener('change', rebuildNetworks);
       kNeighborsInput.addEventListener('change', rebuildNetworks);
-
-      // start with networks off for clarity/performance
-      netImp.checked = false;
-      netDev.checked = false;
+      rebuildNetworks(); // initial
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
@@ -379,20 +457,18 @@
     })();
 
     // Build local k-nearest neighbor network (deduped)
-    function buildLocalNetwork(coords, color, layer, k=1, opacity=0.3, weight=1.2){
+    function buildLocalNetwork(coords, color, layer, k=4, opacity=0.3, weight=1.2){
       const n = coords.length;
       if (n < 2) return;
       const seen = new Set();
 
       for (let i=0;i<n;i++){
-        // Build list of distances from i to all j
         const dists = [];
         for (let j=0;j<n;j++){
           if (i===j) continue;
           dists.push({ j, d: haversine(coords[i], coords[j]) });
         }
         dists.sort((a,b)=>a.d-b.d);
-
         const limit = Math.min(k, dists.length);
         for (let t=0;t<limit;t++){
           const j = dists[t].j;
