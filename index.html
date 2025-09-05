@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID Map</title>
 
-  <!-- Leaflet core -->
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -23,13 +23,13 @@
       --text:#e6f3ea;
       --muted:#8aa39a;
 
-      /* STATUS COLORS (dots + shading) */
-      --red:#ff3333;     /* Implemented */
+      /* STATUS COLORS */
+      --red:#ff3333;     /* Implemented (dots & arcs) */
       --orange:#ff9900;  /* In Discussion / implementing */
       --cyan:#35d3ff;    /* Pilot */
       --grey:#8a8a8a;    /* Abandoned */
 
-      --neutral:#4b5563; /* for untracked country shading */
+      --neutral:#4b5563; /* untracked shade */
       --neon:#00ff95;    /* title accent */
     }
     html, body { height:100%; margin:0; background:var(--bg); color:var(--text); }
@@ -61,7 +61,7 @@
     .debug{
       margin-top:10px; padding-top:8px; border-top:1px dashed #26313a;
       font-size:12px; color:#9ab3a8; max-height:120px; overflow:auto;
-      display:none; /* set to block if you want always-on */
+      display:none;
     }
 
     .leaflet-popup-content-wrapper{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
@@ -104,7 +104,7 @@
     /* ===== CONFIG ===== */
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Map sheet values (case-insensitive) to canonical statuses:
+    // Status normalization
     const STATUS_ALIASES = {
       "implemented":"Implemented",
       "in development":"In Discussion",
@@ -114,22 +114,23 @@
       "abandoned":"Abandoned"
     };
 
-    // Country aliases & normalizer (applied to BOTH sheet + world polygons)
+    // Country aliases (applied to BOTH sheet + polygons)
     const COUNTRY_ALIASES = new Map([
-      ["usa","united states"], ["united states of america","united states"], ["u.s.a.","united states"],
+      ["u.s.a.","united states"], ["usa","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
-      ["wales","united kingdom"], ["northern ireland","united kingdom"], ["great britain","united kingdom"], ["u.k.","united kingdom"],
+      ["wales","united kingdom"], ["northern ireland","united kingdom"], ["great britain","united kingdom"],
       ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
-      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"], ["south korea (republic of)","south korea"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
-      ["czech republic","czechia"], ["swaziland","eswatini"],
-      ["macedonia","north macedonia"], ["lao pdr","laos"], ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
+      ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
+      ["macedonia","north macedonia"], ["lao pdr","laos"],
+      ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
       ["congo, democratic republic of the","democratic republic of the congo"],
-      ["russian federation","russia"]
+      ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
+      ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"]
     ]);
 
-    // Colors per status
     const STATUS_COLOR = {
       "Implemented":   getCSS("--red"),
       "In Discussion": getCSS("--orange"),
@@ -149,19 +150,17 @@
     const arcLayer = L.layerGroup().addTo(map);
 
     (async function init(){
-      const rows = await loadSheet(CSV_URL);       // normalized rows
-      const data = aggregateByCountry(rows);       // Map keyed by normalized country
+      const rows = await loadSheet(CSV_URL);             // normalized rows
+      const data = aggregateByCountry(rows);             // Map(country -> record)
       updateCounts(data);
 
       const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
 
-      // Build centroid lookup + a list of keys for fuzzy matching
+      // Build centroid lookup
       const centroid = {};
-      const allKeys = [];
       L.geoJSON(world).eachLayer(l=>{
         const nm = normalizeName(l.feature.properties.ADMIN);
         centroid[nm] = l.getBounds().getCenter();
-        allKeys.push(nm);
       });
 
       // SHADING
@@ -187,16 +186,18 @@
 
       data.forEach(rec=>{
         let key = rec.country;
-        if (!centroid[key]) key = bestKey(key, centroid);
+        if (!hasKey(centroid, key)) key = bestKey(key, centroid);
         const c = centroid[key];
         if (!c){ unmatched.add(rec.countryRaw || rec.country); return; }
 
         const color = STATUS_COLOR[rec.status] || "#bbb";
-        const m = L.circleMarker(c, {
+        L.circleMarker(c, {
           radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity: .95
-        }).bindTooltip(`${rec.country}: ${rec.status}`, {direction:'top', offset:[0,-6]})
-          .bindPopup(popupHtml(rec));
-        m.addTo(dotLayer);
+        })
+        .bindTooltip(`${rec.country}: ${rec.status}`, {direction:'top', offset:[0,-6]})
+        .bindPopup(popupHtml(rec))
+        .addTo(dotLayer);
+
         if (rec.status === "Implemented") implementedPts.push(c);
       });
 
@@ -213,7 +214,7 @@
         e.target.checked ? map.addLayer(arcLayer) : map.removeLayer(arcLayer);
       });
 
-      // Debug list (to help fix any remaining names)
+      // Debug names that still didn’t match
       if (unmatched.size){
         const dbg = document.getElementById('debug');
         dbg.style.display = 'block';
@@ -228,13 +229,12 @@
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
 
-      // Map YOUR headers -> canonical fields; normalize names + status
       return parsed.data.map(row => {
         const countryRaw = String(row["Countries"]||"").trim();
-        const country = normalizeName(countryRaw);  // apply alias
+        const country = normalizeName(countryRaw);
         return {
           countryRaw,
-          country,                                   // normalized + aliased
+          country,
           program: String(row["Title"]||"").trim(),
           status:  canonicalStatus(row["Status"]),
           notes:   String(row["Description"]||"").trim()
@@ -242,27 +242,18 @@
       }).filter(r => r.country);
     }
 
-    // Collapse multiple rows per country -> keep highest-priority status + merge programs/notes
     function aggregateByCountry(rows){
       const prio = { "Implemented":3, "In Discussion":2, "Pilot":1, "Abandoned":0 };
-      const map = new Map();
+      const m = new Map();
       for (const r of rows){
-        const cur = map.get(r.country);
-        if (!cur){
-          map.set(r.country, { country:r.country, countryRaw:r.countryRaw, status:r.status, programs:[], notes:[] });
-        }
-        const obj = map.get(r.country);
-        if (prio[r.status] > (prio[obj.status] ?? -1)) obj.status = r.status;
-        if (r.program) obj.programs.push(r.program);
-        if (r.notes) obj.notes.push(r.notes);
+        if (!m.has(r.country)) m.set(r.country, { country:r.country, countryRaw:r.countryRaw, status:r.status, programs:[], notes:[] });
+        const cur = m.get(r.country);
+        if (prio[r.status] > (prio[cur.status] ?? -1)) cur.status = r.status;
+        if (r.program) cur.programs.push(r.program);
+        if (r.notes)   cur.notes.push(r.notes);
       }
-      // flatten
-      map.forEach(v => {
-        v.program = v.programs.join("; ");
-        v.notes   = v.notes.join(" • ");
-        delete v.programs;
-      });
-      return map;
+      m.forEach(v => { v.program = v.programs.join("; "); v.notes = v.notes.join(" • "); delete v.programs; });
+      return m;
     }
 
     function canonicalStatus(s){
@@ -270,35 +261,49 @@
       return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
     }
 
-    // Normalize country names (strip punctuation/accents, alias, Title Case)
     function normalizeName(s){
       const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9 ]+/gi,' ')
-        .replace(/\s+/g,' ')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')  // strip accents
+        .replace(/[^a-z0-9 ]+/gi,' ')                     // punctuation -> space
+        .replace(/\s+/g,' ')                               // collapse spaces
         .toLowerCase().trim();
       const aliased = COUNTRY_ALIASES.get(k) || k;
       return aliased.split(' ').map(w => w ? (w[0].toUpperCase()+w.slice(1)) : "").join(' ');
     }
 
-    // If exact key is missing, try to find a reasonable alternative
+    /* ===== Matching helpers (fixed for Map vs Object) ===== */
+    function hasKey(container, key){
+      return container instanceof Map ? container.has(key) : Object.prototype.hasOwnProperty.call(container, key);
+    }
+
     function bestKey(name, container){
-      // Direct
-      if (container[name]) return name;
-      // Try simplified (drop stopwords like "of", "the", "and", "republic", "kingdom", "federation")
-      const simplify = t => t.toLowerCase().replace(/\b(of|the|and|republic|kingdom|federation|state|states|arab|democratic|people s|plurinational|bolivarian)\b/g,'').replace(/\s+/g,' ').trim();
+      // build candidate list
+      const keys = container instanceof Map ? Array.from(container.keys())
+                  : Array.isArray(container) ? container
+                  : Object.keys(container);
       const sName = simplify(name);
-      const keys = Array.isArray(container) ? container : Object.keys(container);
-      // substring contains one another
+
+      // exact simplified
       let found = keys.find(k => simplify(k) === sName);
       if (found) return found;
+
+      // substring contains
       found = keys.find(k => simplify(k).includes(sName) || sName.includes(simplify(k)));
       return found || name;
     }
 
-    function updateCounts(dataMap){
+    function simplify(t){
+      return String(t).toLowerCase()
+        .replace(/\b(of|the|and|republic|kingdom|federation|state|states|arab|democratic|people s|plurinational|bolivarian)\b/g,'')
+        .replace(/[^a-z0-9 ]+/g,' ')
+        .replace(/\s+/g,' ')
+        .trim();
+    }
+
+    /* ===== UI helpers ===== */
+    function updateCounts(mapData){
       const counts = { "Implemented":0, "In Discussion":0, "Pilot":0, "Abandoned":0 };
-      dataMap.forEach(d => { if (counts[d.status] != null) counts[d.status]++; });
+      mapData.forEach(d => { if (counts[d.status] != null) counts[d.status]++; });
       document.getElementById('c-imp').textContent   = counts["Implemented"];
       document.getElementById('c-disc').textContent  = counts["In Discussion"];
       document.getElementById('c-pilot').textContent = counts["Pilot"];
@@ -309,15 +314,14 @@
       return `
         <div style="min-width:240px">
           <h3 style="margin:0 0 6px 0; font-size:16px;">
-            ${escapeHtml(d.country)} 
+            ${escapeHtml(d.country)}
             <span class="pill" style="margin-left:6px; border:1px solid #1b3a2e; padding:2px 8px;">
               ${escapeHtml(d.status)}
             </span>
           </h3>
           ${d.program ? `<div><strong>Program(s):</strong> ${escapeHtml(d.program)}</div>` : ""}
           ${d.notes   ? `<div style="color:${getCSS('--muted')}; margin-top:6px;">${escapeHtml(d.notes)}</div>` : ""}
-        </div>
-      `;
+        </div>`;
     }
 
     /* ===== Arcs ===== */
@@ -344,7 +348,7 @@
       });
     }
 
-    /* ===== Utilities ===== */
+    /* ===== Utils ===== */
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
       const n = parseInt(hex.replace('#',''),16);
