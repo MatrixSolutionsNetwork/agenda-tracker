@@ -3,120 +3,64 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Digital ID Map</title>
+  <title>Matrix Solutions Network — Digital ID Dots</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-  <!-- Curved arcs -->
-  <script src="https://unpkg.com/leaflet-arc@1.0.0/dist/leaflet-arc.min.js"></script>
 
   <!-- CSV parsing -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
     :root{
-      --bg:#0b0f12;
-      --panel:#0f1418;
-      --panelEdge:#151b21;
-      --text:#e6f3ea;
-      --muted:#8aa39a;
-
-      /* STATUS COLORS */
-      --red:#ff3333;     /* Implemented (dots & arcs) */
-      --orange:#ff9900;  /* In Discussion / implementing */
-      --cyan:#35d3ff;    /* Pilot */
-      --grey:#8a8a8a;    /* Abandoned */
-
-      --neutral:#4b5563; /* untracked shade */
-      --neon:#00ff95;    /* title accent */
+      --bg:#0b0f12; --text:#e6f3ea; --muted:#8aa39a;
+      --panel:#0f1418; --panelEdge:#151b21;
+      --orange:#ff9900; /* In development / discussion */
+      --red:#ff3333;    /* Implemented */
+      --other:#5ec1ff;  /* anything else */
     }
-    html, body { height:100%; margin:0; background:var(--bg); color:var(--text); }
-    #map { height:100%; width:100%; filter:saturate(.95) contrast(1.05); }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
+    #map{height:100%;width:100%}
 
-    .titlebar{
-      position:absolute; top:16px; left:50%; transform:translateX(-50%);
-      background:rgba(10,16,13,.85); color:var(--neon);
-      padding:6px 12px; border-radius:10px; border:1px solid #163a2c;
-      font:600 14px ui-sans-serif,system-ui; z-index:900; letter-spacing:.3px;
-      box-shadow:0 6px 18px rgba(0,0,0,.45);
-    }
     .panel{
-      position:absolute; top:16px; left:16px; z-index:1000;
-      background:linear-gradient(180deg, rgba(21,27,33,.92), rgba(15,20,24,.94));
-      border:1px solid var(--panelEdge); border-radius:14px;
+      position:absolute; top:12px; left:12px; z-index:1000;
+      background:linear-gradient(180deg,rgba(21,27,33,.92),rgba(15,20,24,.94));
+      border:1px solid var(--panelEdge); border-radius:12px;
+      padding:12px 14px; width:300px; font:14px/1.4 ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
-      padding:14px 16px; width:300px;
-      font:14px/1.4 ui-sans-serif,system-ui;
     }
-    .panel h2{margin:0 0 10px 0; font-size:15px;}
-    .legend .item{display:flex; align-items:center; gap:10px; margin:6px 0;}
-    .swatch{width:12px; height:12px; border-radius:50%;}
-    .count{margin-left:auto; font-weight:700; color:var(--muted);}
-    .hr{border:none;border-top:1px solid #182126;margin:10px 0;}
-    .hint{color:var(--muted); font-size:12px;}
-    .toggle-row{display:flex; align-items:center; gap:8px; margin:6px 0;}
-
-    .debug{
-      margin-top:10px; padding-top:8px; border-top:1px dashed #26313a;
-      font-size:12px; color:#9ab3a8; max-height:120px; overflow:auto;
-      display:none;
-    }
-
-    .leaflet-popup-content-wrapper{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
-    .leaflet-popup-tip{background:#0e1512; border:1px solid #1b3a2e;}
-    .leaflet-tooltip{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
+    .panel h2{margin:0 0 8px 0; font-size:15px;}
+    .row{display:flex;align-items:center;gap:8px;margin:4px 0;}
+    .sw{width:12px;height:12px;border-radius:50%}
+    .count{margin-left:auto;color:var(--muted);font-weight:700}
+    .hr{border:none;border-top:1px solid #182126;margin:8px 0}
+    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+    .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
+    .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
+    .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
   </style>
 </head>
 <body>
   <div id="map"></div>
-  <div class="titlebar">Matrix Solutions Network — Digital ID Map</div>
 
   <div class="panel">
     <h2>Status Overview</h2>
-    <div class="legend">
-      <div class="item"><span class="swatch" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-      <div class="item"><span class="swatch" style="background:var(--orange)"></span> In Discussion <span class="count" id="c-disc">0</span></div>
-      <div class="item"><span class="swatch" style="background:var(--cyan)"></span> Pilot <span class="count" id="c-pilot">0</span></div>
-      <div class="item"><span class="swatch" style="background:var(--grey)"></span> Abandoned <span class="count" id="c-abnd">0</span></div>
-    </div>
-
+    <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
     <div class="hr"></div>
-    <div class="toggle-row">
-      <input type="checkbox" id="toggleShade" checked>
-      <label for="toggleShade">Country shading</label>
-    </div>
-    <div class="toggle-row">
-      <input type="checkbox" id="toggleDots" checked>
-      <label for="toggleDots">Status dots</label>
-    </div>
-    <div class="toggle-row">
-      <input type="checkbox" id="toggleArcs" checked>
-      <label for="toggleArcs">Implemented arcs</label>
-    </div>
-
-    <div id="debug" class="debug"></div>
-    <div class="hint" style="margin-top:8px;">Click a dot or country. Data loads from your Google Sheet CSV.</div>
+    <div class="debug" id="debug"></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet (CSV). Click a dot for details.</div>
   </div>
 
   <script>
-    /* ===== CONFIG ===== */
+    /* === CONFIG === */
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Status normalization
-    const STATUS_ALIASES = {
-      "implemented":"Implemented",
-      "in development":"In Discussion",
-      "in discussion":"In Discussion",
-      "implementing":"In Discussion",
-      "pilot":"Pilot",
-      "abandoned":"Abandoned"
-    };
-
-    // Country aliases (applied to sheet + polygons)
+    // Minimal alias table for common variants/abbreviations
     const COUNTRY_ALIASES = new Map([
-      ["u.s.a.","united states"], ["usa","united states"], ["united states of america","united states"],
+      ["usa","united states"], ["u.s.a.","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
       ["wales","united kingdom"], ["northern ireland","united kingdom"], ["great britain","united kingdom"],
       ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
@@ -131,242 +75,118 @@
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"]
     ]);
 
-    const STATUS_COLOR = {
-      "Implemented":   getCSS("--red"),
-      "In Discussion": getCSS("--orange"),
-      "Pilot":         getCSS("--cyan"),
-      "Abandoned":     getCSS("--grey")
-    };
-    const NEUTRAL_SHADE = getCSS("--neutral");
+    // Color rules: red for Implemented; orange for anything that looks like "in dev/discussion"; else blue.
+    function colorForStatus(s){
+      const k = String(s||"").toLowerCase();
+      if (k.includes("implement")) return getCSS("--red");
+      if (k.includes("in development") || k.includes("in discussion") || k.includes("discussion") || k.includes("develop")) return getCSS("--orange");
+      return getCSS("--other");
+    }
 
-    /* ===== MAP ===== */
+    /* === MAP === */
     const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
-
-    let shadeLayer = null;
-    const dotLayer = L.layerGroup().addTo(map);
-    const arcLayer = L.layerGroup().addTo(map);
+    const dots = L.layerGroup().addTo(map);
 
     (async function init(){
-      const rows = await loadSheet(CSV_URL);             // normalized rows
-      const data = aggregateByCountry(rows);             // Map(country -> record)
-      updateCounts(data);
-
+      // 1) Load polygons once to get country centroids
       const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
-
-      // Build centroid lookup (object -> simpler)
-      const centroid = {};
-      const polygonKeys = [];
+      const centroids = {};
       L.geoJSON(world).eachLayer(l=>{
-        const key = normalizeName(l.feature.properties.ADMIN);
-        centroid[key] = l.getBounds().getCenter();
-        polygonKeys.push(key);
+        const key = normalizeCountry(l.feature.properties.ADMIN);
+        centroids[key] = l.getBounds().getCenter();
       });
 
-      // SHADING
-      shadeLayer = L.geoJSON(world, {
-        style: f => {
-          const key = normalizeName(f.properties.ADMIN);
-          const rec = data.get(key) || data.get(bestKey(key, data));
-          if (!rec) return { color: NEUTRAL_SHADE, weight: 0.5, opacity:.35, fillColor: NEUTRAL_SHADE, fillOpacity:.06 };
-          const col = STATUS_COLOR[rec.status] || NEUTRAL_SHADE;
-          return { color: col, weight: 0.8, opacity:.5, fillColor: col, fillOpacity:.18 };
-        },
-        onEachFeature: (f, layer) => {
-          const key = normalizeName(f.properties.ADMIN);
-          const rec = data.get(key) || data.get(bestKey(key, data));
-          if (rec) layer.bindPopup(popupHtml(rec));
-          else layer.bindPopup(`<b>${key}</b><div class="hint">No record in dataset.</div>`);
-        }
-      }).addTo(map);
+      // 2) Load your sheet
+      const rows = await loadSheet(CSV_URL);
 
-      // DOTS
-      const implementedPts = [];
+      // 3) Expand multi-country cells into individual records and draw dots
+      const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
 
-      data.forEach(rec=>{
-        let key = rec.country;
-        if (!(key in centroid)) key = bestKey(key, centroid);
-        const c = key ? centroid[key] : null;
-        if (!c){ unmatched.add(rec.countryRaw || rec.country); return; }
+      for (const r of rows){
+        const countries = splitCountries(r.countryRaw);
+        for (const cRaw of countries){
+          const c = normalizeCountry(cRaw);
+          const key = centroids[c] ? c : null;
+          if (!key){ unmatched.add(cRaw); continue; }
 
-        const color = STATUS_COLOR[rec.status] || "#bbb";
-        L.circleMarker(c, {
-          radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity: .95
-        })
-        .bindTooltip(`${rec.country}: ${rec.status}`, {direction:'top', offset:[0,-6]})
-        .bindPopup(popupHtml(rec))
-        .addTo(dotLayer);
+          const color = colorForStatus(r.status);
+          L.circleMarker(centroids[key], {
+            radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
+          })
+          .bindTooltip(`${titleCase(c)}: ${r.status}`, {direction:'top', offset:[0,-6]})
+          .bindPopup(popupHtml(titleCase(c), r))
+          .addTo(dots);
 
-        if (rec.status === "Implemented") implementedPts.push(c);
-      });
+          // counts
+          const s = r.status.toLowerCase();
+          if (s.includes("implement")) counts.imp++;
+          else if (s.includes("develop") || s.includes("discussion")) counts.dev++;
+          else counts.other++;
+        }
+      }
 
-      drawImplementedArcs(implementedPts);
+      document.getElementById('c-imp').textContent = counts.imp;
+      document.getElementById('c-dev').textContent = counts.dev;
+      document.getElementById('c-oth').textContent = counts.other;
 
-      // TOGGLES
-      document.getElementById('toggleShade').addEventListener('change', e=>{
-        e.target.checked ? map.addLayer(shadeLayer) : map.removeLayer(shadeLayer);
-      });
-      document.getElementById('toggleDots').addEventListener('change', e=>{
-        e.target.checked ? map.addLayer(dotLayer) : map.removeLayer(dotLayer);
-      });
-      document.getElementById('toggleArcs').addEventListener('change', e=>{
-        e.target.checked ? map.addLayer(arcLayer) : map.removeLayer(arcLayer);
-      });
-
-      // Debug names that still didn’t match
+      // 4) Show unmatched in panel (so you can add aliases if needed)
       if (unmatched.size){
         const dbg = document.getElementById('debug');
         dbg.style.display = 'block';
-        dbg.innerHTML = `<b>Unmatched from sheet (check aliases):</b><br>${[...unmatched].sort().join(', ')}`;
-        console.warn("Unmatched country names from sheet:", [...unmatched].sort());
+        dbg.innerHTML = `<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`;
+        console.warn("Unmatched:", [...unmatched].sort());
       }
     })();
 
-    /* ===== Data helpers ===== */
+    /* === Helpers === */
     async function loadSheet(url){
       const res = await fetch(url, { cache:'no-store' });
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-
-      return parsed.data.map(row => {
-        const countryRaw = String(row["Countries"]||"").trim();
-        const country = normalizeName(countryRaw);
-        return {
-          countryRaw,
-          country,
-          program: String(row["Title"]||"").trim(),
-          status:  canonicalStatus(row["Status"]),
-          notes:   String(row["Description"]||"").trim()
-        };
-      }).filter(r => r.country);
+      // Expecting headers: Countries, Title, Status, Description
+      return parsed.data.map(row => ({
+        countryRaw: String(row["Countries"]||"").trim(),
+        title:      String(row["Title"]||"").trim(),
+        status:     String(row["Status"]||"").trim(),
+        notes:      String(row["Description"]||"").trim()
+      })).filter(r => r.countryRaw);
     }
 
-    function aggregateByCountry(rows){
-      const prio = { "Implemented":3, "In Discussion":2, "Pilot":1, "Abandoned":0 };
-      const m = new Map();
-      for (const r of rows){
-        if (!m.has(r.country)) m.set(r.country, { country:r.country, countryRaw:r.countryRaw, status:r.status, programs:[], notes:[] });
-        const cur = m.get(r.country);
-        if (prio[r.status] > (prio[cur.status] ?? -1)) cur.status = r.status;
-        if (r.program) cur.programs.push(r.program);
-        if (r.notes)   cur.notes.push(r.notes);
-      }
-      m.forEach(v => { v.program = v.programs.join("; "); v.notes = v.notes.join(" • "); delete v.programs; });
-      return m;
+    function splitCountries(cell){
+      // Split on comma/semicolon/slash/&/‘and’; keep tokens clean
+      return String(cell)
+        .replace(/・/g, ',') // just in case
+        .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
+        .map(s=>s.trim())
+        .filter(Boolean);
     }
 
-    function canonicalStatus(s){
-      const k = String(s||"").toLowerCase().trim();
-      return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
-    }
-
-    // Normalize: remove accents/punct, alias, Title Case
-    function normalizeName(s){
+    function normalizeCountry(s){
       const k = String(s||"")
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
         .replace(/[^a-z0-9 ]+/gi,' ')
         .replace(/\s+/g,' ')
         .toLowerCase().trim();
       const aliased = COUNTRY_ALIASES.get(k) || k;
-      return aliased.split(' ').map(w => w ? (w[0].toUpperCase()+w.slice(1)) : "").join(' ');
+      return aliased;
     }
 
-    /* ===== Robust matching =====
-       - exact key if present
-       - else Jaccard token similarity on words (stopwords removed)
-       - require a minimum score; otherwise return null (no match)
-    */
-    function bestKey(name, container){
-      const keys = Array.isArray(container) ? container
-                : (container instanceof Map ? Array.from(container.keys())
-                  : Object.keys(container));
-
-      const tName = tokens(name);
-      if (tName.length === 0) return null;
-
-      // exact token string
-      const nameSig = tName.join(' ');
-      let found = keys.find(k => tokens(k).join(' ') === nameSig);
-      if (found) return found;
-
-      // score by Jaccard
-      let best = null, bestScore = 0;
-      for (const k of keys){
-        const score = jaccard(tName, tokens(k));
-        if (score > bestScore){ bestScore = score; best = k; }
-      }
-      // require at least 0.5 overlap (tuneable)
-      return bestScore >= 0.5 ? best : null;
-    }
-
-    function tokens(s){
-      const STOP = new Set(["of","the","and","republic","kingdom","federation","state","states","arab","democratic","people","plurinational","bolivarian","united"]);
-      return String(s).toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9 ]+/g,' ')
-        .split(/\s+/).filter(w => w && !STOP.has(w));
-    }
-
-    function jaccard(a, b){
-      const A = new Set(a), B = new Set(b);
-      let inter = 0;
-      for (const x of A) if (B.has(x)) inter++;
-      const union = new Set([...A, ...B]).size;
-      return union ? inter / union : 0;
-    }
-
-    /* ===== UI helpers ===== */
-    function updateCounts(mapData){
-      const counts = { "Implemented":0, "In Discussion":0, "Pilot":0, "Abandoned":0 };
-      mapData.forEach(d => { if (counts[d.status] != null) counts[d.status]++; });
-      document.getElementById('c-imp').textContent   = counts["Implemented"];
-      document.getElementById('c-disc').textContent  = counts["In Discussion"];
-      document.getElementById('c-pilot').textContent = counts["Pilot"];
-      document.getElementById('c-abnd').textContent  = counts["Abandoned"];
-    }
-
-    function popupHtml(d){
+    function popupHtml(countryName, rec){
       return `
         <div style="min-width:240px">
-          <h3 style="margin:0 0 6px 0; font-size:16px;">
-            ${escapeHtml(d.country)}
-            <span class="pill" style="margin-left:6px; border:1px solid #1b3a2e; padding:2px 8px;">
-              ${escapeHtml(d.status)}
-            </span>
-          </h3>
-          ${d.program ? `<div><strong>Program(s):</strong> ${escapeHtml(d.program)}</div>` : ""}
-          ${d.notes   ? `<div style="color:${getCSS('--muted')}; margin-top:6px;">${escapeHtml(d.notes)}</div>` : ""}
-        </div>`;
+          <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(countryName)}</h3>
+          ${rec.title ? `<div><strong>Program:</strong> ${escapeHtml(rec.title)}</div>` : ""}
+          ${rec.status ? `<div><strong>Status:</strong> ${escapeHtml(rec.status)}</div>` : ""}
+          ${rec.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(rec.notes)}</div>` : ""}
+        </div>
+      `;
     }
 
-    /* ===== Arcs ===== */
-    function drawImplementedArcs(points){
-      arcLayer.clearLayers();
-      if (!points.length) return;
-
-      // Hub = centroid of all implemented points
-      const hub = points.reduce((acc,p)=>({lat:acc.lat+p.lat,lng:acc.lng+p.lng}),{lat:0,lng:0});
-      hub.lat /= points.length; hub.lng /= points.length;
-
-      points.forEach(p=>{
-        // outer glow
-        L.Polyline.Arc([p.lat,p.lng],[hub.lat,hub.lng], {
-          color: hexWithAlpha(getCSS("--red"), 0.25),
-          weight: 4.5, opacity: 0.25, vertices: 200
-        }).addTo(arcLayer);
-
-        // bright dashed core
-        L.Polyline.Arc([p.lat,p.lng],[hub.lat,hub.lng], {
-          color: getCSS("--red"),
-          weight: 1.4, opacity: 0.85, dashArray: "6,6", vertices: 200
-        }).addTo(arcLayer);
-      });
-    }
-
-    /* ===== Utils ===== */
+    function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
       const n = parseInt(hex.replace('#',''),16);
@@ -374,16 +194,7 @@
       r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
       return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
     }
-    function hexWithAlpha(hex, alpha){
-      const c = hex.replace('#','');
-      const r = parseInt(c.substring(0,2),16);
-      const g = parseInt(c.substring(2,4),16);
-      const b = parseInt(c.substring(4,6),16);
-      return `rgba(${r},${g},${b},${alpha})`;
-    }
-    function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s]));
-    }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
   </script>
 </body>
 </html>
