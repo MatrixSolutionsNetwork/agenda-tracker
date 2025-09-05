@@ -23,7 +23,7 @@
       --text:#e6f3ea;
       --muted:#8aa39a;
 
-      /* STATUS COLORS (dots) */
+      /* STATUS COLORS (dots + shading) */
       --red:#ff3333;     /* Implemented */
       --orange:#ff9900;  /* In Discussion (implementing) */
       --cyan:#35d3ff;    /* Pilot */
@@ -94,7 +94,7 @@
   </div>
 
   <script>
-    // ===== CONFIG =====
+    /* ===== CONFIG ===== */
     const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
     // Map sheet values (case-insensitive) to canonical statuses:
@@ -107,7 +107,22 @@
       "abandoned":"Abandoned"
     };
 
-    // Colors per status (dots + shading)
+    // Country name aliases (applied to BOTH sheet + world polygons)
+    const COUNTRY_ALIASES = new Map([
+      ["usa","united states"], ["united states of america","united states"], ["u.s.a.","united states"],
+      ["uk","united kingdom"], ["england","united kingdom"], ["great britain","united kingdom"],
+      ["uae","united arab emirates"],
+      ["türkiye","turkey"], ["turkiye","turkey"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"],
+      ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
+      ["czech republic","czechia"],
+      ["russian federation","russia"],
+      ["myanmar (burma)","myanmar"],
+      ["macedonia","north macedonia"],
+      ["u.k.","united kingdom"]
+    ]);
+
+    // Colors per status
     const STATUS_COLOR = {
       "Implemented":   getCSS("--red"),
       "In Discussion": getCSS("--orange"),
@@ -116,69 +131,67 @@
     };
     const NEUTRAL_SHADE = getCSS("--neutral");
 
-    // ===== MAP =====
+    /* ===== MAP ===== */
     const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // Layers
     let shadeLayer = null;
     const dotLayer = L.layerGroup().addTo(map);
     const arcLayer = L.layerGroup().addTo(map);
 
-    // Load CSV -> render
     (async function init(){
-      const data = await loadSheet(CSV_URL);
+      const rows = await loadSheet(CSV_URL);                // raw rows, normalized names + statuses
+      const data = aggregateByCountry(rows);                // one record per country (highest status)
       updateCounts(data);
+
       const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
 
-      // Build centroid + polygon lookups
-      const nameAlias = buildNameAlias();
+      // Build centroid lookup
       const centroid = {};
-      const polyByName = {};
+      const countriesSet = new Set();
       L.geoJSON(world).eachLayer(l=>{
-        const nm = normalizeName(l.feature.properties.ADMIN, nameAlias);
+        const nm = normalizeName(l.feature.properties.ADMIN);
         const b = l.getBounds();
         centroid[nm] = b.getCenter();
-        polyByName[nm] = l; // for shading
+        countriesSet.add(nm);
       });
 
-      // Draw shading
+      // SHADING
       shadeLayer = L.geoJSON(world, {
         style: f => {
-          const nm = normalizeName(f.properties.ADMIN, nameAlias);
-          const rec = data.find(d => d.country === nm);
+          const nm = normalizeName(f.properties.ADMIN);
+          const rec = data.get(nm);
           if (!rec) return { color: NEUTRAL_SHADE, weight: 0.5, opacity:.35, fillColor: NEUTRAL_SHADE, fillOpacity:.06 };
           const col = STATUS_COLOR[rec.status] || NEUTRAL_SHADE;
           return { color: col, weight: 0.8, opacity:.5, fillColor: col, fillOpacity:.18 };
         },
         onEachFeature: (f, layer) => {
-          const nm = normalizeName(f.properties.ADMIN, nameAlias);
-          const rec = data.find(d => d.country === nm);
+          const nm = normalizeName(f.properties.ADMIN);
+          const rec = data.get(nm);
           if (rec) layer.bindPopup(popupHtml(rec));
           else layer.bindPopup(`<b>${nm}</b><div class="hint">No record in dataset.</div>`);
         }
       }).addTo(map);
 
-      // Draw dots
+      // DOTS
       const implementedPts = [];
-      data.forEach(d=>{
-        const c = centroid[d.country];
+      data.forEach(rec=>{
+        const c = centroid[rec.country];
         if (!c) return;
-        const color = STATUS_COLOR[d.status] || "#bbb";
+        const color = STATUS_COLOR[rec.status] || "#bbb";
         const m = L.circleMarker(c, {
           radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity: .95
-        }).bindTooltip(`${d.country}: ${d.status}`, {direction:'top', offset:[0,-6]})
-          .bindPopup(popupHtml(d));
+        }).bindTooltip(`${rec.country}: ${rec.status}`, {direction:'top', offset:[0,-6]})
+          .bindPopup(popupHtml(rec));
         m.addTo(dotLayer);
-        if (d.status === "Implemented") implementedPts.push(c);
+        if (rec.status === "Implemented") implementedPts.push(c);
       });
 
-      // Draw arcs (implemented -> hub)
       drawImplementedArcs(implementedPts);
 
-      // Toggles
+      // TOGGLES
       document.getElementById('toggleShade').addEventListener('change', e=>{
         e.target.checked ? map.addLayer(shadeLayer) : map.removeLayer(shadeLayer);
       });
@@ -188,20 +201,54 @@
       document.getElementById('toggleArcs').addEventListener('change', e=>{
         e.target.checked ? map.addLayer(arcLayer) : map.removeLayer(arcLayer);
       });
+
+      // Console report for any names that didn’t match (helps debugging)
+      const unmatched = [];
+      rows.forEach(r => { if (!centroid[r.country]) unmatched.push(r.countryRaw); });
+      if (unmatched.length) console.warn("Unmatched country names from sheet (check aliases):", Array.from(new Set(unmatched)).sort());
     })();
 
-    // ===== Helpers =====
+    /* ===== Data helpers ===== */
     async function loadSheet(url){
       const res = await fetch(url, { cache:'no-store' });
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-      // Map YOUR headers -> canonical fields
-      return parsed.data.map(row => ({
-        country: normalizeName(String(row["Countries"]||"")),
-        program: String(row["Title"]||"").trim(),
-        status:  canonicalStatus(row["Status"]),
-        notes:   String(row["Description"]||"").trim()
-      })).filter(r => r.country);
+
+      // Map YOUR headers -> canonical fields; normalize names + status
+      return parsed.data.map(row => {
+        const countryRaw = String(row["Countries"]||"").trim();
+        const country = normalizeName(countryRaw);  // apply alias
+        return {
+          countryRaw,
+          country,                                   // normalized + aliased
+          program: String(row["Title"]||"").trim(),
+          status:  canonicalStatus(row["Status"]),
+          notes:   String(row["Description"]||"").trim()
+        };
+      }).filter(r => r.country);
+    }
+
+    // Collapse multiple rows per country -> keep highest-priority status + merge programs/notes
+    function aggregateByCountry(rows){
+      const prio = { "Implemented":3, "In Discussion":2, "Pilot":1, "Abandoned":0 };
+      const map = new Map();
+      for (const r of rows){
+        const cur = map.get(r.country);
+        if (!cur){
+          map.set(r.country, { country:r.country, status:r.status, programs:[], notes:[] });
+        }
+        const obj = map.get(r.country);
+        if (prio[r.status] > (prio[obj.status] ?? -1)) obj.status = r.status;
+        if (r.program) obj.programs.push(r.program);
+        if (r.notes) obj.notes.push(r.notes);
+      }
+      // flatten
+      map.forEach(v => {
+        v.program = v.programs.join("; ");
+        v.notes   = v.notes.join(" • ");
+        delete v.programs; delete v.notesRaw;
+      });
+      return map;
     }
 
     function canonicalStatus(s){
@@ -209,56 +256,42 @@
       return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
     }
 
-    function buildNameAlias(){
-      // alias table for common variations
-      const m = new Map([
-        ["united states of america","united states"],
-        ["usa","united states"],
-        ["republic of korea","south korea"],
-        ["korea (republic of)","south korea"],
-        ["korea, south","south korea"],
-        ["uae","united arab emirates"],
-        ["türkiye","turkey"],
-        ["russian federation","russia"]
-      ]);
-      return m;
-    }
-
-    function normalizeName(s, aliasMap){
+    function normalizeName(s){
       const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9 ]+/gi,' ')
-        .replace(/\s+/g,' ')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // strip accents
+        .replace(/[^a-z0-9 ]+/gi,' ')                    // punctuation to space
+        .replace(/\s+/g,' ')                             // collapse spaces
         .toLowerCase().trim();
-      const aliased = aliasMap ? (aliasMap.get(k) || k) : k;
-      // Title case for display & matching consistency with our dataset
+      const aliased = COUNTRY_ALIASES.get(k) || k;
+      // Title Case for display and stable keys
       return aliased.split(' ').map(w => w ? (w[0].toUpperCase()+w.slice(1)) : "").join(' ');
     }
 
-    function popupHtml(d){
-      return `
-        <div style="min-width:220px">
-          <h3 style="margin:0 0 6px 0; font-size:16px;">
-            ${escapeHtml(d.country)} 
-            <span class="pill" style="margin-left:6px; border:1px solid #1b3a2e; padding:2px 8px;">
-              ${escapeHtml(d.status)}
-            </span>
-          </h3>
-          ${d.program ? `<div><strong>Program:</strong> ${escapeHtml(d.program)}</div>` : ""}
-          ${d.notes ? `<div style="color:${getCSS('--muted')}; margin-top:6px;">${escapeHtml(d.notes)}</div>` : ""}
-        </div>
-      `;
-    }
-
-    function updateCounts(data){
+    function updateCounts(dataMap){
       const counts = { "Implemented":0, "In Discussion":0, "Pilot":0, "Abandoned":0 };
-      data.forEach(d => { if (counts[d.status] != null) counts[d.status]++; });
+      dataMap.forEach(d => { if (counts[d.status] != null) counts[d.status]++; });
       document.getElementById('c-imp').textContent   = counts["Implemented"];
       document.getElementById('c-disc').textContent  = counts["In Discussion"];
       document.getElementById('c-pilot').textContent = counts["Pilot"];
       document.getElementById('c-abnd').textContent  = counts["Abandoned"];
     }
 
+    function popupHtml(d){
+      return `
+        <div style="min-width:240px">
+          <h3 style="margin:0 0 6px 0; font-size:16px;">
+            ${escapeHtml(d.country)} 
+            <span class="pill" style="margin-left:6px; border:1px solid #1b3a2e; padding:2px 8px;">
+              ${escapeHtml(d.status)}
+            </span>
+          </h3>
+          ${d.program ? `<div><strong>Program(s):</strong> ${escapeHtml(d.program)}</div>` : ""}
+          ${d.notes   ? `<div style="color:${getCSS('--muted')}; margin-top:6px;">${escapeHtml(d.notes)}</div>` : ""}
+        </div>
+      `;
+    }
+
+    /* ===== Arcs ===== */
     function drawImplementedArcs(points){
       arcLayer.clearLayers();
       if (!points.length) return;
@@ -267,15 +300,14 @@
       const hub = points.reduce((acc,p)=>({lat:acc.lat+p.lat,lng:acc.lng+p.lng}),{lat:0,lng:0});
       hub.lat /= points.length; hub.lng /= points.length;
 
-      // “3D glow” effect = two arcs: outer glow + core line
       points.forEach(p=>{
-        // outer glow (thicker, faint)
+        // outer glow
         L.Polyline.Arc([p.lat,p.lng],[hub.lat,hub.lng], {
           color: hexWithAlpha(getCSS("--red"), 0.25),
           weight: 4.5, opacity: 0.25, vertices: 200
         }).addTo(arcLayer);
 
-        // core bright line (dashed)
+        // bright dashed core
         L.Polyline.Arc([p.lat,p.lng],[hub.lat,hub.lng], {
           color: getCSS("--red"),
           weight: 1.4, opacity: 0.85, dashArray: "6,6", vertices: 200
@@ -283,7 +315,7 @@
       });
     }
 
-    // CSS helpers
+    /* ===== Utilities ===== */
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
       const n = parseInt(hex.replace('#',''),16);
