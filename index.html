@@ -27,7 +27,7 @@
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
     #map{height:100%;width:100%}
 
-    /* ===== Bottom-left toolbar (works nicely inside Notion) ===== */
+    /* ===== Bottom-left toolbar ===== */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:8px;
@@ -43,7 +43,7 @@
     #fab .d-org{ background:var(--orange); }
     #fab .d-oth{ background:var(--other); }
 
-    /* Drawer that opens above the fab */
+    /* Drawer */
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
       width:320px; max-width:90vw; max-height:60vh; overflow:auto;
@@ -85,7 +85,7 @@
     <span style="font-size:12px;opacity:.7;">▸</span>
   </div>
 
-  <!-- Compact drawer with pie + toggles -->
+  <!-- Drawer with pie + toggles -->
   <div id="drawer" role="dialog" aria-modal="false" aria-label="Status overview">
     <div class="drawer-head">
       <h3 class="drawer-title">Status Overview</h3>
@@ -99,10 +99,23 @@
     <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
     <div class="hr"></div>
 
-    <label class="row" style="cursor:pointer;">
-      <input type="checkbox" id="toggleNetwork" />
-      <span>Show network lines for Implemented</span>
-    </label>
+    <div class="row" style="gap:12px; align-items:center;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="netImp" />
+        <span>Local network — Implemented</span>
+      </label>
+    </div>
+    <div class="row" style="gap:12px; align-items:center;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="netDev" />
+        <span>Local network — In development</span>
+      </label>
+    </div>
+    <div class="row" style="gap:8px; align-items:center; font-size:12px;">
+      <label>Neighbors:</label>
+      <input type="number" id="kNeighbors" min="1" max="3" value="1" style="width:48px;background:#0b1216;border:1px solid #22313a;border-radius:6px;color:#e6f3ea;padding:2px 6px;">
+      <span class="hint">(# of nearest neighbors per dot)</span>
+    </div>
 
     <div id="debug" class="debug"></div>
     <div class="hint" style="margin-top:6px;">Data loads from your Google Sheet. Click a dot for country details.</div>
@@ -171,13 +184,25 @@
     }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
 
+    // Haversine distance (km)
+    function haversine(a, b){
+      const toRad = d => d * Math.PI/180;
+      const R = 6371;
+      const dLat = toRad(b[0]-a[0]);
+      const dLng = toRad(b[1]-a[1]);
+      const s1 = Math.sin(dLat/2)**2 +
+                 Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
+      return 2*R*Math.asin(Math.sqrt(s1));
+    }
+
     /* ---------- Map ---------- */
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
     const dotsLayer = L.layerGroup().addTo(map);
-    const linesLayer = L.layerGroup(); // toggled on demand
+    const linesImpLayer = L.layerGroup();
+    const linesDevLayer = L.layerGroup();
 
     const dbgEl = document.getElementById('debug');
     const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
@@ -190,6 +215,15 @@
     function closeDrawer(){ drawer.classList.remove('open'); }
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', closeDrawer);
+
+    // controls
+    const netImp = document.getElementById('netImp');
+    const netDev = document.getElementById('netDev');
+    const kNeighborsInput = document.getElementById('kNeighbors');
+
+    // coord stores
+    let implementedCoords = [];
+    let devCoords = [];
 
     (async function init(){
       // 1) Polygons with multi-source fallback for centroids
@@ -244,10 +278,11 @@
         })).filter(r => r.countryRaw);
       } catch(e){ dbg("Failed to load/parse CSV. Ensure the sheet is published and reachable."); console.error(e); return; }
 
-      // 3) draw dots + gather implemented coords
+      // 3) draw dots + collect coords by status
       const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
-      const implementedCoords = [];
+      implementedCoords = [];
+      devCoords = [];
 
       for (const r of rows){
         for (const raw of splitCountries(r.countryRaw)){
@@ -257,9 +292,12 @@
 
           const color = colorForStatus(r.status);
           const isImplemented = /implement/i.test(r.status);
-          if (isImplemented) implementedCoords.push([pt.lat, pt.lng]);
+          const isDev = /develop|discussion/i.test(r.status);
 
-          L.circleMarker(pt, {
+          if (isImplemented) implementedCoords.push([pt.lat, pt.lng]);
+          else if (isDev) devCoords.push([pt.lat, pt.lng]);
+
+          L.circleMarker([pt.lat, pt.lng], {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
           })
           .bindTooltip(`${titleCase(key)}: ${r.status}`, {direction:'top', offset:[0,-6]})
@@ -285,7 +323,7 @@
       document.getElementById('c-oth').textContent = counts.other;
 
       const total = Math.max(1, counts.imp + counts.dev + counts.other);
-      const pie = new Chart(document.getElementById('statusPie'), {
+      new Chart(document.getElementById('statusPie'), {
         type: 'pie',
         data: {
           labels: ['Implemented', 'In development', 'Other'],
@@ -302,8 +340,7 @@
             tooltip: {
               callbacks: {
                 label(ctx){
-                  const v = ctx.raw || 0;
-                  const pct = Math.round((v/total)*100);
+                  const v = ctx.raw || 0; const pct = Math.round((v/total)*100);
                   return `${ctx.label}: ${v} (${pct}%)`;
                 }
               }
@@ -312,32 +349,65 @@
         }
       });
 
-      // 5) build network lines (Implemented only), toggled off by default
-      function buildNetwork(){
-        linesLayer.clearLayers();
-        const n = implementedCoords.length;
-        for (let i=0;i<n;i++){
-          for (let j=i+1;j<n;j++){
-            L.polyline([implementedCoords[i], implementedCoords[j]], {
-              color: getCSS('--red'), weight: 1, opacity: 0.18, smoothFactor: 1
-            }).addTo(linesLayer);
-          }
-        }
+      // Hook up toggles
+      function rebuildNetworks(){
+        const k = Math.max(1, Math.min(3, parseInt(kNeighborsInput.value||'1',10)));
+        linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
+
+        if (netImp.checked) buildLocalNetwork(implementedCoords, getCSS('--red'), linesImpLayer, k, 0.30, 1.2);
+        if (netDev.checked) buildLocalNetwork(devCoords, getCSS('--orange'), linesDevLayer, k, 0.25, 1.1);
+
+        if (netImp.checked && !map.hasLayer(linesImpLayer)) linesImpLayer.addTo(map);
+        else if (!netImp.checked && map.hasLayer(linesImpLayer)) map.removeLayer(linesImpLayer);
+
+        if (netDev.checked && !map.hasLayer(linesDevLayer)) linesDevLayer.addTo(map);
+        else if (!netDev.checked && map.hasLayer(linesDevLayer)) map.removeLayer(linesDevLayer);
       }
-      const toggleNetwork = document.getElementById('toggleNetwork');
-      toggleNetwork.addEventListener('change', (e)=>{
-        if (e.target.checked){
-          if (!map.hasLayer(linesLayer)){ buildNetwork(); linesLayer.addTo(map); }
-        } else {
-          if (map.hasLayer(linesLayer)) map.removeLayer(linesLayer);
-        }
-      });
+
+      netImp.addEventListener('change', rebuildNetworks);
+      netDev.addEventListener('change', rebuildNetworks);
+      kNeighborsInput.addEventListener('change', rebuildNetworks);
+
+      // start with networks off for clarity/performance
+      netImp.checked = false;
+      netDev.checked = false;
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
       }
     })();
+
+    // Build local k-nearest neighbor network (deduped)
+    function buildLocalNetwork(coords, color, layer, k=1, opacity=0.3, weight=1.2){
+      const n = coords.length;
+      if (n < 2) return;
+      const seen = new Set();
+
+      for (let i=0;i<n;i++){
+        // Build list of distances from i to all j
+        const dists = [];
+        for (let j=0;j<n;j++){
+          if (i===j) continue;
+          dists.push({ j, d: haversine(coords[i], coords[j]) });
+        }
+        dists.sort((a,b)=>a.d-b.d);
+
+        const limit = Math.min(k, dists.length);
+        for (let t=0;t<limit;t++){
+          const j = dists[t].j;
+          const key = i<j ? `${i}-${j}` : `${j}-${i}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          L.polyline([coords[i], coords[j]], {
+            color, weight, opacity, smoothFactor:1
+          }).addTo(layer);
+        }
+      }
+    }
+
+    // small helpers
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   </script>
 </body>
 </html>
