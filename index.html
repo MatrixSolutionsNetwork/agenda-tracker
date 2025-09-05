@@ -25,7 +25,7 @@
 
       /* STATUS COLORS (dots + shading) */
       --red:#ff3333;     /* Implemented */
-      --orange:#ff9900;  /* In Discussion (implementing) */
+      --orange:#ff9900;  /* In Discussion / implementing */
       --cyan:#35d3ff;    /* Pilot */
       --grey:#8a8a8a;    /* Abandoned */
 
@@ -47,7 +47,7 @@
       background:linear-gradient(180deg, rgba(21,27,33,.92), rgba(15,20,24,.94));
       border:1px solid var(--panelEdge); border-radius:14px;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
-      padding:14px 16px; width:290px;
+      padding:14px 16px; width:300px;
       font:14px/1.4 ui-sans-serif,system-ui;
     }
     .panel h2{margin:0 0 10px 0; font-size:15px;}
@@ -57,6 +57,12 @@
     .hr{border:none;border-top:1px solid #182126;margin:10px 0;}
     .hint{color:var(--muted); font-size:12px;}
     .toggle-row{display:flex; align-items:center; gap:8px; margin:6px 0;}
+
+    .debug{
+      margin-top:10px; padding-top:8px; border-top:1px dashed #26313a;
+      font-size:12px; color:#9ab3a8; max-height:120px; overflow:auto;
+      display:none; /* set to block if you want always-on */
+    }
 
     .leaflet-popup-content-wrapper{background:#0e1512; color:var(--text); border:1px solid #1b3a2e;}
     .leaflet-popup-tip{background:#0e1512; border:1px solid #1b3a2e;}
@@ -90,6 +96,7 @@
       <label for="toggleArcs">Implemented arcs</label>
     </div>
 
+    <div id="debug" class="debug"></div>
     <div class="hint" style="margin-top:8px;">Click a dot or country. Data loads from your Google Sheet CSV.</div>
   </div>
 
@@ -107,19 +114,19 @@
       "abandoned":"Abandoned"
     };
 
-    // Country name aliases (applied to BOTH sheet + world polygons)
+    // Country aliases & normalizer (applied to BOTH sheet + world polygons)
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["united states of america","united states"], ["u.s.a.","united states"],
-      ["uk","united kingdom"], ["england","united kingdom"], ["great britain","united kingdom"],
-      ["uae","united arab emirates"],
+      ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
+      ["wales","united kingdom"], ["northern ireland","united kingdom"], ["great britain","united kingdom"], ["u.k.","united kingdom"],
+      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
-      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"], ["south korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
-      ["czech republic","czechia"],
-      ["russian federation","russia"],
-      ["myanmar (burma)","myanmar"],
-      ["macedonia","north macedonia"],
-      ["u.k.","united kingdom"]
+      ["czech republic","czechia"], ["swaziland","eswatini"],
+      ["macedonia","north macedonia"], ["lao pdr","laos"], ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
+      ["congo, democratic republic of the","democratic republic of the congo"],
+      ["russian federation","russia"]
     ]);
 
     // Colors per status
@@ -142,34 +149,33 @@
     const arcLayer = L.layerGroup().addTo(map);
 
     (async function init(){
-      const rows = await loadSheet(CSV_URL);                // raw rows, normalized names + statuses
-      const data = aggregateByCountry(rows);                // one record per country (highest status)
+      const rows = await loadSheet(CSV_URL);       // normalized rows
+      const data = aggregateByCountry(rows);       // Map keyed by normalized country
       updateCounts(data);
 
       const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
 
-      // Build centroid lookup
+      // Build centroid lookup + a list of keys for fuzzy matching
       const centroid = {};
-      const countriesSet = new Set();
+      const allKeys = [];
       L.geoJSON(world).eachLayer(l=>{
         const nm = normalizeName(l.feature.properties.ADMIN);
-        const b = l.getBounds();
-        centroid[nm] = b.getCenter();
-        countriesSet.add(nm);
+        centroid[nm] = l.getBounds().getCenter();
+        allKeys.push(nm);
       });
 
       // SHADING
       shadeLayer = L.geoJSON(world, {
         style: f => {
           const nm = normalizeName(f.properties.ADMIN);
-          const rec = data.get(nm);
+          const rec = data.get(nm) || data.get(bestKey(nm, data));
           if (!rec) return { color: NEUTRAL_SHADE, weight: 0.5, opacity:.35, fillColor: NEUTRAL_SHADE, fillOpacity:.06 };
           const col = STATUS_COLOR[rec.status] || NEUTRAL_SHADE;
           return { color: col, weight: 0.8, opacity:.5, fillColor: col, fillOpacity:.18 };
         },
         onEachFeature: (f, layer) => {
           const nm = normalizeName(f.properties.ADMIN);
-          const rec = data.get(nm);
+          const rec = data.get(nm) || data.get(bestKey(nm, data));
           if (rec) layer.bindPopup(popupHtml(rec));
           else layer.bindPopup(`<b>${nm}</b><div class="hint">No record in dataset.</div>`);
         }
@@ -177,9 +183,14 @@
 
       // DOTS
       const implementedPts = [];
+      const unmatched = new Set();
+
       data.forEach(rec=>{
-        const c = centroid[rec.country];
-        if (!c) return;
+        let key = rec.country;
+        if (!centroid[key]) key = bestKey(key, centroid);
+        const c = centroid[key];
+        if (!c){ unmatched.add(rec.countryRaw || rec.country); return; }
+
         const color = STATUS_COLOR[rec.status] || "#bbb";
         const m = L.circleMarker(c, {
           radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity: .95
@@ -202,10 +213,13 @@
         e.target.checked ? map.addLayer(arcLayer) : map.removeLayer(arcLayer);
       });
 
-      // Console report for any names that didn’t match (helps debugging)
-      const unmatched = [];
-      rows.forEach(r => { if (!centroid[r.country]) unmatched.push(r.countryRaw); });
-      if (unmatched.length) console.warn("Unmatched country names from sheet (check aliases):", Array.from(new Set(unmatched)).sort());
+      // Debug list (to help fix any remaining names)
+      if (unmatched.size){
+        const dbg = document.getElementById('debug');
+        dbg.style.display = 'block';
+        dbg.innerHTML = `<b>Unmatched from sheet (check aliases):</b><br>${[...unmatched].sort().join(', ')}`;
+        console.warn("Unmatched country names from sheet:", [...unmatched].sort());
+      }
     })();
 
     /* ===== Data helpers ===== */
@@ -235,7 +249,7 @@
       for (const r of rows){
         const cur = map.get(r.country);
         if (!cur){
-          map.set(r.country, { country:r.country, status:r.status, programs:[], notes:[] });
+          map.set(r.country, { country:r.country, countryRaw:r.countryRaw, status:r.status, programs:[], notes:[] });
         }
         const obj = map.get(r.country);
         if (prio[r.status] > (prio[obj.status] ?? -1)) obj.status = r.status;
@@ -246,7 +260,7 @@
       map.forEach(v => {
         v.program = v.programs.join("; ");
         v.notes   = v.notes.join(" • ");
-        delete v.programs; delete v.notesRaw;
+        delete v.programs;
       });
       return map;
     }
@@ -256,15 +270,30 @@
       return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
     }
 
+    // Normalize country names (strip punctuation/accents, alias, Title Case)
     function normalizeName(s){
       const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // strip accents
-        .replace(/[^a-z0-9 ]+/gi,' ')                    // punctuation to space
-        .replace(/\s+/g,' ')                             // collapse spaces
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9 ]+/gi,' ')
+        .replace(/\s+/g,' ')
         .toLowerCase().trim();
       const aliased = COUNTRY_ALIASES.get(k) || k;
-      // Title Case for display and stable keys
       return aliased.split(' ').map(w => w ? (w[0].toUpperCase()+w.slice(1)) : "").join(' ');
+    }
+
+    // If exact key is missing, try to find a reasonable alternative
+    function bestKey(name, container){
+      // Direct
+      if (container[name]) return name;
+      // Try simplified (drop stopwords like "of", "the", "and", "republic", "kingdom", "federation")
+      const simplify = t => t.toLowerCase().replace(/\b(of|the|and|republic|kingdom|federation|state|states|arab|democratic|people s|plurinational|bolivarian)\b/g,'').replace(/\s+/g,' ').trim();
+      const sName = simplify(name);
+      const keys = Array.isArray(container) ? container : Object.keys(container);
+      // substring contains one another
+      let found = keys.find(k => simplify(k) === sName);
+      if (found) return found;
+      found = keys.find(k => simplify(k).includes(sName) || sName.includes(simplify(k)));
+      return found || name;
     }
 
     function updateCounts(dataMap){
