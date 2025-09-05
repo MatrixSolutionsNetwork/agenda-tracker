@@ -23,14 +23,31 @@
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
     #map{height:100%;width:100%}
 
+    /* ===== Panel (now resizable + collapsible) ===== */
     .panel{
       position:absolute; top:12px; left:12px; z-index:1000;
       background:linear-gradient(180deg,rgba(21,27,33,.92),rgba(15,20,24,.94));
       border:1px solid var(--panelEdge); border-radius:12px;
-      padding:12px 14px; width:320px; font:14px/1.4 ui-sans-serif,system-ui;
+      padding:10px 12px; width:320px; font:14px/1.4 ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
+      overflow:auto;                /* required for CSS resize */
+      resize: both;                 /* drag bottom-right to resize */
+      min-width: 220px; max-width: 420px; min-height: 90px;
     }
-    .panel h2{margin:0 0 8px 0; font-size:15px;}
+    .panel-header{
+      display:flex; align-items:center; justify-content:space-between;
+      gap:8px; user-select:none; cursor:default;
+    }
+    .panel-header h2{margin:0; font-size:15px;}
+    .icon-btn{
+      width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
+      background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
+      display:inline-flex; align-items:center; justify-content:center;
+      cursor:pointer; padding:0;
+    }
+    .icon-btn:hover{filter:brightness(1.08);}
+    .panel.collapsed{padding:8px 10px; height:auto;}
+    .panel.collapsed #panelBody{display:none;}
     .row{display:flex;align-items:center;gap:8px;margin:4px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
@@ -45,41 +62,33 @@
 <body>
   <div id="map"></div>
 
-  <div class="panel">
-    <h2>Status Overview</h2>
-    <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
-    <div class="hr"></div>
-    <div class="debug" id="debug"></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet. Click a dot for details.</div>
+  <div class="panel" id="panel">
+    <div class="panel-header" id="panelHeader">
+      <h2>Status Overview</h2>
+      <button id="panelToggle" class="icon-btn" aria-label="Collapse" aria-expanded="true" title="Collapse/Expand">▾</button>
+    </div>
+
+    <div id="panelBody">
+      <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
+      <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+      <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
+      <div class="hr"></div>
+      <div class="debug" id="debug"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet. Click a dot for details.</div>
+    </div>
   </div>
 
   <script>
-    /* === PUT YOUR SHEET LINK (any format) === */
+    /* === SHEET LINK (any format; we coerce to CSV) === */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
     /* ---------- Utilities ---------- */
     function toCsvUrl(u){
       if (!u) return u;
-      if (/output=csv/i.test(u)) return u;                         // already csv
-      if (/\/pubhtml/i.test(u)){                                   // pubhtml -> pub?output=csv
-        const url = new URL(u);
-        url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub");
-        url.searchParams.set("output","csv");
-        if (!url.searchParams.has("single")) url.searchParams.set("single","true");
-        return url.toString();
-      }
-      if (/\/spreadsheets\/d\//i.test(u)){                         // edit/share -> export?format=csv
-        const m = u.match(/\/spreadsheets\/d\/([^/]+)/i);
-        if (m){
-          const id = m[1];
-          const url = new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
-          url.searchParams.set("format","csv");
-          return url.toString();
-        }
-      }
+      if (/output=csv/i.test(u)) return u; // already CSV
+      if (/\/pubhtml/i.test(u)){ const url = new URL(u); url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single"))url.searchParams.set("single","true"); return url.toString(); }
+      if (/\/spreadsheets\/d\//i.test(u)){ const m = u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
@@ -107,7 +116,6 @@
         return getCSS("--orange");
       return getCSS("--other");
     }
-
     function normalizeCountry(s){
       const k = String(s||"")
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -116,7 +124,6 @@
         .toLowerCase().trim();
       return COUNTRY_ALIASES.get(k) || k;
     }
-
     function splitCountries(cell){
       return String(cell)
         .replace(/・/g, ',')
@@ -124,7 +131,6 @@
         .map(s=>s.trim())
         .filter(Boolean);
     }
-
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
@@ -146,7 +152,7 @@
     const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
 
     (async function init(){
-      // 1) Load polygons with multi-source fallback
+      // 1) Polygons with multi-source fallback
       let geo = null, lastErr = null;
       const SOURCES = [
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -159,17 +165,16 @@
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const j = await r.json();
           if (!j || !j.features || j.features.length < 100) throw new Error('Bad geojson');
-          geo = j;
-          break;
+          geo = j; break;
         } catch(e){ lastErr = e; }
       }
       if (!geo){
-        dbg(`Failed to load world polygons (tried ${SOURCES.length} sources).`);
+        dbg(`Failed to load world polygons (CDN blocked?).`);
         console.error('World polygons fetch failed:', lastErr);
         return;
       }
 
-      // 2) Detect a country name value
+      // 2) pick a country name field
       function getName(props){
         if (!props) return null;
         if (typeof props.name === 'string') return props.name;
@@ -178,29 +183,28 @@
         if (props.NAME) return props.NAME;
         if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
         if (props.SOVEREIGNT) return props.SOVEREIGNT;
-        // fallback: first string prop that looks like a name
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
       }
 
-      // 3) Build centroids
+      // 3) build centroids
       const centroids = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (nm) centroids[nm] = l.getBounds().getCenter();
       });
 
-      // 4) Load your sheet rows
+      // 4) load sheet
       let rows;
       try {
         rows = await loadSheet(CSV_URL);
       } catch(e){
-        dbg("Failed to load/parse CSV. Make sure the sheet is published and reachable.");
+        dbg("Failed to load/parse CSV. Ensure the sheet is published and reachable.");
         console.error(e);
         return;
       }
 
-      // 5) Expand and draw
+      // 5) draw
       const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
 
@@ -246,7 +250,6 @@
       if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-      // Expecting headers: Countries, Title, Status, Description
       return parsed.data.map(row => ({
         countryRaw: String(row["Countries"]||"").trim(),
         title:      String(row["Title"]||"").trim(),
@@ -254,6 +257,28 @@
         notes:      String(row["Description"]||"").trim()
       })).filter(r => r.countryRaw);
     }
+
+    /* ===== Collapse / Expand (non-breaking) ===== */
+    const panel = document.getElementById('panel');
+    const panelBody = document.getElementById('panelBody');
+    const panelToggle = document.getElementById('panelToggle');
+    const panelHeader = document.getElementById('panelHeader');
+
+    function setCollapsed(collapsed){
+      panel.classList.toggle('collapsed', collapsed);
+      panelToggle.setAttribute('aria-expanded', String(!collapsed));
+      panelToggle.textContent = collapsed ? '▸' : '▾';
+      try{ localStorage.setItem('msn_panel_collapsed', collapsed ? '1':'0'); }catch{}
+    }
+    // restore previous state
+    try{
+      const prev = localStorage.getItem('msn_panel_collapsed');
+      if (prev === '1') setCollapsed(true);
+    }catch{}
+
+    panelToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setCollapsed(!panel.classList.contains('collapsed')); });
+    // also allow double-click on the header to toggle
+    panelHeader.addEventListener('dblclick', ()=> setCollapsed(!panel.classList.contains('collapsed')));
   </script>
 </body>
 </html>
