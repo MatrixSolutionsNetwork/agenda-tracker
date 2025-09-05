@@ -5,14 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>MSN — Digital ID Status</title>
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- PapaParse (CSV) -->
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-
-<!-- Chart.js (pie chart) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
 
 <style>
@@ -22,9 +17,9 @@
     --panelEdge:#151b21;
     --text:#e6f3ea;
     --muted:#91a29a;
-    --green:#00ff95;   /* Matrix green */
-    --red:#ff4b4b;     /* Implemented dots/lines */
-    --orange:#ffb02e;  /* In development dots/lines */
+    --green:#00ff95;
+    --red:#ff4b4b;      /* Implemented dots/lines */
+    --orange:#ffb02e;   /* In development */
     --grid:rgba(0,255,149,.06);
   }
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.35 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
@@ -33,19 +28,13 @@
     background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),
                      linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
     background-size:60px 60px}
-  /* Panel */
-  .panel{
-    position:absolute;left:14px;bottom:14px;z-index:1000;width:330px;
-    background:linear-gradient(180deg,rgba(21,27,33,.96),rgba(12,16,20,.96));
-    border:1px solid var(--panelEdge);border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,.45);
-    padding:12px 12px 10px 12px
-  }
+  .panel{position:absolute;left:14px;bottom:14px;z-index:1000;width:330px;background:linear-gradient(180deg,rgba(21,27,33,.96),rgba(12,16,20,.96));
+    border:1px solid var(--panelEdge);border-radius:14px;box-shadow:0 10px 24px rgba(0,0,0,.45);padding:12px 12px 10px}
   .hdr1{font-weight:800;color:var(--green);letter-spacing:.2px}
   .hdr2{margin-top:2px;color:#cfe8df;font-weight:700}
   .row{display:flex;align-items:center;gap:8px}
   .split{display:flex;justify-content:space-between;gap:10px}
   .btn{background:#0d1511;border:1px solid #1a3a2d;color:var(--text);padding:6px 10px;border-radius:10px;cursor:pointer}
-  .btn:active{transform:translateY(1px)}
   .ctl{width:100%;padding:8px 9px;border-radius:10px;border:1px solid #22313a;background:#0c1216;color:#eaf3ef}
   .select{appearance:none}
   .legend{display:flex;gap:18px;align-items:center;margin:8px 0 6px 0}
@@ -59,13 +48,11 @@
   .switch input{width:16px;height:16px}
   .footer{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
   .pill{padding:2px 8px;border-radius:999px;border:1px solid #1a3a2d;background:#0c1511;font-weight:700}
-  .kbd{padding:0 6px;border-radius:6px;border:1px solid #2a3740;background:#0a1216}
   .hdrline{display:flex;align-items:center;gap:6px;margin-bottom:10px}
   .collapse{position:absolute;right:8px;top:8px;border:none;background:#0e1512;color:#9fb6ad;border:1px solid #22313a;border-radius:10px;width:26px;height:26px;cursor:pointer}
   .collapsed .body{display:none}
   .collapsed{width:42px}
   .regionBox{pointer-events:none}
-  /* Leaflet tweaks */
   .leaflet-container a{color:var(--green)}
   .leaflet-popup-content-wrapper{background:#0f1512;color:var(--text);border:1px solid #1b3a2e}
   .leaflet-popup-tip{background:#0f1512;border:1px solid #1b3a2e}
@@ -75,7 +62,6 @@
 <body>
 <div id="map"></div>
 
-<!-- Control panel -->
 <div class="panel" id="panel">
   <button class="collapse" id="collapseBtn" title="Hide/Show">✕</button>
   <div class="body">
@@ -148,10 +134,8 @@
 </div>
 
 <script>
-/*** ========= CONFIG ========= ***/
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz7O1G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-// Status aliases (sheet → canonical)
 const STATUS_ALIASES = {
   "implemented":"Implemented",
   "in development":"In development / discussion",
@@ -159,8 +143,6 @@ const STATUS_ALIASES = {
   "discussion":"In development / discussion",
   "pilot":"In development / discussion"
 };
-
-// Country name aliases to map your sheet names to GeoJSON names and to our override table
 const NAME_ALIASES = {
   "usa":"United States","united states":"United States","usa, united states":"United States",
   "uk":"United Kingdom",
@@ -169,8 +151,6 @@ const NAME_ALIASES = {
   "viet nam":"Vietnam",
   "cote d’ivoire":"Ivory Coast","côte d’ivoire":"Ivory Coast"
 };
-
-// Canonical map names (for country shading match with the countries.geojson "ADMIN")
 const MAP_NAME_ALIASES = {
   "United States":"United States of America",
   "United Kingdom":"United Kingdom",
@@ -179,8 +159,6 @@ const MAP_NAME_ALIASES = {
   "Russia":"Russian Federation",
   "Bolivia":"Bolivia (Plurinational State of)"
 };
-
-// Region mapping for the Region filter
 const REGION_OF = {
   "Argentina":"Americas","Armenia":"Asia","Austria":"Europe","Belgium":"Europe","Brazil":"Americas",
   "Canada":"Americas","China":"Asia","Costa Rica":"Americas","Denmark":"Europe","Estonia":"Europe",
@@ -193,8 +171,6 @@ const REGION_OF = {
   "Switzerland":"Europe","Thailand":"Asia","Turkey":"Middle East","United Arab Emirates":"Middle East",
   "United Kingdom":"Europe","Ukraine":"Europe","Uruguay":"Americas","United States":"Americas","Vietnam":"Asia"
 };
-
-// Label/marker coordinate overrides (used when Lat/Lon not provided in sheet)
 const LABEL_OVERRIDES = {
   "Argentina":[-34.6037,-58.3816],
   "Armenia":[40.1792,44.4991],
@@ -245,32 +221,25 @@ const LABEL_OVERRIDES = {
   "United States":[39.8283,-98.5795],
   "Vietnam":[21.0278,105.8342]
 };
-
-// Colors
 const COLORS = {
   impl: getComputedStyle(document.documentElement).getPropertyValue('--red').trim() || '#ff4b4b',
-  dev: getComputedStyle(document.documentElement).getPropertyValue('--orange').trim() || '#ffb02e',
-  green: getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#00ff95',
+  dev:  getComputedStyle(document.documentElement).getPropertyValue('--orange').trim() || '#ffb02e',
+  green:getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#00ff95',
   neutral:'#4b5563'
 };
-/*** ======== END CONFIG ======== ***/
 
-
-/* -------- Map setup -------- */
 const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
   attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8, minZoom:2
 }).addTo(map);
 
-// Layers
 const dotsImpl = L.layerGroup().addTo(map);
 const dotsDev  = L.layerGroup().addTo(map);
 let linesImpl = L.layerGroup().addTo(map);
-let linesDev  = L.layerGroup(); // off by default
+let linesDev  = L.layerGroup();
 let shadeLayer = null;
 let regionOutline = null;
 
-// UI refs
 const elSearch   = document.getElementById('search');
 const elGo       = document.getElementById('goBtn');
 const elRegion   = document.getElementById('regionSel');
@@ -286,145 +255,83 @@ const elExport   = document.getElementById('exportBtn');
 const panel      = document.getElementById('panel');
 const collapseBtn= document.getElementById('collapseBtn');
 
-// collapse panel
 collapseBtn.onclick = () => panel.classList.toggle('collapsed');
 
-// dataset
-let ROWS = [];           // all rows (normalized)
-let MARKERS = [];        // marker refs for filtering
+let ROWS = [];
+let MARKERS = [];
 let PIE;
 
-
-/* ---------- Helpers ---------- */
 const norm = s => (s||'').toString().trim();
-function canonCountry(raw){
-  let s = norm(raw);
-  const k = s.toLowerCase();
-  if (NAME_ALIASES[k]) return NAME_ALIASES[k];
-  return s;
-}
-function mapAdminName(name){
-  return MAP_NAME_ALIASES[name] || name;
-}
-function statusCanon(s){
-  const k = norm(s).toLowerCase();
-  return STATUS_ALIASES[k] || (s === 'Implemented' ? 'Implemented' : 'In development / discussion');
-}
+function canonCountry(raw){ const k = norm(raw).toLowerCase(); return NAME_ALIASES[k] || norm(raw); }
+function mapAdminName(name){ return MAP_NAME_ALIASES[name] || name; }
+function statusCanon(s){ const k = norm(s).toLowerCase(); return STATUS_ALIASES[k] || (s==='Implemented'?'Implemented':'In development / discussion'); }
 function computeBBox(points){
   if(!points.length) return null;
   let minLat=90,maxLat=-90,minLon=180,maxLon=-180;
-  points.forEach(([lat,lon])=>{
-    if(lat<minLat) minLat=lat; if(lat>maxLat) maxLat=lat;
-    if(lon<minLon) minLon=lon; if(lon>maxLon) maxLon=lon;
-  });
-  // expand a touch so the line isn't on top of dots
-  const pad = 2.0;
-  return [[minLat-pad,minLon-pad],[maxLat+pad,maxLon+pad]];
+  points.forEach(([lat,lon])=>{ if(lat<minLat)minLat=lat; if(lat>maxLat)maxLat=lat; if(lon<minLon)minLon=lon; if(lon>maxLon)maxLon=lon; });
+  const pad = 2.0; return [[minLat-pad,minLon-pad],[maxLat+pad,maxLon+pad]];
 }
 function drawRegionOutline(points){
   if(regionOutline){ map.removeLayer(regionOutline); regionOutline=null; }
   if(!points.length) return;
   const bb = computeBBox(points);
-  const poly = L.polygon([
-    [bb[0][0],bb[0][1]],
-    [bb[0][0],bb[1][1]],
-    [bb[1][0],bb[1][1]],
-    [bb[1][0],bb[0][1]]
-  ], {color:COLORS.green, weight:1.5, fill:false, opacity:0.9, className:'regionBox'});
-  regionOutline = poly.addTo(map);
+  regionOutline = L.polygon([
+    [bb[0][0],bb[0][1]],[bb[0][0],bb[1][1]],[bb[1][0],bb[1][1]],[bb[1][0],bb[0][1]]
+  ], {color:COLORS.green, weight:1.5, fill:false, opacity:.9, className:'regionBox'}).addTo(map);
 }
-
-// network (k-nearest within same status & visible region)
 function buildLocalNetwork(group, arr, color, k){
   const layer = L.layerGroup();
-  // naive KNN (N small, fast enough)
   for(let i=0;i<arr.length;i++){
-    const a = arr[i];
-    // find nearest k by haversine
-    const dists = [];
+    const a = arr[i], dists=[];
     for(let j=0;j<arr.length;j++){
       if(i===j) continue;
-      const b = arr[j];
-      const d = haversine(a.lat,a.lon,b.lat,b.lon);
+      const b = arr[j], d = haversine(a.lat,a.lon,b.lat,b.lon);
       dists.push([d,j]);
     }
-    dists.sort((x,y)=>x[0]-y[0]);
-    const pick = dists.slice(0,k);
-    pick.forEach(([_,j])=>{
-      const b = arr[j];
-      L.polyline([[a.lat,a.lon],[b.lat,b.lon]], {color:color, weight:1, opacity:.25}).addTo(layer);
-    });
+    dists.sort((x,y)=>x[0]-y[0]); const pick = dists.slice(0,k);
+    pick.forEach(([_,j])=> L.polyline([[a.lat,a.lon],[arr[j].lat,arr[j].lon]], {color, weight:1, opacity:.25}).addTo(layer));
   }
   return layer;
 }
-
 function haversine(lat1,lon1,lat2,lon2){
-  const toRad = d=>d*Math.PI/180;
-  const R=6371, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
+  const toRad = d=>d*Math.PI/180, R=6371, dLat=toRad(lat2-lat1), dLon=toRad(lon2-lon1);
   const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
   return 2*R*Math.asin(Math.sqrt(a));
 }
-
 function updatePie(counts){
   const data = [counts.impl, counts.dev];
   const labels = ["Implemented","In development"];
   if(!PIE){
     PIE = new Chart(elPie.getContext('2d'), {
       type:'pie',
-      data:{labels, datasets:[{data, backgroundColor:[COLORS.red, COLORS.dev]}]},
-      options:{
-        plugins:{legend:{display:false}, tooltip:{enabled:true}},
-        animation:false
-      }
+      data:{labels, datasets:[{data, backgroundColor:[COLORS.impl, COLORS.dev]}]},
+      options:{plugins:{legend:{display:false}, tooltip:{enabled:true}}, animation:false}
     });
-  }else{
-    PIE.data.datasets[0].data = data;
-    PIE.update();
-  }
+  }else{ PIE.data.datasets[0].data = data; PIE.update(); }
 }
 
-/* ---------- Data load ---------- */
 async function loadCSV(){
   const res = await fetch(CSV_URL, {cache:'no-store'});
   const text = await res.text();
   const parsed = Papa.parse(text, {header:true, skipEmptyLines:true});
-  const COLS = {
-    country: "Countries",
-    title:   "Title",
-    status:  "Status",
-    notes:   "Description",
-    lat:     "Lat",
-    lon:     "Lon"
-  };
-
-  const rows = parsed.data.map(r=>{
-    const countryRaw = norm(r[COLS.country]);
-    const country = canonCountry(countryRaw);
-    const status = statusCanon(r[COLS.status]);
+  const COLS = { country:"Countries", title:"Title", status:"Status", notes:"Description", lat:"Lat", lon:"Lon" };
+  return parsed.data.map(r=>{
+    const country = canonCountry(r[COLS.country]);
+    const status  = statusCanon(r[COLS.status]);
     const lat = r[COLS.lat] ? +r[COLS.lat] : (LABEL_OVERRIDES[country]?.[0]);
     const lon = r[COLS.lon] ? +r[COLS.lon] : (LABEL_OVERRIDES[country]?.[1]);
-    return {
-      country, status,
-      title: norm(r[COLS.title]),
-      notes: norm(r[COLS.notes]),
-      lat, lon,
-      region: REGION_OF[country] || "Other"
-    };
+    return { country, status, title:norm(r[COLS.title]), notes:norm(r[COLS.notes]), lat, lon, region: REGION_OF[country] || "Other" };
   });
-  return rows;
 }
 
-
-/* ---------- Render ---------- */
 async function main(){
   ROWS = await loadCSV();
 
-  // build markers
   MARKERS = [];
   dotsImpl.clearLayers(); dotsDev.clearLayers();
   ROWS.forEach(d=>{
-    if(d.lat==null || d.lon==null) return; // skip if we still don’t know where to put it
-    const color = d.status==="Implemented" ? COLORS.red : COLORS.dev;
+    if(d.lat==null || d.lon==null) return;
+    const color = d.status==="Implemented" ? COLORS.impl : COLORS.dev;
     const layer = d.status==="Implemented" ? dotsImpl : dotsDev;
     const m = L.circleMarker([d.lat,d.lon], {
       radius:6.5, color:tinyTint(color,-40), weight:1.2, fillColor:color, fillOpacity:.95
@@ -435,159 +342,106 @@ async function main(){
       <div><b>Program:</b> ${escapeHtml(d.title||"—")}</div>
       <div><b>Status:</b> ${d.status}</div>
       <div class="muted" style="margin-top:6px">${escapeHtml(d.notes||"")}</div>
-    `)
-    .addTo(layer);
-
-    MARKERS.push({d, m});
+    `).addTo(layer);
+    MARKERS.push({d,m});
   });
 
-  // country shading
   buildShading();
-
-  // initial lines and pie
   rebuildNetworks();
   refreshRegion();
   refreshPie();
 
-  // UI events
-  elDotsR.onchange = ()=> toggleLayer(dotsImpl, elDotsR.checked);
-  elDotsO.onchange = ()=> toggleLayer(dotsDev,  elDotsO.checked);
-  elShade.onchange = ()=> toggleLayer(shadeLayer, elShade.checked);
-  elNetR.onchange  = ()=> { linesImpl && map.removeLayer(linesImpl); if(elNetR.checked) { linesImpl = rebuildNetworkFor("Implemented"); map.addLayer(linesImpl); } };
-  elNetO.onchange  = ()=> { linesDev  && map.removeLayer(linesDev);  if(elNetO.checked) { linesDev  = rebuildNetworkFor("In development / discussion"); map.addLayer(linesDev); } };
-  elK.onchange     = ()=> rebuildNetworks();
-  elRegion.onchange= ()=> refreshRegion();
-  elGo.onclick     = ()=> searchCountry();
-  elSearch.addEventListener('keydown', e=>{ if(e.key==="Enter") searchCountry(); });
-  elExport.onclick = ()=> downloadCSV(ROWS);
+  document.getElementById('dotsRed').onchange   = ()=> toggleLayer(dotsImpl, document.getElementById('dotsRed').checked);
+  document.getElementById('dotsOrange').onchange= ()=> toggleLayer(dotsDev,  document.getElementById('dotsOrange').checked);
+  document.getElementById('shadeOn').onchange   = ()=> toggleLayer(shadeLayer, document.getElementById('shadeOn').checked);
+  document.getElementById('netRed').onchange    = ()=> { linesImpl && map.removeLayer(linesImpl); if(document.getElementById('netRed').checked){ linesImpl = rebuildNetworkFor("Implemented"); map.addLayer(linesImpl);} };
+  document.getElementById('netOrange').onchange = ()=> { linesDev  && map.removeLayer(linesDev);  if(document.getElementById('netOrange').checked){ linesDev  = rebuildNetworkFor("In development / discussion"); map.addLayer(linesDev);} };
+  document.getElementById('kSel').onchange      = ()=> rebuildNetworks();
+  document.getElementById('regionSel').onchange = ()=> refreshRegion();
+  document.getElementById('goBtn').onclick      = ()=> searchCountry();
+  document.getElementById('search').addEventListener('keydown', e=>{ if(e.key==="Enter") searchCountry(); });
+  document.getElementById('exportBtn').onclick  = ()=> downloadCSV(ROWS);
 
-  // small mismatch helper for shading names
   showMismatches();
 }
 
 function rebuildNetworks(){
   linesImpl && map.removeLayer(linesImpl);
   linesDev  && map.removeLayer(linesDev);
-  if(elNetR.checked) { linesImpl = rebuildNetworkFor("Implemented"); map.addLayer(linesImpl); }
-  if(elNetO.checked) { linesDev  = rebuildNetworkFor("In development / discussion"); map.addLayer(linesDev); }
+  if(document.getElementById('netRed').checked){ linesImpl = rebuildNetworkFor("Implemented"); map.addLayer(linesImpl); }
+  if(document.getElementById('netOrange').checked){ linesDev = rebuildNetworkFor("In development / discussion"); map.addLayer(linesDev); }
 }
-
 function rebuildNetworkFor(status){
-  const k = +elK.value;
-  const region = elRegion.value;
-  const pts = MARKERS
-    .filter(o => o.d.status===status && (region==="ALL" || o.d.region===region))
-    .map(o => ({lat:o.d.lat, lon:o.d.lon}));
-  const color = status==="Implemented" ? COLORS.red : COLORS.dev;
+  const k = +document.getElementById('kSel').value;
+  const region = document.getElementById('regionSel').value;
+  const pts = MARKERS.filter(o=> o.d.status===status && (region==="ALL" || o.d.region===region))
+                     .map(o=>({lat:o.d.lat,lon:o.d.lon}));
+  const color = status==="Implemented" ? COLORS.impl : COLORS.dev;
   return buildLocalNetwork(map, pts, color, k);
 }
-
 function refreshPie(){
-  const region = elRegion.value;
-  const counts = {impl:0, dev:0};
-  ROWS.forEach(d=>{
-    if(region!=="ALL" && d.region!==region) return;
-    if(d.status==="Implemented") counts.impl++; else counts.dev++;
-  });
+  const region = document.getElementById('regionSel').value;
+  const counts = {impl:0,dev:0};
+  ROWS.forEach(d=>{ if(region!=="ALL" && d.region!==region) return; if(d.status==="Implemented") counts.impl++; else counts.dev++; });
   updatePie(counts);
 }
-
 function refreshRegion(){
-  const region = elRegion.value;
-
-  // show/hide dots by region
+  const region = document.getElementById('regionSel').value;
   MARKERS.forEach(o=>{
     const inRegion = (region==="ALL" || o.d.region===region);
     if(inRegion){
-      if(o.d.status==="Implemented"){ if(elDotsR.checked) dotsImpl.addLayer(o.m); }
-      else { if(elDotsO.checked) dotsDev.addLayer(o.m); }
-    }else{
-      dotsImpl.removeLayer(o.m);
-      dotsDev.removeLayer(o.m);
-    }
+      if(o.d.status==="Implemented"){ if(document.getElementById('dotsRed').checked) dotsImpl.addLayer(o.m); }
+      else { if(document.getElementById('dotsOrange').checked) dotsDev.addLayer(o.m); }
+    }else{ dotsImpl.removeLayer(o.m); dotsDev.removeLayer(o.m); }
   });
-
-  // rebuild networks to respect region
   rebuildNetworks();
-
-  // draw outline around filtered region
   const pts = MARKERS.filter(o=> (region==="ALL" || o.d.region===region)).map(o=>[o.d.lat,o.d.lon]);
   drawRegionOutline(region==="ALL" ? [] : pts);
-
-  // update pie
   refreshPie();
 }
-
-function toggleLayer(layer, on){
-  if(!layer) return;
-  if(on) map.addLayer(layer); else map.removeLayer(layer);
-}
+function toggleLayer(layer,on){ if(!layer) return; if(on) map.addLayer(layer); else map.removeLayer(layer); }
 
 function searchCountry(){
-  const q = canonCountry(elSearch.value);
+  const q = canonCountry(document.getElementById('search').value);
   const hit = MARKERS.find(o=>o.d.country.toLowerCase()===q.toLowerCase());
-  if(hit){
-    map.flyTo([hit.d.lat, hit.d.lon], 4);
-    hit.m.openPopup();
-  }
+  if(hit){ map.flyTo([hit.d.lat,hit.d.lon], 4); hit.m.openPopup(); }
 }
 
-/* ---- Country shading ---- */
 async function buildShading(){
   if(shadeLayer){ map.removeLayer(shadeLayer); shadeLayer=null; }
   const geo = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
+  const lookup = {}; ROWS.forEach(d=>{ const c = mapAdminName(canonCountry(d.country)); lookup[c.toLowerCase()] = d.status; });
 
-  const lookup = {};
-  ROWS.forEach(d=>{
-    const c = mapAdminName(canonCountry(d.country));
-    lookup[c.toLowerCase()] = d.status;
-  });
-
-  let unmatched = [];
-  shadeLayer = L.geoJSON(geo, {
-    style: f=>{
-      const admin = f.properties.ADMIN;
-      const status = lookup[admin.toLowerCase()];
-      if(!status){
-        unmatched.push(admin);
-        return {color:COLORS.neutral, weight:.6, fillColor:COLORS.neutral, fillOpacity:.05, opacity:.3};
-      }
-      const color = status==="Implemented" ? COLORS.red : COLORS.dev;
-      return {color:tinyTint(color,-50), weight:.9, fillColor:color, fillOpacity:.12, opacity:.7};
+  let unmatched=[];
+  shadeLayer = L.geoJSON(geo,{
+    style:f=>{
+      const admin = f.properties.ADMIN, status = lookup[admin.toLowerCase()];
+      if(!status){ unmatched.push(admin); return {color:COLORS.neutral,weight:.6,fillColor:COLORS.neutral,fillOpacity:.05,opacity:.3}; }
+      const color = status==="Implemented" ? COLORS.impl : COLORS.dev;
+      return {color:tinyTint(color,-50),weight:.9,fillColor:color,fillOpacity:.12,opacity:.7};
     }
   }).addTo(map);
 
-  if(!elShade.checked) map.removeLayer(shadeLayer);
+  if(!document.getElementById('shadeOn').checked) map.removeLayer(shadeLayer);
 }
-
 function showMismatches(){
-  // Only report sheet countries that didn't have a dot (no coords) or didn’t match region map
   const off = ROWS.filter(d=> (d.lat==null || d.lon==null));
   const names = off.map(d=>d.country);
-  elMismatch.textContent = names.length ? `Unmatched country tokens (add aliases or fix sheet): ${names.join(', ')}` : '';
+  document.getElementById('mismatch').textContent = names.length ? `Unmatched country tokens (add aliases or fix sheet): ${names.join(', ')}` : '';
 }
-
-/* ---- Utils ---- */
-function tinyTint(hex, amt){
-  const n = parseInt(hex.replace('#',''),16);
-  let r=(n>>16)+amt, g=((n>>8)&255)+amt, b=(n&255)+amt;
+function tinyTint(hex,amt){
+  const n=parseInt(hex.replace('#',''),16); let r=(n>>16)+amt,g=((n>>8)&255)+amt,b=(n&255)+amt;
   r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
   return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
 }
-function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
-
+function escapeHtml(str){return String(str).replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
 function downloadCSV(rows){
-  const headers = ["Country","Region","Status","Title","Notes","Lat","Lon"];
-  const csv = [headers.join(",")].concat(rows.map(r =>
-    [r.country, r.region, r.status, `"${(r.title||"").replace(/"/g,'""')}"`, `"${(r.notes||"").replace(/"/g,'""')}"`, r.lat??"", r.lon??""].join(",")
-  )).join("\n");
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='digital-id-export.csv'; a.click();
-  URL.revokeObjectURL(url);
+  const headers=["Country","Region","Status","Title","Notes","Lat","Lon"];
+  const csv=[headers.join(",")].concat(rows.map(r=>[r.country,r.region,r.status,
+    `"${(r.title||"").replace(/"/g,'""')}"`,`"${(r.notes||"").replace(/"/g,'""')}"`,r.lat??"",r.lon??""].join(","))).join("\n");
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download='digital-id-export.csv'; a.click(); URL.revokeObjectURL(url);
 }
-
-/* start */
 main();
 </script>
 </body>
