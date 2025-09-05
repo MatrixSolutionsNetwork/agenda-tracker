@@ -50,7 +50,7 @@
     /* Drawer */
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
-      width:340px; max-width:92vw; max-height:62vh; overflow:auto;
+      width:360px; max-width:92vw; max-height:66vh; overflow:auto;
       background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
@@ -76,6 +76,16 @@
     .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
     .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
+
+    /* mini inputs */
+    .textfield, .select, .num {
+      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
+      padding:6px 8px;font:500 13px Inter,ui-sans-serif; outline:none; width:100%;
+    }
+    .btn {
+      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
+      padding:6px 10px;font:600 13px Inter,ui-sans-serif; cursor:pointer;
+    }
   </style>
 </head>
 <body>
@@ -93,7 +103,29 @@
     <div class="drawer-head">
       <h3 class="drawer-title">Status Overview</h3>
       <div class="brand">Matrix Solutions Network</div>
-      <button id="drawerClose" class="icon-btn" title="Close">✕</button>
+      <div style="display:flex;gap:6px;">
+        <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
+        <button id="drawerClose" class="icon-btn" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- NEW: Search -->
+    <div class="row" style="gap:8px;align-items:center;">
+      <input id="searchCountry" class="textfield" list="countryList" placeholder="Search country… (Enter)" />
+      <datalist id="countryList"></datalist>
+      <button id="btnSearch" class="btn">Go</button>
+    </div>
+
+    <!-- NEW: Region + Timeline (Min year) -->
+    <div class="row" style="gap:8px;align-items:center;">
+      <select id="regionSelect" class="select" title="Region">
+        <option value="__all">All regions</option>
+      </select>
+    </div>
+    <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
+      <label style="white-space:nowrap;">Min year:</label>
+      <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
+      <span id="yearMinVal" style="width:44px;text-align:right;">Any</span>
     </div>
 
     <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
@@ -119,7 +151,7 @@
 
     <div class="hr"></div>
 
-    <!-- Local networks (Imp: ON, Dev: OFF) -->
+    <!-- Local networks (Imp ON, Dev OFF) -->
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netImp" checked />
@@ -134,8 +166,16 @@
     </div>
     <div class="row" style="gap:8px; align-items:center; font-size:12px;">
       <label>Neighbors:</label>
-      <input type="number" id="kNeighbors" min="1" max="6" value="4" style="width:48px;background:#0b1216;border:1px solid #22313a;border-radius:6px;color:#e6f3ea;padding:2px 6px;">
-      <span class="hint">(nearest neighbors per dot)</span>
+      <input type="number" id="kNeighbors" min="1" max="6" value="4" class="num" style="width:56px;">
+      <span class="hint">(nearest per dot)</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- NEW: Export -->
+    <div class="row" style="gap:8px;">
+      <button id="btnExport" class="btn" title="Download current view as CSV">Export CSV</button>
+      <span class="hint" id="lastUpdated" style="margin-left:auto;"></span>
     </div>
 
     <div id="debug" class="debug"></div>
@@ -172,13 +212,13 @@
       ["republic of serbia","serbia"]
     ]);
 
-    // manual centroid overrides for tricky cases (kept minimal)
+    // manual centroid overrides for tricky cases
     const CENTROID_OVERRIDES = new Map([
-      ["spain",        [40.4168, -3.7038]],   // Madrid
-      ["italy",        [42.5, 12.5]],         // central Italy
-      ["denmark",      [56.2639, 9.5019]],    // central Denmark (Jutland)
-      ["united kingdom",[52.3555,-1.1743]],   // England interior
-      ["serbia",       [44.0165, 21.0059]]    // interior Serbia
+      ["spain",        [40.4168, -3.7038]],
+      ["italy",        [42.5, 12.5]],
+      ["denmark",      [56.2639, 9.5019]],
+      ["united kingdom",[52.3555,-1.1743]],
+      ["serbia",       [44.0165, 21.0059]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -205,7 +245,6 @@
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
-    // Haversine (km)
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
@@ -229,6 +268,7 @@
     const fab = document.getElementById('fab');
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
+    const drawerRefresh = document.getElementById('drawerRefresh');
     const netImp = document.getElementById('netImp');
     const netDev = document.getElementById('netDev');
     const kNeighborsInput = document.getElementById('kNeighbors');
@@ -237,15 +277,31 @@
     const dbgEl = document.getElementById('debug');
     const dbg = (m)=>{ dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + m; };
 
+    const searchInput = document.getElementById('searchCountry');
+    const searchBtn = document.getElementById('btnSearch');
+    const dataList = document.getElementById('countryList');
+    const regionSelect = document.getElementById('regionSelect');
+    const yearRow = document.getElementById('yearRow');
+    const yearMin = document.getElementById('yearMin');
+    const yearMinVal = document.getElementById('yearMinVal');
+    const btnExport = document.getElementById('btnExport');
+    const lastUpdated = document.getElementById('lastUpdated');
+
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
+    drawerRefresh.addEventListener('click', ()=> location.reload());
 
-    // centroids store for networks
+    // state
     let implementedCoords = [];
     let devCoords = [];
+    let entries = [];     // all plotted rows with metadata
+    let regionMap = {};   // countryKey -> region
+    let allRegions = new Set();
+    let yearBounds = null;// {min,max} if any year present
 
+    /* ----------- Build pipeline ----------- */
     (async function init(){
-      // 1) polygons
+      // 1) polygons (for centroids + region)
       let geo=null, lastErr=null;
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -272,6 +328,9 @@
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
       }
+      function getRegion(props){
+        return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
+      }
       function centroidInside(feature){
         try {
           if (feature.geometry && (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
@@ -297,8 +356,8 @@
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
-      // centroid map
       const centroids = {};
+      regionMap = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
@@ -308,64 +367,78 @@
         } else {
           centroids[nm] = centroidInside(l.feature);
         }
+        const reg = getRegion(l.feature.properties) || 'Other';
+        regionMap[nm] = reg;
+        allRegions.add(reg);
+      });
+
+      // build region select options
+      [...[...allRegions].sort()].forEach(r=>{
+        const opt=document.createElement('option');
+        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
       // 2) sheet
-      let rows;
+      let rawRows;
       try{
-        const res = await fetch(CSV_URL, { cache:'no-store' });
+        const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+        lastUpdated.textContent = 'Updated: ' + (res.headers.get('Date') || 'now');
         const text = await res.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-        rows = parsed.data.map(row => ({
-          countryRaw: String(row["Countries"]||"").trim(),
-          title:      String(row["Title"]||"").trim(),
-          status:     String(row["Status"]||"").trim(),
-          notes:      String(row["Description"]||"").trim()
-        })).filter(r=>r.countryRaw);
+        rawRows = parsed.data;
       }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      // 3) plot
+      // 3) normalize + collect years/regions
+      entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
       implementedCoords=[]; devCoords=[];
+      let yMin=Infinity, yMax=-Infinity;
 
-      for (const r of rows){
-        for (const raw of splitCountries(r.countryRaw)){
+      function pickYear(row){
+        const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
+        for (const k of keys){
+          if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
+        }
+        return null;
+      }
+
+      for (const row of rawRows){
+        const title = String(row["Title"]||"").trim();
+        const status = String(row["Status"]||"").trim();
+        const notes = String(row["Description"]||"").trim();
+        const yr = pickYear(row);
+
+        if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
+
+        const countriesCell = String(row["Countries"]||"").trim();
+        if (!countriesCell) continue;
+
+        for (const raw of splitCountries(countriesCell)){
           const key = normalizeCountry(raw);
           let pt = centroids[key];
-
-          // tiny fallback: if not found, try dropping leading “republic/kingdom of”
           if (!pt){
             const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
             pt = centroids[alt];
           }
           if (!pt){ unmatched.add(raw); continue; }
 
-          const isImplemented = /implement/i.test(r.status);
-          const isDev = /develop|discussion/i.test(r.status);
-          const color = isImplemented ? getCSS('--red') : getCSS('--orange');
-          const layer = isImplemented ? dotsImpLayer : dotsDevLayer;
-
-          const marker = L.circleMarker([pt.lat, pt.lng], {
-            radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
-          })
-          .bindTooltip(`${titleCase(key)}: ${r.status}`, {direction:'top', offset:[0,-6]})
-          .bindPopup(`
-            <div style="min-width:240px">
-              <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(titleCase(key))}</h3>
-              ${r.title ? `<div><strong>Program:</strong> ${escapeHtml(r.title)}</div>` : ""}
-              ${r.status ? `<div><strong>Status:</strong> ${escapeHtml(r.status)}</div>` : ""}
-              ${r.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(r.notes)}</div>` : ""}
-            </div>
-          `).addTo(layer);
+          const reg = regionMap[key] || 'Other';
+          const isImplemented = /implement/i.test(status);
+          const isDev = /develop|discussion/i.test(status);
+          const obj = {
+            key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
+            status, isImplemented, isDev, title, notes, year: yr, region: reg
+          };
+          entries.push(obj);
 
           if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
           else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
         }
       }
 
-      // 4) counters + pie
+      // 4) UI: pie + counters
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
 
@@ -393,27 +466,44 @@
         }
       });
 
-      // dot visibility toggles
-      function refreshDots(){
-        const sI=showImpDots.checked, sD=showDevDots.checked;
-        if (sI && !map.hasLayer(dotsImpLayer)) dotsImpLayer.addTo(map); else if (!sI && map.hasLayer(dotsImpLayer)) map.removeLayer(dotsImpLayer);
-        if (sD && !map.hasLayer(dotsDevLayer)) dotsDevLayer.addTo(map); else if (!sD && map.hasLayer(dotsDevLayer)) map.removeLayer(dotsDevLayer);
-      }
-      showImpDots.addEventListener('change', refreshDots);
-      showDevDots.addEventListener('change', refreshDots);
-      refreshDots();
+      // 5) Search list
+      const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
+      dataList.innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
 
-      // local networks (Imp ON, Dev OFF)
-      function rebuildNetworks(){
-        const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
-        linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
-        if (netImp.checked) buildLocalNetwork(implementedCoords, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
-        if (netDev.checked) buildLocalNetwork(devCoords,         getCSS('--orange'),linesDevLayer, k, .30, 1.1);
+      // 6) Timeline control (only if we have any year)
+      if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
+        yearBounds = {min:yMin, max:yMax};
+        yearRow.style.display='flex';
+        yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
+        yearMinVal.textContent = 'Any';
+        yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
-      netImp.addEventListener('change', rebuildNetworks);
-      netDev.addEventListener('change', rebuildNetworks);
-      kNeighborsInput.addEventListener('change', rebuildNetworks);
-      rebuildNetworks();
+
+      // 7) Listeners
+      showImpDots.addEventListener('change', applyFilters);
+      showDevDots.addEventListener('change', applyFilters);
+      regionSelect.addEventListener('change', applyFilters);
+      netImp.addEventListener('change', applyNetworks);
+      netDev.addEventListener('change', applyNetworks);
+      kNeighborsInput.addEventListener('change', applyNetworks);
+      btnExport.addEventListener('click', exportCurrent);
+
+      function runSearch(){
+        const q = (searchInput.value||'').trim().toLowerCase();
+        if (!q) return;
+        const hit = entries.find(e=>e.country.toLowerCase()===q) || entries.find(e=>e.country.toLowerCase().includes(q));
+        if (!hit) return;
+        map.flyTo([hit.lat, hit.lng], 4, {duration:.6});
+        L.popup({autoClose:true, closeOnClick:true})
+          .setLatLng([hit.lat,hit.lng])
+          .setContent(`<b>${escapeHtml(hit.country)}</b><br>${escapeHtml(hit.status)}`)
+          .openOn(map);
+      }
+      searchBtn.addEventListener('click', runSearch);
+      searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
+
+      // 8) Draw initial view
+      applyFilters();
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
@@ -421,7 +511,68 @@
       }
     })();
 
-    // Build k-NN network (deduped)
+    /* -------- Filtering, rendering, networks, export -------- */
+    function currentFilters(){
+      const showImp = document.getElementById('showImpDots').checked;
+      const showDev = document.getElementById('showDevDots').checked;
+      const region = document.getElementById('regionSelect').value || '__all';
+      const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
+      const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
+      return {showImp, showDev, region, minYear, hasYearUI};
+    }
+
+    function applyFilters(){
+      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
+
+      dotsImpLayer.clearLayers();
+      dotsDevLayer.clearLayers();
+
+      const red = getCSS('--red'), orange=getCSS('--orange');
+
+      const filt = e => {
+        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
+        if (e.isImplemented && !showImp) return false;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
+      };
+
+      const impPts=[], devPts=[];
+      for (const e of entries){
+        if (!filt(e)) continue;
+        const color = e.isImplemented ? red : orange;
+        const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
+
+        const m = L.circleMarker([e.lat, e.lng], {
+          radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
+        })
+        .bindTooltip(`${e.country}: ${e.status}`, {direction:'top', offset:[0,-6]})
+        .bindPopup(`
+          <div style="min-width:240px">
+            <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(e.country)}</h3>
+            ${e.title ? `<div><strong>Program:</strong> ${escapeHtml(e.title)}</div>` : ""}
+            ${e.status ? `<div><strong>Status:</strong> ${escapeHtml(e.status)}</div>` : ""}
+            ${Number.isInteger(e.year) ? `<div><strong>Year:</strong> ${e.year}</div>` : ""}
+            ${e.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(e.notes)}</div>` : ""}
+          </div>
+        `).addTo(layer);
+
+        if (e.isImplemented) impPts.push([e.lat,e.lng]); else if (e.isDev) devPts.push([e.lat,e.lng]);
+      }
+
+      // rebuild networks for filtered points
+      rebuildNetworksWithPoints(impPts, devPts);
+    }
+
+    function rebuildNetworksWithPoints(impPts, devPts){
+      const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
+      linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
+
+      if (netImp.checked && impPts.length>1) buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
+      if (netDev.checked && devPts.length>1) buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
+    }
+    function applyNetworks(){ applyFilters(); } // reuse filtering to rebuild lines
+
     function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
       const n=coords.length; if(n<2) return;
       const seen=new Set();
@@ -435,6 +586,36 @@
           L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
         }
       }
+    }
+
+    function exportCurrent(){
+      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
+      const rows = entries.filter(e=>{
+        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
+        if (e.isImplemented && !showImp) return false;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
+      }).map(e=>({
+        Country:e.country, Title:e.title, Status:e.status, Year:e.year||"",
+        Region:e.region||"", Lat:e.lat, Lng:e.lng, Notes:e.notes||""
+      }));
+
+      const header = Object.keys(rows[0]||{
+        Country:"",Title:"",Status:"",Year:"",Region:"",Lat:"",Lng:"",Notes:""
+      });
+      const csv = [header.join(",")]
+        .concat(rows.map(r=>header.map(k=>{
+          const v = String(r[k]??"").replace(/"/g,'""');
+          return `"${v}"`;
+        }).join(",")))
+        .join("\n");
+
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download='digital-id-export.csv';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
   </script>
 </body>
