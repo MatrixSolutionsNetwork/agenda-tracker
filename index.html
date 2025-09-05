@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Digital ID Dots</title>
+  <title>Matrix Solutions Network — Digital ID (Dots)</title>
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -18,7 +18,7 @@
       --panel:#0f1418; --panelEdge:#151b21;
       --orange:#ff9900; /* In development / discussion */
       --red:#ff3333;    /* Implemented */
-      --other:#5ec1ff;  /* anything else */
+      --other:#5ec1ff;  /* any other status */
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
     #map{height:100%;width:100%}
@@ -27,7 +27,7 @@
       position:absolute; top:12px; left:12px; z-index:1000;
       background:linear-gradient(180deg,rgba(21,27,33,.92),rgba(15,20,24,.94));
       border:1px solid var(--panelEdge); border-radius:12px;
-      padding:12px 14px; width:300px; font:14px/1.4 ui-sans-serif,system-ui;
+      padding:12px 14px; width:310px; font:14px/1.4 ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
     }
     .panel h2{margin:0 0 8px 0; font-size:15px;}
@@ -35,7 +35,8 @@
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
     .hr{border:none;border-top:1px solid #182126;margin:8px 0}
-    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+    .debug{margin-top:8px;max-height:140px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+
     .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
     .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
@@ -51,14 +52,41 @@
     <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
     <div class="hr"></div>
     <div class="debug" id="debug"></div>
-    <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet (CSV). Click a dot for details.</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet. Click a dot for details.</div>
   </div>
 
   <script>
-    /* === CONFIG === */
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+    /* === YOUR SHEET LINK (put whatever you copied) === */
+    const SHEET_PUBLISHED_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Minimal alias table for common variants/abbreviations
+    /* === Robust URL coercion: accept pubhtml/edit/share links and coerce to CSV === */
+    function toCsvUrl(u){
+      if (!u) return u;
+      // already csv
+      if (/output=csv/i.test(u)) return u;
+      // pubhtml -> pub?output=csv (preserve gid if present)
+      if (/\/pubhtml/i.test(u)) {
+        const url = new URL(u);
+        url.pathname = url.pathname.replace(/\/pubhtml/i, "/pub");
+        url.searchParams.set("output","csv");
+        if (!url.searchParams.has("single")) url.searchParams.set("single","true");
+        return url.toString();
+      }
+      // edit?usp=sharing or /d/{id} — build /export?format=csv
+      if (/\/spreadsheets\/d\//i.test(u)) {
+        const m = u.match(/\/spreadsheets\/d\/([^/]+)/i);
+        if (m) {
+          const id = m[1];
+          const url = new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
+          url.searchParams.set("format","csv");
+          return url.toString();
+        }
+      }
+      return u;
+    }
+    const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
+
+    /* === Minimal alias map for common variants === */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
@@ -75,7 +103,7 @@
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"]
     ]);
 
-    // Color rules: red for Implemented; orange for anything that looks like "in dev/discussion"; else blue.
+    // Color rules
     function colorForStatus(s){
       const k = String(s||"").toLowerCase();
       if (k.includes("implement")) return getCSS("--red");
@@ -83,7 +111,7 @@
       return getCSS("--other");
     }
 
-    /* === MAP === */
+    // Map
     const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
@@ -91,37 +119,58 @@
     const dots = L.layerGroup().addTo(map);
 
     (async function init(){
-      // 1) Load polygons once to get country centroids
-      const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
+      const dbg = (msg) => { const el = document.getElementById('debug'); el.style.display='block'; el.innerHTML += (el.innerHTML?'<br>':'') + msg; };
+
+      // 1) Load a reliable world dataset (CORS-friendly)
+      //    property name detected dynamically among common keys
+      let geo;
+      try {
+        const res = await fetch('https://cdn.jsdelivr.net/npm/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json', {cache:'default'});
+        geo = await res.json();
+      } catch(e){
+        dbg("Failed to load world polygons. Check network/CORS.");
+        console.error(e);
+        return;
+      }
+
+      const nameKey = detectNameKey(geo.features[0]?.properties || {});
+      if (!nameKey){ dbg("Could not detect country name property in GeoJSON."); return; }
+
+      // Build centroids
       const centroids = {};
-      L.geoJSON(world).eachLayer(l=>{
-        const key = normalizeCountry(l.feature.properties.ADMIN);
-        centroids[key] = l.getBounds().getCenter();
+      L.geoJSON(geo).eachLayer(l=>{
+        const nm = normalizeCountry(l.feature.properties[nameKey]);
+        centroids[nm] = l.getBounds().getCenter();
       });
 
-      // 2) Load your sheet
-      const rows = await loadSheet(CSV_URL);
+      // 2) Load sheet CSV (auto-coerced URL)
+      let rows;
+      try {
+        rows = await loadSheet(CSV_URL);
+      } catch(e){
+        dbg("Failed to load/parse CSV. Make sure the sheet is published as CSV.");
+        console.error(e);
+        return;
+      }
 
-      // 3) Expand multi-country cells into individual records and draw dots
+      // 3) Expand and draw
       const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
 
       for (const r of rows){
-        const countries = splitCountries(r.countryRaw);
-        for (const cRaw of countries){
-          const c = normalizeCountry(cRaw);
-          const key = centroids[c] ? c : null;
-          if (!key){ unmatched.add(cRaw); continue; }
+        for (const cRaw of splitCountries(r.countryRaw)){
+          const key = normalizeCountry(cRaw);
+          const pt = centroids[key];
+          if (!pt){ unmatched.add(cRaw); continue; }
 
           const color = colorForStatus(r.status);
-          L.circleMarker(centroids[key], {
+          L.circleMarker(pt, {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
           })
-          .bindTooltip(`${titleCase(c)}: ${r.status}`, {direction:'top', offset:[0,-6]})
-          .bindPopup(popupHtml(titleCase(c), r))
+          .bindTooltip(`${titleCase(key)}: ${r.status}`, {direction:'top', offset:[0,-6]})
+          .bindPopup(popupHtml(titleCase(key), r))
           .addTo(dots);
 
-          // counts
           const s = r.status.toLowerCase();
           if (s.includes("implement")) counts.imp++;
           else if (s.includes("develop") || s.includes("discussion")) counts.dev++;
@@ -133,11 +182,8 @@
       document.getElementById('c-dev').textContent = counts.dev;
       document.getElementById('c-oth').textContent = counts.other;
 
-      // 4) Show unmatched in panel (so you can add aliases if needed)
       if (unmatched.size){
-        const dbg = document.getElementById('debug');
-        dbg.style.display = 'block';
-        dbg.innerHTML = `<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`;
+        dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
       }
     })();
@@ -145,6 +191,7 @@
     /* === Helpers === */
     async function loadSheet(url){
       const res = await fetch(url, { cache:'no-store' });
+      if (!res.ok) throw new Error("CSV fetch failed");
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
       // Expecting headers: Countries, Title, Status, Description
@@ -157,9 +204,8 @@
     }
 
     function splitCountries(cell){
-      // Split on comma/semicolon/slash/&/‘and’; keep tokens clean
       return String(cell)
-        .replace(/・/g, ',') // just in case
+        .replace(/・/g, ',')
         .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
         .map(s=>s.trim())
         .filter(Boolean);
@@ -171,8 +217,12 @@
         .replace(/[^a-z0-9 ]+/gi,' ')
         .replace(/\s+/g,' ')
         .toLowerCase().trim();
-      const aliased = COUNTRY_ALIASES.get(k) || k;
-      return aliased;
+      return COUNTRY_ALIASES.get(k) || k;
+    }
+
+    function detectNameKey(props){
+      const candidates = ["ADMIN","NAME_EN","name_en","NAME","name","name_long","NAME_LONG","formal_en","SOVEREIGNT","sovereignt"];
+      return candidates.find(k => k in props) || Object.keys(props).find(k => /name/i.test(k));
     }
 
     function popupHtml(countryName, rec){
