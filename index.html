@@ -12,9 +12,13 @@
   <!-- CSV parsing -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
+  <!-- Pie chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
     :root{
       --bg:#0b0f12; --text:#e6f3ea; --muted:#8aa39a;
+      --chip:#0b1216; --chipEdge:#22313a;
       --panel:#0f1418; --panelEdge:#151b21;
       --orange:#ff9900; /* In development / discussion */
       --red:#ff3333;    /* Implemented */
@@ -23,36 +27,46 @@
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
     #map{height:100%;width:100%}
 
-    /* ===== Panel (now resizable + collapsible) ===== */
-    .panel{
-      position:absolute; top:12px; left:12px; z-index:1000;
-      background:linear-gradient(180deg,rgba(21,27,33,.92),rgba(15,20,24,.94));
-      border:1px solid var(--panelEdge); border-radius:12px;
-      padding:10px 12px; width:320px; font:14px/1.4 ui-sans-serif,system-ui;
+    /* ===== Bottom-left toolbar (works nicely inside Notion) ===== */
+    #fab{
+      position:absolute; left:12px; bottom:12px; z-index:1002;
+      display:inline-flex; align-items:center; gap:8px;
+      background:var(--chip); border:1px solid var(--chipEdge); color:#cfe9dc;
+      border-radius:999px; padding:8px 12px; cursor:pointer;
+      font:600 13px ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
-      overflow:auto;                /* required for CSS resize */
-      resize: both;                 /* drag bottom-right to resize */
-      min-width: 220px; max-width: 420px; min-height: 90px;
+      user-select:none;
     }
-    .panel-header{
-      display:flex; align-items:center; justify-content:space-between;
-      gap:8px; user-select:none; cursor:default;
+    #fab:hover{ filter:brightness(1.08); }
+    #fab .dot{width:10px;height:10px;border-radius:50%;}
+    #fab .d-red{ background:var(--red); }
+    #fab .d-org{ background:var(--orange); }
+    #fab .d-oth{ background:var(--other); }
+
+    /* Drawer that opens above the fab */
+    #drawer{
+      position:absolute; left:12px; bottom:56px; z-index:1001;
+      width:320px; max-width:90vw; max-height:60vh; overflow:auto;
+      background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
+      border:1px solid var(--panelEdge); border-radius:12px;
+      padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
+      backdrop-filter: blur(1px);
     }
-    .panel-header h2{margin:0; font-size:15px;}
+    #drawer.open{ display:block; }
+    .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .drawer-title{ margin:0; font-size:14px; }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
       background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0;
     }
-    .icon-btn:hover{filter:brightness(1.08);}
-    .panel.collapsed{padding:8px 10px; height:auto;}
-    .panel.collapsed #panelBody{display:none;}
-    .row{display:flex;align-items:center;gap:8px;margin:4px 0;}
+    .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
     .hr{border:none;border-top:1px solid #182126;margin:8px 0}
-    .debug{margin-top:8px;max-height:160px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+    .hint{font-size:12px;color:var(--muted)}
+    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
 
     .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
@@ -62,20 +76,36 @@
 <body>
   <div id="map"></div>
 
-  <div class="panel" id="panel">
-    <div class="panel-header" id="panelHeader">
-      <h2>Status Overview</h2>
-      <button id="panelToggle" class="icon-btn" aria-label="Collapse" aria-expanded="true" title="Collapse/Expand">▾</button>
+  <!-- Tiny toolbar -->
+  <div id="fab" aria-label="Open stats panel">
+    <span style="opacity:.85;">Digital ID Overview</span>
+    <span class="dot d-red" title="Implemented"></span>
+    <span class="dot d-org" title="In development"></span>
+    <span class="dot d-oth" title="Other"></span>
+    <span style="font-size:12px;opacity:.7;">▸</span>
+  </div>
+
+  <!-- Compact drawer with pie + toggles -->
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Status overview">
+    <div class="drawer-head">
+      <h3 class="drawer-title">Status Overview</h3>
+      <button id="drawerClose" class="icon-btn" title="Close">✕</button>
     </div>
 
-    <div id="panelBody">
-      <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-      <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
-      <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
-      <div class="hr"></div>
-      <div class="debug" id="debug"></div>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">Data loads from your Google Sheet. Click a dot for details.</div>
-    </div>
+    <canvas id="statusPie" width="280" height="180" style="margin-top:8px;"></canvas>
+
+    <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
+    <div class="hr"></div>
+
+    <label class="row" style="cursor:pointer;">
+      <input type="checkbox" id="toggleNetwork" />
+      <span>Show network lines for Implemented</span>
+    </label>
+
+    <div id="debug" class="debug"></div>
+    <div class="hint" style="margin-top:6px;">Data loads from your Google Sheet. Click a dot for country details.</div>
   </div>
 
   <script>
@@ -142,17 +172,27 @@
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
 
     /* ---------- Map ---------- */
-    const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
+    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
-    const dots = L.layerGroup().addTo(map);
+    const dotsLayer = L.layerGroup().addTo(map);
+    const linesLayer = L.layerGroup(); // toggled on demand
 
     const dbgEl = document.getElementById('debug');
     const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
 
+    // toolbar open/close
+    const fab = document.getElementById('fab');
+    const drawer = document.getElementById('drawer');
+    const drawerClose = document.getElementById('drawerClose');
+    function openDrawer(){ drawer.classList.add('open'); }
+    function closeDrawer(){ drawer.classList.remove('open'); }
+    fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
+    drawerClose.addEventListener('click', closeDrawer);
+
     (async function init(){
-      // 1) Polygons with multi-source fallback
+      // 1) Polygons with multi-source fallback for centroids
       let geo = null, lastErr = null;
       const SOURCES = [
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -168,13 +208,8 @@
           geo = j; break;
         } catch(e){ lastErr = e; }
       }
-      if (!geo){
-        dbg(`Failed to load world polygons (CDN blocked?).`);
-        console.error('World polygons fetch failed:', lastErr);
-        return;
-      }
+      if (!geo){ dbg(`Failed to load world polygons (CDN blocked?).`); console.error('Polygons fetch failed:', lastErr); return; }
 
-      // 2) pick a country name field
       function getName(props){
         if (!props) return null;
         if (typeof props.name === 'string') return props.name;
@@ -187,26 +222,32 @@
         return null;
       }
 
-      // 3) build centroids
+      // build centroids
       const centroids = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (nm) centroids[nm] = l.getBounds().getCenter();
       });
 
-      // 4) load sheet
+      // 2) load sheet
       let rows;
       try {
-        rows = await loadSheet(CSV_URL);
-      } catch(e){
-        dbg("Failed to load/parse CSV. Ensure the sheet is published and reachable.");
-        console.error(e);
-        return;
-      }
+        const res = await fetch(CSV_URL, { cache:'no-store' });
+        if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+        const text = await res.text();
+        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+        rows = parsed.data.map(row => ({
+          countryRaw: String(row["Countries"]||"").trim(),
+          title:      String(row["Title"]||"").trim(),
+          status:     String(row["Status"]||"").trim(),
+          notes:      String(row["Description"]||"").trim()
+        })).filter(r => r.countryRaw);
+      } catch(e){ dbg("Failed to load/parse CSV. Ensure the sheet is published and reachable."); console.error(e); return; }
 
-      // 5) draw
+      // 3) draw dots + gather implemented coords
       const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
+      const implementedCoords = [];
 
       for (const r of rows){
         for (const raw of splitCountries(r.countryRaw)){
@@ -215,6 +256,9 @@
           if (!pt){ unmatched.add(raw); continue; }
 
           const color = colorForStatus(r.status);
+          const isImplemented = /implement/i.test(r.status);
+          if (isImplemented) implementedCoords.push([pt.lat, pt.lng]);
+
           L.circleMarker(pt, {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
           })
@@ -226,7 +270,7 @@
               ${r.status ? `<div><strong>Status:</strong> ${escapeHtml(r.status)}</div>` : ""}
               ${r.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(r.notes)}</div>` : ""}
             </div>
-          `).addTo(dots);
+          `).addTo(dotsLayer);
 
           const s = r.status.toLowerCase();
           if (s.includes("implement")) counts.imp++;
@@ -235,50 +279,65 @@
         }
       }
 
+      // 4) update counters + pie chart
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
       document.getElementById('c-oth').textContent = counts.other;
+
+      const total = Math.max(1, counts.imp + counts.dev + counts.other);
+      const pie = new Chart(document.getElementById('statusPie'), {
+        type: 'pie',
+        data: {
+          labels: ['Implemented', 'In development', 'Other'],
+          datasets: [{
+            data: [counts.imp, counts.dev, counts.other],
+            backgroundColor: [getCSS('--red'), getCSS('--orange'), getCSS('--other')],
+            borderColor: 'rgba(0,0,0,.45)', borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            tooltip: {
+              callbacks: {
+                label(ctx){
+                  const v = ctx.raw || 0;
+                  const pct = Math.round((v/total)*100);
+                  return `${ctx.label}: ${v} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 5) build network lines (Implemented only), toggled off by default
+      function buildNetwork(){
+        linesLayer.clearLayers();
+        const n = implementedCoords.length;
+        for (let i=0;i<n;i++){
+          for (let j=i+1;j<n;j++){
+            L.polyline([implementedCoords[i], implementedCoords[j]], {
+              color: getCSS('--red'), weight: 1, opacity: 0.18, smoothFactor: 1
+            }).addTo(linesLayer);
+          }
+        }
+      }
+      const toggleNetwork = document.getElementById('toggleNetwork');
+      toggleNetwork.addEventListener('change', (e)=>{
+        if (e.target.checked){
+          if (!map.hasLayer(linesLayer)){ buildNetwork(); linesLayer.addTo(map); }
+        } else {
+          if (map.hasLayer(linesLayer)) map.removeLayer(linesLayer);
+        }
+      });
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
       }
     })();
-
-    async function loadSheet(url){
-      const res = await fetch(url, { cache:'no-store' });
-      if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
-      const text = await res.text();
-      const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-      return parsed.data.map(row => ({
-        countryRaw: String(row["Countries"]||"").trim(),
-        title:      String(row["Title"]||"").trim(),
-        status:     String(row["Status"]||"").trim(),
-        notes:      String(row["Description"]||"").trim()
-      })).filter(r => r.countryRaw);
-    }
-
-    /* ===== Collapse / Expand (non-breaking) ===== */
-    const panel = document.getElementById('panel');
-    const panelBody = document.getElementById('panelBody');
-    const panelToggle = document.getElementById('panelToggle');
-    const panelHeader = document.getElementById('panelHeader');
-
-    function setCollapsed(collapsed){
-      panel.classList.toggle('collapsed', collapsed);
-      panelToggle.setAttribute('aria-expanded', String(!collapsed));
-      panelToggle.textContent = collapsed ? '▸' : '▾';
-      try{ localStorage.setItem('msn_panel_collapsed', collapsed ? '1':'0'); }catch{}
-    }
-    // restore previous state
-    try{
-      const prev = localStorage.getItem('msn_panel_collapsed');
-      if (prev === '1') setCollapsed(true);
-    }catch{}
-
-    panelToggle.addEventListener('click', (e)=>{ e.stopPropagation(); setCollapsed(!panel.classList.contains('collapsed')); });
-    // also allow double-click on the header to toggle
-    panelHeader.addEventListener('dblclick', ()=> setCollapsed(!panel.classList.contains('collapsed')));
   </script>
 </body>
 </html>
