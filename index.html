@@ -3,7 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Digital ID (Dots)</title>
+  <title>Matrix Solutions Network — Digital ID</title>
+
+  <!-- Inter font (Notion-style) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -12,11 +15,11 @@
   <!-- CSV parsing -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Pie chart + labels -->
+  <!-- Pie + labels -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
-  <!-- Centroids that stay INSIDE polygons -->
+  <!-- Robust in-polygon centroid -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
 
@@ -27,25 +30,22 @@
       --panel:#0f1418; --panelEdge:#151b21;
       --orange:#ff9900; /* In development / discussion */
       --red:#ff3333;    /* Implemented */
-      --other:#5ec1ff;  /* any other status */
     }
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
 
-    /* Bottom-left toolbar */
+    /* Bottom-left chip */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
-      display:inline-flex; align-items:center; gap:8px;
+      display:inline-flex; align-items:center; gap:10px;
       background:var(--chip); border:1px solid var(--chipEdge); color:#cfe9dc;
-      border-radius:999px; padding:8px 12px; cursor:pointer;
-      font:600 13px ui-sans-serif,system-ui;
-      box-shadow:0 6px 18px rgba(0,0,0,.45);
-      user-select:none;
+      border-radius:999px; padding:10px 12px; cursor:pointer;
+      font:600 13px Inter,ui-sans-serif,system-ui;
+      box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
     }
-    #fab .dot{width:10px;height:10px;border-radius:50%;}
-    #fab .d-red{ background:var(--red); }
-    #fab .d-org{ background:var(--orange); }
-    #fab .d-oth{ background:var(--other); }
+    #fab .dot{width:10px;height:10px;border-radius:50%}
+    #fab .d-red{ background:var(--red) }
+    #fab .d-org{ background:var(--orange) }
 
     /* Drawer */
     #drawer{
@@ -56,9 +56,10 @@
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
       backdrop-filter: blur(1px);
     }
-    #drawer.open{ display:block; }
+    #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .drawer-title{ margin:0; font-size:14px; }
+    .brand{ color:#7be2b1; font-weight:700; font-size:12px; letter-spacing:.3px }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
       background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
@@ -82,25 +83,23 @@
 
   <!-- Tiny toolbar -->
   <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.85;">Digital ID Overview</span>
+    <span style="opacity:.85;">Digital ID Overview — <u>click to open</u></span>
     <span class="dot d-red" title="Implemented"></span>
     <span class="dot d-org" title="In development"></span>
-    <span class="dot d-oth" title="Other"></span>
-    <span style="font-size:12px;opacity:.7;">▸</span>
   </div>
 
-  <!-- Drawer (starts OPEN by default) -->
+  <!-- Drawer (open by default) -->
   <div id="drawer" class="open" role="dialog" aria-modal="false" aria-label="Status overview">
     <div class="drawer-head">
       <h3 class="drawer-title">Status Overview</h3>
+      <div class="brand">Matrix Solutions Network</div>
       <button id="drawerClose" class="icon-btn" title="Close">✕</button>
     </div>
 
-    <canvas id="statusPie" width="300" height="190" style="margin-top:8px;"></canvas>
+    <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
 
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--other)"></span> Other <span class="count" id="c-oth">0</span></div>
 
     <div class="hr"></div>
 
@@ -117,16 +116,10 @@
         <span>Show dots — In development</span>
       </label>
     </div>
-    <div class="row" style="gap:12px;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="showOthDots" checked />
-        <span>Show dots — Other</span>
-      </label>
-    </div>
 
     <div class="hr"></div>
 
-    <!-- Local networks (default ON, neighbors = 4) -->
+    <!-- Local networks (Imp: ON, Dev: OFF) -->
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netImp" checked />
@@ -135,7 +128,7 @@
     </div>
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="netDev" checked />
+        <input type="checkbox" id="netDev" />
         <span>Local network — In development</span>
       </label>
     </div>
@@ -146,18 +139,18 @@
     </div>
 
     <div id="debug" class="debug"></div>
-    <div class="hint" style="margin-top:6px;">Data loads from your Google Sheet. Click a dot for country details.</div>
+    <div class="hint" style="margin-top:6px;">Click a dot for country details.</div>
   </div>
 
   <script>
-    /* === SHEET LINK (any format; we coerce to CSV) === */
+    /* === SHEET LINK (published) === */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    /* ---------- Utilities ---------- */
+    /* ---------- Helpers ---------- */
     function toCsvUrl(u){
       if (!u) return u;
-      if (/output=csv/i.test(u)) return u; // already CSV
+      if (/output=csv/i.test(u)) return u;
       if (/\/pubhtml/i.test(u)){ const url = new URL(u); url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single"))url.searchParams.set("single","true"); return url.toString(); }
       if (/\/spreadsheets\/d\//i.test(u)){ const m = u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
       return u;
@@ -166,26 +159,34 @@
 
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["united states of america","united states"],
-      ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
-      ["wales","united kingdom"], ["northern ireland","united kingdom"], ["great britain","united kingdom"],
+      ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
       ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
-      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["korea, south","south korea"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
       ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
       ["macedonia","north macedonia"], ["lao pdr","laos"],
       ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
-      ["congo, democratic republic of the","democratic republic of the congo"],
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
-      ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"]
+      ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
+      ["republic of serbia","serbia"]
     ]);
 
-    function colorForStatus(s){
-      const k = String(s||"").toLowerCase();
-      if (k.includes("implement")) return getCSS("--red");
-      if (k.includes("in development") || k.includes("in discussion") || k.includes("discussion") || k.includes("develop"))
-        return getCSS("--orange");
-      return getCSS("--other");
+    // manual centroid overrides for tricky cases (kept minimal)
+    const CENTROID_OVERRIDES = new Map([
+      ["spain",        [40.4168, -3.7038]],   // Madrid
+      ["italy",        [42.5, 12.5]],         // central Italy
+      ["denmark",      [56.2639, 9.5019]],    // central Denmark (Jutland)
+      ["united kingdom",[52.3555,-1.1743]],   // England interior
+      ["serbia",       [44.0165, 21.0059]]    // interior Serbia
+    ]);
+
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){
+      const n = parseInt(hex.replace('#',''),16);
+      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
     }
     function normalizeCountry(s){
       const k = String(s||"")
@@ -203,23 +204,12 @@
         .filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){
-      const n = parseInt(hex.replace('#',''),16);
-      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
-      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
-    }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
-
-    // Haversine distance (km)
+    // Haversine (km)
     function haversine(a, b){
-      const toRad = d => d * Math.PI/180;
-      const R = 6371;
-      const dLat = toRad(b[0]-a[0]);
-      const dLng = toRad(b[1]-a[1]);
-      const s1 = Math.sin(dLat/2)**2 +
-                 Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
+      const toRad = d => d * Math.PI/180, R=6371;
+      const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
+      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
       return 2*R*Math.asin(Math.sqrt(s1));
     }
 
@@ -229,56 +219,47 @@
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // Dot layers per status (toggleable)
+    // layers per status
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
-    const dotsOthLayer = L.layerGroup().addTo(map);
-
-    // Local network layers
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
 
-    const dbgEl = document.getElementById('debug');
-    const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
-
-    // toolbar open/close
+    // UI refs
     const fab = document.getElementById('fab');
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
-    fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
-    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
-
-    // controls
     const netImp = document.getElementById('netImp');
     const netDev = document.getElementById('netDev');
     const kNeighborsInput = document.getElementById('kNeighbors');
-
     const showImpDots = document.getElementById('showImpDots');
     const showDevDots = document.getElementById('showDevDots');
-    const showOthDots = document.getElementById('showOthDots');
+    const dbgEl = document.getElementById('debug');
+    const dbg = (m)=>{ dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + m; };
 
-    // coord stores
+    fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
+    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
+
+    // centroids store for networks
     let implementedCoords = [];
     let devCoords = [];
 
     (async function init(){
-      // 1) Polygons with multi-source fallback for centroids
-      let geo = null, lastErr = null;
-      const SOURCES = [
+      // 1) polygons
+      let geo=null, lastErr=null;
+      const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
         'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
       ];
       for (const src of SOURCES){
-        try {
-          const r = await fetch(src, {cache:'default', mode:'cors'});
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          const j = await r.json();
-          if (!j || !j.features || j.features.length < 100) throw new Error('Bad geojson');
-          geo = j; break;
-        } catch(e){ lastErr = e; }
+        try{
+          const r=await fetch(src,{cache:'default',mode:'cors'}); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j=await r.json(); if(!j || !j.features || j.features.length<100) throw new Error('Bad geojson');
+          geo=j; break;
+        }catch(e){ lastErr=e; }
       }
-      if (!geo){ dbg(`Failed to load world polygons (CDN blocked?).`); console.error('Polygons fetch failed:', lastErr); return; }
+      if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
 
       function getName(props){
         if (!props) return null;
@@ -291,44 +272,47 @@
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
       }
-
-      // Robust centroid inside polygon
       function centroidInside(feature){
         try {
-          if (feature.geometry && (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon')){
-            let coords = null;
-            if (feature.geometry.type === 'Polygon'){
-              coords = feature.geometry.coordinates;
+          if (feature.geometry && (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
+            let coords=null;
+            if (feature.geometry.type==='Polygon'){
+              coords=feature.geometry.coordinates;
             } else {
-              // pick largest polygon by area
-              let best = null, bestA = -1;
+              let best=null,bestA=-1;
               for (const poly of feature.geometry.coordinates){
-                const a = turf.area(turf.polygon(poly));
-                if (a>bestA){ bestA=a; best=poly; }
+                const a=turf.area(turf.polygon(poly));
+                if(a>bestA){ bestA=a; best=poly; }
               }
-              coords = best;
+              coords=best;
             }
-            const p = polylabel(coords, 1.0); // [lng,lat]
+            const p=polylabel(coords, 1.0); // [lng,lat]
             return L.latLng(p[1], p[0]);
           }
-        } catch(e){}
+        }catch(e){}
         try {
-          const c = turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
+          const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
           return L.latLng(c[1], c[0]);
-        } catch(e){}
+        }catch(e){}
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
-      // build centroids map
+      // centroid map
       const centroids = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
-        if (nm) centroids[nm] = centroidInside(l.feature);
+        if (!nm) return;
+        if (CENTROID_OVERRIDES.has(nm)){
+          const [lat,lng] = CENTROID_OVERRIDES.get(nm);
+          centroids[nm] = L.latLng(lat,lng);
+        } else {
+          centroids[nm] = centroidInside(l.feature);
+        }
       });
 
-      // 2) load sheet
+      // 2) sheet
       let rows;
-      try {
+      try{
         const res = await fetch(CSV_URL, { cache:'no-store' });
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
         const text = await res.text();
@@ -338,24 +322,30 @@
           title:      String(row["Title"]||"").trim(),
           status:     String(row["Status"]||"").trim(),
           notes:      String(row["Description"]||"").trim()
-        })).filter(r => r.countryRaw);
-      } catch(e){ dbg("Failed to load/parse CSV. Ensure the sheet is published and reachable."); console.error(e); return; }
+        })).filter(r=>r.countryRaw);
+      }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      // 3) draw dots + collect coords by status
-      const counts = { imp:0, dev:0, other:0 };
+      // 3) plot
+      const counts={imp:0, dev:0};
       const unmatched = new Set();
-      implementedCoords = [];
-      devCoords = [];
+      implementedCoords=[]; devCoords=[];
 
       for (const r of rows){
         for (const raw of splitCountries(r.countryRaw)){
           const key = normalizeCountry(raw);
-          const pt = centroids[key];
+          let pt = centroids[key];
+
+          // tiny fallback: if not found, try dropping leading “republic/kingdom of”
+          if (!pt){
+            const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
+            pt = centroids[alt];
+          }
           if (!pt){ unmatched.add(raw); continue; }
 
-          const color = colorForStatus(r.status);
           const isImplemented = /implement/i.test(r.status);
           const isDev = /develop|discussion/i.test(r.status);
+          const color = isImplemented ? getCSS('--red') : getCSS('--orange');
+          const layer = isImplemented ? dotsImpLayer : dotsDevLayer;
 
           const marker = L.circleMarker([pt.lat, pt.lng], {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
@@ -368,87 +358,62 @@
               ${r.status ? `<div><strong>Status:</strong> ${escapeHtml(r.status)}</div>` : ""}
               ${r.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(r.notes)}</div>` : ""}
             </div>
-          `);
+          `).addTo(layer);
 
-          if (isImplemented){
-            marker.addTo(dotsImpLayer);
-            implementedCoords.push([pt.lat, pt.lng]);
-            counts.imp++;
-          } else if (isDev){
-            marker.addTo(dotsDevLayer);
-            devCoords.push([pt.lat, pt.lng]);
-            counts.dev++;
-          } else {
-            marker.addTo(dotsOthLayer);
-            counts.other++;
-          }
+          if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
+          else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
         }
       }
 
-      // 4) update counters + pie chart (with counts & % labels)
+      // 4) counters + pie
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
-      document.getElementById('c-oth').textContent = counts.other;
 
-      const total = Math.max(1, counts.imp + counts.dev + counts.other);
+      const total = Math.max(1, counts.imp + counts.dev);
       Chart.register(ChartDataLabels);
       new Chart(document.getElementById('statusPie'), {
-        type: 'pie',
-        data: {
-          labels: ['Implemented', 'In development', 'Other'],
-          datasets: [{
-            data: [counts.imp, counts.dev, counts.other],
-            backgroundColor: [getCSS('--red'), getCSS('--orange'), getCSS('--other')],
-            borderColor: 'rgba(0,0,0,.45)', borderWidth: 1
+        type:'pie',
+        data:{
+          labels:['Implemented','In development'],
+          datasets:[{
+            data:[counts.imp, counts.dev],
+            backgroundColor:[getCSS('--red'), getCSS('--orange')],
+            borderColor:'rgba(0,0,0,.45)', borderWidth:1
           }]
         },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
-            datalabels: {
+        options:{
+          responsive:true,
+          plugins:{
+            legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
-              formatter: (value, ctx) => {
-                const pct = Math.round((value/total)*100);
-                return `${value} (${pct}%)`;
-              }
-            },
-            tooltip: {
-              callbacks: {
-                label(ctx){
-                  const v = ctx.raw || 0; const pct = Math.round((v/total)*100);
-                  return `${ctx.label}: ${v} (${pct}%)`;
-                }
-              }
+              formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
             }
           }
         }
       });
 
-      // Dots show/hide
+      // dot visibility toggles
       function refreshDots(){
-        const sI = showImpDots.checked, sD = showDevDots.checked, sO = showOthDots.checked;
+        const sI=showImpDots.checked, sD=showDevDots.checked;
         if (sI && !map.hasLayer(dotsImpLayer)) dotsImpLayer.addTo(map); else if (!sI && map.hasLayer(dotsImpLayer)) map.removeLayer(dotsImpLayer);
         if (sD && !map.hasLayer(dotsDevLayer)) dotsDevLayer.addTo(map); else if (!sD && map.hasLayer(dotsDevLayer)) map.removeLayer(dotsDevLayer);
-        if (sO && !map.hasLayer(dotsOthLayer)) dotsOthLayer.addTo(map); else if (!sO && map.hasLayer(dotsOthLayer)) map.removeLayer(dotsOthLayer);
       }
       showImpDots.addEventListener('change', refreshDots);
       showDevDots.addEventListener('change', refreshDots);
-      showOthDots.addEventListener('change', refreshDots);
-      refreshDots(); // initial
+      refreshDots();
 
-      // Networks (default ON; neighbors default 4)
+      // local networks (Imp ON, Dev OFF)
       function rebuildNetworks(){
         const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
         linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
-
-        if (netImp.checked) buildLocalNetwork(implementedCoords, getCSS('--red'), linesImpLayer, k, 0.30, 1.2);
-        if (netDev.checked) buildLocalNetwork(devCoords, getCSS('--orange'), linesDevLayer, k, 0.25, 1.1);
+        if (netImp.checked) buildLocalNetwork(implementedCoords, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
+        if (netDev.checked) buildLocalNetwork(devCoords,         getCSS('--orange'),linesDevLayer, k, .30, 1.1);
       }
       netImp.addEventListener('change', rebuildNetworks);
       netDev.addEventListener('change', rebuildNetworks);
       kNeighborsInput.addEventListener('change', rebuildNetworks);
-      rebuildNetworks(); // initial
+      rebuildNetworks();
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
@@ -456,34 +421,21 @@
       }
     })();
 
-    // Build local k-nearest neighbor network (deduped)
-    function buildLocalNetwork(coords, color, layer, k=4, opacity=0.3, weight=1.2){
-      const n = coords.length;
-      if (n < 2) return;
-      const seen = new Set();
-
-      for (let i=0;i<n;i++){
-        const dists = [];
-        for (let j=0;j<n;j++){
-          if (i===j) continue;
-          dists.push({ j, d: haversine(coords[i], coords[j]) });
-        }
+    // Build k-NN network (deduped)
+    function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
+      const n=coords.length; if(n<2) return;
+      const seen=new Set();
+      for(let i=0;i<n;i++){
+        const dists=[];
+        for(let j=0;j<n;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
         dists.sort((a,b)=>a.d-b.d);
-        const limit = Math.min(k, dists.length);
-        for (let t=0;t<limit;t++){
-          const j = dists[t].j;
-          const key = i<j ? `${i}-${j}` : `${j}-${i}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          L.polyline([coords[i], coords[j]], {
-            color, weight, opacity, smoothFactor:1
-          }).addTo(layer);
+        const limit=Math.min(k, dists.length);
+        for(let t=0;t<limit;t++){
+          const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
+          L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
         }
       }
     }
-
-    // small helpers
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
   </script>
 </body>
 </html>
