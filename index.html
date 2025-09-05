@@ -114,7 +114,7 @@
       "abandoned":"Abandoned"
     };
 
-    // Country aliases (applied to BOTH sheet + polygons)
+    // Country aliases (applied to sheet + polygons)
     const COUNTRY_ALIASES = new Map([
       ["u.s.a.","united states"], ["usa","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
@@ -156,27 +156,29 @@
 
       const world = await fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson').then(r=>r.json());
 
-      // Build centroid lookup
+      // Build centroid lookup (object -> simpler)
       const centroid = {};
+      const polygonKeys = [];
       L.geoJSON(world).eachLayer(l=>{
-        const nm = normalizeName(l.feature.properties.ADMIN);
-        centroid[nm] = l.getBounds().getCenter();
+        const key = normalizeName(l.feature.properties.ADMIN);
+        centroid[key] = l.getBounds().getCenter();
+        polygonKeys.push(key);
       });
 
       // SHADING
       shadeLayer = L.geoJSON(world, {
         style: f => {
-          const nm = normalizeName(f.properties.ADMIN);
-          const rec = data.get(nm) || data.get(bestKey(nm, data));
+          const key = normalizeName(f.properties.ADMIN);
+          const rec = data.get(key) || data.get(bestKey(key, data));
           if (!rec) return { color: NEUTRAL_SHADE, weight: 0.5, opacity:.35, fillColor: NEUTRAL_SHADE, fillOpacity:.06 };
           const col = STATUS_COLOR[rec.status] || NEUTRAL_SHADE;
           return { color: col, weight: 0.8, opacity:.5, fillColor: col, fillOpacity:.18 };
         },
         onEachFeature: (f, layer) => {
-          const nm = normalizeName(f.properties.ADMIN);
-          const rec = data.get(nm) || data.get(bestKey(nm, data));
+          const key = normalizeName(f.properties.ADMIN);
+          const rec = data.get(key) || data.get(bestKey(key, data));
           if (rec) layer.bindPopup(popupHtml(rec));
-          else layer.bindPopup(`<b>${nm}</b><div class="hint">No record in dataset.</div>`);
+          else layer.bindPopup(`<b>${key}</b><div class="hint">No record in dataset.</div>`);
         }
       }).addTo(map);
 
@@ -186,8 +188,8 @@
 
       data.forEach(rec=>{
         let key = rec.country;
-        if (!hasKey(centroid, key)) key = bestKey(key, centroid);
-        const c = centroid[key];
+        if (!(key in centroid)) key = bestKey(key, centroid);
+        const c = key ? centroid[key] : null;
         if (!c){ unmatched.add(rec.countryRaw || rec.country); return; }
 
         const color = STATUS_COLOR[rec.status] || "#bbb";
@@ -261,43 +263,59 @@
       return STATUS_ALIASES[k] || (["Implemented","In Discussion","Pilot","Abandoned"].includes(s) ? s : "In Discussion");
     }
 
+    // Normalize: remove accents/punct, alias, Title Case
     function normalizeName(s){
       const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')  // strip accents
-        .replace(/[^a-z0-9 ]+/gi,' ')                     // punctuation -> space
-        .replace(/\s+/g,' ')                               // collapse spaces
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9 ]+/gi,' ')
+        .replace(/\s+/g,' ')
         .toLowerCase().trim();
       const aliased = COUNTRY_ALIASES.get(k) || k;
       return aliased.split(' ').map(w => w ? (w[0].toUpperCase()+w.slice(1)) : "").join(' ');
     }
 
-    /* ===== Matching helpers (fixed for Map vs Object) ===== */
-    function hasKey(container, key){
-      return container instanceof Map ? container.has(key) : Object.prototype.hasOwnProperty.call(container, key);
-    }
-
+    /* ===== Robust matching =====
+       - exact key if present
+       - else Jaccard token similarity on words (stopwords removed)
+       - require a minimum score; otherwise return null (no match)
+    */
     function bestKey(name, container){
-      // build candidate list
-      const keys = container instanceof Map ? Array.from(container.keys())
-                  : Array.isArray(container) ? container
-                  : Object.keys(container);
-      const sName = simplify(name);
+      const keys = Array.isArray(container) ? container
+                : (container instanceof Map ? Array.from(container.keys())
+                  : Object.keys(container));
 
-      // exact simplified
-      let found = keys.find(k => simplify(k) === sName);
+      const tName = tokens(name);
+      if (tName.length === 0) return null;
+
+      // exact token string
+      const nameSig = tName.join(' ');
+      let found = keys.find(k => tokens(k).join(' ') === nameSig);
       if (found) return found;
 
-      // substring contains
-      found = keys.find(k => simplify(k).includes(sName) || sName.includes(simplify(k)));
-      return found || name;
+      // score by Jaccard
+      let best = null, bestScore = 0;
+      for (const k of keys){
+        const score = jaccard(tName, tokens(k));
+        if (score > bestScore){ bestScore = score; best = k; }
+      }
+      // require at least 0.5 overlap (tuneable)
+      return bestScore >= 0.5 ? best : null;
     }
 
-    function simplify(t){
-      return String(t).toLowerCase()
-        .replace(/\b(of|the|and|republic|kingdom|federation|state|states|arab|democratic|people s|plurinational|bolivarian)\b/g,'')
+    function tokens(s){
+      const STOP = new Set(["of","the","and","republic","kingdom","federation","state","states","arab","democratic","people","plurinational","bolivarian","united"]);
+      return String(s).toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
         .replace(/[^a-z0-9 ]+/g,' ')
-        .replace(/\s+/g,' ')
-        .trim();
+        .split(/\s+/).filter(w => w && !STOP.has(w));
+    }
+
+    function jaccard(a, b){
+      const A = new Set(a), B = new Set(b);
+      let inter = 0;
+      for (const x of A) if (B.has(x)) inter++;
+      const union = new Set([...A, ...B]).size;
+      return union ? inter / union : 0;
     }
 
     /* ===== UI helpers ===== */
