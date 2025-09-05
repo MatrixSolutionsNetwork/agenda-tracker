@@ -5,21 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <!-- Inter font (Notion-style) -->
+  <!-- Inter (Notion-y font) -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- CSV parsing -->
+  <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Pie + labels -->
+  <!-- Chart.js (+labels) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
-  <!-- Robust in-polygon centroid -->
+  <!-- Turf + polylabel for robust centroids -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
 
@@ -28,11 +28,14 @@
       --bg:#0b0f12; --text:#e6f3ea; --muted:#8aa39a;
       --chip:#0b1216; --chipEdge:#22313a;
       --panel:#0f1418; --panelEdge:#151b21;
-      --orange:#ff9900; /* In development / discussion */
+      --orange:#ff9900; /* In development */
       --red:#ff3333;    /* Implemented */
+      --mint:#7be2b1;   /* Outline */
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
+    /* Slightly brighter tiles for readability */
+    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 
     /* Bottom-left chip */
     #fab{
@@ -59,7 +62,7 @@
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .drawer-title{ margin:0; font-size:14px; }
-    .brand{ color:#7be2b1; font-weight:700; font-size:12px; letter-spacing:.3px }
+    .brand{ color:var(--mint); font-weight:700; font-size:12px; letter-spacing:.3px }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
       background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
@@ -77,7 +80,7 @@
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
     .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
 
-    /* mini inputs */
+    /* Inputs */
     .textfield, .select, .num {
       background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
       padding:6px 8px;font:500 13px Inter,ui-sans-serif; outline:none; width:100%;
@@ -98,7 +101,7 @@
     <span class="dot d-org" title="In development"></span>
   </div>
 
-  <!-- Drawer (open by default) -->
+  <!-- Drawer -->
   <div id="drawer" class="open" role="dialog" aria-modal="false" aria-label="Status overview">
     <div class="drawer-head">
       <h3 class="drawer-title">Status Overview</h3>
@@ -109,19 +112,21 @@
       </div>
     </div>
 
-    <!-- NEW: Search -->
+    <!-- Search -->
     <div class="row" style="gap:8px;align-items:center;">
       <input id="searchCountry" class="textfield" list="countryList" placeholder="Search country… (Enter)" />
       <datalist id="countryList"></datalist>
       <button id="btnSearch" class="btn">Go</button>
     </div>
 
-    <!-- NEW: Region + Timeline (Min year) -->
+    <!-- Region -->
     <div class="row" style="gap:8px;align-items:center;">
       <select id="regionSelect" class="select" title="Region">
         <option value="__all">All regions</option>
       </select>
     </div>
+
+    <!-- Min year (auto-shown only if Year exists) -->
     <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
       <label style="white-space:nowrap;">Min year:</label>
       <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
@@ -135,7 +140,15 @@
 
     <div class="hr"></div>
 
-    <!-- Show/Hide dots by status -->
+    <!-- NEW: Country shading toggle -->
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="shadeImp" checked />
+        <span>Country shading — Implemented</span>
+      </label>
+    </div>
+
+    <!-- Show/Hide dots -->
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="showImpDots" checked />
@@ -151,7 +164,7 @@
 
     <div class="hr"></div>
 
-    <!-- Local networks (Imp ON, Dev OFF) -->
+    <!-- Local networks -->
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netImp" checked />
@@ -172,7 +185,7 @@
 
     <div class="hr"></div>
 
-    <!-- NEW: Export -->
+    <!-- Export -->
     <div class="row" style="gap:8px;">
       <button id="btnExport" class="btn" title="Download current view as CSV">Export CSV</button>
       <span class="hint" id="lastUpdated" style="margin-left:auto;"></span>
@@ -183,7 +196,7 @@
   </div>
 
   <script>
-    /* === SHEET LINK (published) === */
+    /* === YOUR PUBLISHED CSV LINK === */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
@@ -198,7 +211,7 @@
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
     const COUNTRY_ALIASES = new Map([
-      ["usa","united states"], ["u.s.a.","united states"], ["united states of america","united states"],
+      ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
       ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
@@ -209,16 +222,18 @@
       ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
-      ["republic of serbia","serbia"]
+      ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    // manual centroid overrides for tricky cases
+    // Accurate centroid overrides for tricky cases
     const CENTROID_OVERRIDES = new Map([
-      ["spain",        [40.4168, -3.7038]],
-      ["italy",        [42.5, 12.5]],
-      ["denmark",      [56.2639, 9.5019]],
+      ["spain",         [40.4168, -3.7038]],
+      ["italy",         [42.5, 12.5]],
+      ["denmark",       [56.2639, 9.5019]],
       ["united kingdom",[52.3555,-1.1743]],
-      ["serbia",       [44.0165, 21.0059]]
+      ["serbia",        [44.0165, 21.0059]],
+      ["united states", [39.8283,-98.5795]],
+      ["canada",        [56.1304,-106.3468]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -258,11 +273,15 @@
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // layers per status
+    // dot and line layers
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
+
+    // NEW: country outline + implemented-shade layers
+    let outlineLayer = null;
+    let shadeLayer = null;
 
     // UI refs
     const fab = document.getElementById('fab');
@@ -274,6 +293,7 @@
     const kNeighborsInput = document.getElementById('kNeighbors');
     const showImpDots = document.getElementById('showImpDots');
     const showDevDots = document.getElementById('showDevDots');
+    const shadeImp = document.getElementById('shadeImp');
     const dbgEl = document.getElementById('debug');
     const dbg = (m)=>{ dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + m; };
 
@@ -294,14 +314,18 @@
     // state
     let implementedCoords = [];
     let devCoords = [];
-    let entries = [];     // all plotted rows with metadata
-    let regionMap = {};   // countryKey -> region
+    let entries = [];
+    let regionMap = {};
     let allRegions = new Set();
-    let yearBounds = null;// {min,max} if any year present
+    let yearBounds = null;
+
+    // for shading
+    let geoRef = null; // store polygons GeoJSON
+    let centroidByKey = {}; // key->LatLng
 
     /* ----------- Build pipeline ----------- */
     (async function init(){
-      // 1) polygons (for centroids + region)
+      // 1) polygons
       let geo=null, lastErr=null;
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -316,6 +340,7 @@
         }catch(e){ lastErr=e; }
       }
       if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
+      geoRef = geo;
 
       function getName(props){
         if (!props) return null;
@@ -356,27 +381,40 @@
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
-      const centroids = {};
+      // build centroid + region lookup
+      centroidByKey = {};
       regionMap = {};
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
         if (CENTROID_OVERRIDES.has(nm)){
           const [lat,lng] = CENTROID_OVERRIDES.get(nm);
-          centroids[nm] = L.latLng(lat,lng);
+          centroidByKey[nm] = L.latLng(lat,lng);
         } else {
-          centroids[nm] = centroidInside(l.feature);
+          centroidByKey[nm] = centroidInside(l.feature);
         }
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
         allRegions.add(reg);
+        // store the normalized key for shading lookups
+        l.feature.properties._key = nm;
       });
 
-      // build region select options
+      // Build region options
       [...[...allRegions].sort()].forEach(r=>{
         const opt=document.createElement('option');
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
+
+      // Add subtle mint outline layer
+      outlineLayer = L.geoJSON(geo, {
+        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
+      }).addTo(map);
+
+      // Prepare shading layer (style updated after we read the sheet)
+      shadeLayer = L.geoJSON(geo, {
+        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) // start off
+      }).addTo(map);
 
       // 2) sheet
       let rawRows;
@@ -389,7 +427,7 @@
         rawRows = parsed.data;
       }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      // 3) normalize + collect years/regions
+      // 3) normalize + collect years
       entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
@@ -409,7 +447,6 @@
         const status = String(row["Status"]||"").trim();
         const notes = String(row["Description"]||"").trim();
         const yr = pickYear(row);
-
         if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
 
         const countriesCell = String(row["Countries"]||"").trim();
@@ -417,10 +454,10 @@
 
         for (const raw of splitCountries(countriesCell)){
           const key = normalizeCountry(raw);
-          let pt = centroids[key];
+          let pt = centroidByKey[key];
           if (!pt){
             const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
-            pt = centroids[alt];
+            pt = centroidByKey[alt];
           }
           if (!pt){ unmatched.add(raw); continue; }
 
@@ -438,10 +475,9 @@
         }
       }
 
-      // 4) UI: pie + counters
+      // UI: pie + counters
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
-
       const total = Math.max(1, counts.imp + counts.dev);
       Chart.register(ChartDataLabels);
       new Chart(document.getElementById('statusPie'), {
@@ -466,11 +502,11 @@
         }
       });
 
-      // 5) Search list
+      // Search list
       const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
-      dataList.innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
+      document.getElementById('countryList').innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
 
-      // 6) Timeline control (only if we have any year)
+      // Timeline control (only if any year)
       if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
         yearBounds = {min:yMin, max:yMax};
         yearRow.style.display='flex';
@@ -479,9 +515,10 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
-      // 7) Listeners
+      // listeners
       showImpDots.addEventListener('change', applyFilters);
       showDevDots.addEventListener('change', applyFilters);
+      shadeImp.addEventListener('change', applyFilters);
       regionSelect.addEventListener('change', applyFilters);
       netImp.addEventListener('change', applyNetworks);
       netDev.addEventListener('change', applyNetworks);
@@ -502,7 +539,7 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
-      // 8) Draw initial view
+      // draw first time
       applyFilters();
 
       if (unmatched.size){
@@ -511,18 +548,18 @@
       }
     })();
 
-    /* -------- Filtering, rendering, networks, export -------- */
     function currentFilters(){
       const showImp = document.getElementById('showImpDots').checked;
       const showDev = document.getElementById('showDevDots').checked;
+      const shadeOn = document.getElementById('shadeImp').checked;
       const region = document.getElementById('regionSelect').value || '__all';
       const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
       const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
-      return {showImp, showDev, region, minYear, hasYearUI};
+      return {showImp, showDev, shadeOn, region, minYear, hasYearUI};
     }
 
     function applyFilters(){
-      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
+      const {showImp, showDev, shadeOn, region, minYear, hasYearUI} = currentFilters();
 
       dotsImpLayer.clearLayers();
       dotsDevLayer.clearLayers();
@@ -538,6 +575,8 @@
       };
 
       const impPts=[], devPts=[];
+      const implementedShown = new Set(); // for shading
+
       for (const e of entries){
         if (!filt(e)) continue;
         const color = e.isImplemented ? red : orange;
@@ -557,10 +596,23 @@
           </div>
         `).addTo(layer);
 
-        if (e.isImplemented) impPts.push([e.lat,e.lng]); else if (e.isDev) devPts.push([e.lat,e.lng]);
+        if (e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(e.key); }
+        else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
-      // rebuild networks for filtered points
+      // Shade implemented countries that are visible
+      if (shadeLayer){
+        const fill = getCSS('--red');
+        shadeLayer.setStyle(f=>{
+          const key = (f.properties && f.properties._key) || '';
+          if (!shadeOn) return {fillOpacity:0, color:'#0000', weight:0};
+          return implementedShown.has(key)
+            ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
+            : {fillOpacity:0, color:'#0000', weight:0};
+        });
+      }
+
+      // networks per filtered set
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
@@ -571,7 +623,7 @@
       if (netImp.checked && impPts.length>1) buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
       if (netDev.checked && devPts.length>1) buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
     }
-    function applyNetworks(){ applyFilters(); } // reuse filtering to rebuild lines
+    function applyNetworks(){ applyFilters(); }
 
     function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
       const n=coords.length; if(n<2) return;
