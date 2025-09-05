@@ -27,7 +27,7 @@
       position:absolute; top:12px; left:12px; z-index:1000;
       background:linear-gradient(180deg,rgba(21,27,33,.92),rgba(15,20,24,.94));
       border:1px solid var(--panelEdge); border-radius:12px;
-      padding:12px 14px; width:310px; font:14px/1.4 ui-sans-serif,system-ui;
+      padding:12px 14px; width:320px; font:14px/1.4 ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45);
     }
     .panel h2{margin:0 0 8px 0; font-size:15px;}
@@ -35,7 +35,7 @@
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
     .hr{border:none;border-top:1px solid #182126;margin:8px 0}
-    .debug{margin-top:8px;max-height:140px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+    .debug{margin-top:8px;max-height:160px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
 
     .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
@@ -56,26 +56,24 @@
   </div>
 
   <script>
-    /* === YOUR SHEET LINK (put whatever you copied) === */
-    const SHEET_PUBLISHED_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+    /* === PUT YOUR SHEET LINK (any format) === */
+    const SHEET_PUBLISHED_LINK =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    /* === Robust URL coercion: accept pubhtml/edit/share links and coerce to CSV === */
+    /* ---------- Utilities ---------- */
     function toCsvUrl(u){
       if (!u) return u;
-      // already csv
-      if (/output=csv/i.test(u)) return u;
-      // pubhtml -> pub?output=csv (preserve gid if present)
-      if (/\/pubhtml/i.test(u)) {
+      if (/output=csv/i.test(u)) return u;                         // already csv
+      if (/\/pubhtml/i.test(u)){                                   // pubhtml -> pub?output=csv
         const url = new URL(u);
-        url.pathname = url.pathname.replace(/\/pubhtml/i, "/pub");
+        url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub");
         url.searchParams.set("output","csv");
         if (!url.searchParams.has("single")) url.searchParams.set("single","true");
         return url.toString();
       }
-      // edit?usp=sharing or /d/{id} — build /export?format=csv
-      if (/\/spreadsheets\/d\//i.test(u)) {
+      if (/\/spreadsheets\/d\//i.test(u)){                         // edit/share -> export?format=csv
         const m = u.match(/\/spreadsheets\/d\/([^/]+)/i);
-        if (m) {
+        if (m){
           const id = m[1];
           const url = new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
           url.searchParams.set("format","csv");
@@ -86,7 +84,6 @@
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
-    /* === Minimal alias map for common variants === */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
@@ -103,73 +100,129 @@
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"]
     ]);
 
-    // Color rules
     function colorForStatus(s){
       const k = String(s||"").toLowerCase();
       if (k.includes("implement")) return getCSS("--red");
-      if (k.includes("in development") || k.includes("in discussion") || k.includes("discussion") || k.includes("develop")) return getCSS("--orange");
+      if (k.includes("in development") || k.includes("in discussion") || k.includes("discussion") || k.includes("develop"))
+        return getCSS("--orange");
       return getCSS("--other");
     }
 
-    // Map
+    function normalizeCountry(s){
+      const k = String(s||"")
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9 ]+/gi,' ')
+        .replace(/\s+/g,' ')
+        .toLowerCase().trim();
+      return COUNTRY_ALIASES.get(k) || k;
+    }
+
+    function splitCountries(cell){
+      return String(cell)
+        .replace(/・/g, ',')
+        .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
+        .map(s=>s.trim())
+        .filter(Boolean);
+    }
+
+    function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){
+      const n = parseInt(hex.replace('#',''),16);
+      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
+    }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+
+    /* ---------- Map ---------- */
     const map = L.map('map', { zoomControl:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
     const dots = L.layerGroup().addTo(map);
 
-    (async function init(){
-      const dbg = (msg) => { const el = document.getElementById('debug'); el.style.display='block'; el.innerHTML += (el.innerHTML?'<br>':'') + msg; };
+    const dbgEl = document.getElementById('debug');
+    const dbg = (msg) => { dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + msg; };
 
-      // 1) Load a reliable world dataset (CORS-friendly)
-      //    property name detected dynamically among common keys
-      let geo;
-      try {
-        const res = await fetch('https://cdn.jsdelivr.net/npm/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json', {cache:'default'});
-        geo = await res.json();
-      } catch(e){
-        dbg("Failed to load world polygons. Check network/CORS.");
-        console.error(e);
+    (async function init(){
+      // 1) Load polygons with multi-source fallback
+      let geo = null, lastErr = null;
+      const SOURCES = [
+        'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
+        'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
+        'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
+      ];
+      for (const src of SOURCES){
+        try {
+          const r = await fetch(src, {cache:'default', mode:'cors'});
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = await r.json();
+          if (!j || !j.features || j.features.length < 100) throw new Error('Bad geojson');
+          geo = j;
+          break;
+        } catch(e){ lastErr = e; }
+      }
+      if (!geo){
+        dbg(`Failed to load world polygons (tried ${SOURCES.length} sources).`);
+        console.error('World polygons fetch failed:', lastErr);
         return;
       }
 
-      const nameKey = detectNameKey(geo.features[0]?.properties || {});
-      if (!nameKey){ dbg("Could not detect country name property in GeoJSON."); return; }
+      // 2) Detect a country name value
+      function getName(props){
+        if (!props) return null;
+        if (typeof props.name === 'string') return props.name;
+        if (props.ADMIN) return props.ADMIN;
+        if (props.NAME_EN) return props.NAME_EN;
+        if (props.NAME) return props.NAME;
+        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
+        if (props.SOVEREIGNT) return props.SOVEREIGNT;
+        // fallback: first string prop that looks like a name
+        for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
+        return null;
+      }
 
-      // Build centroids
+      // 3) Build centroids
       const centroids = {};
       L.geoJSON(geo).eachLayer(l=>{
-        const nm = normalizeCountry(l.feature.properties[nameKey]);
-        centroids[nm] = l.getBounds().getCenter();
+        const nm = normalizeCountry(getName(l.feature.properties));
+        if (nm) centroids[nm] = l.getBounds().getCenter();
       });
 
-      // 2) Load sheet CSV (auto-coerced URL)
+      // 4) Load your sheet rows
       let rows;
       try {
         rows = await loadSheet(CSV_URL);
       } catch(e){
-        dbg("Failed to load/parse CSV. Make sure the sheet is published as CSV.");
+        dbg("Failed to load/parse CSV. Make sure the sheet is published and reachable.");
         console.error(e);
         return;
       }
 
-      // 3) Expand and draw
+      // 5) Expand and draw
       const counts = { imp:0, dev:0, other:0 };
       const unmatched = new Set();
 
       for (const r of rows){
-        for (const cRaw of splitCountries(r.countryRaw)){
-          const key = normalizeCountry(cRaw);
+        for (const raw of splitCountries(r.countryRaw)){
+          const key = normalizeCountry(raw);
           const pt = centroids[key];
-          if (!pt){ unmatched.add(cRaw); continue; }
+          if (!pt){ unmatched.add(raw); continue; }
 
           const color = colorForStatus(r.status);
           L.circleMarker(pt, {
             radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
           })
           .bindTooltip(`${titleCase(key)}: ${r.status}`, {direction:'top', offset:[0,-6]})
-          .bindPopup(popupHtml(titleCase(key), r))
-          .addTo(dots);
+          .bindPopup(`
+            <div style="min-width:240px">
+              <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(titleCase(key))}</h3>
+              ${r.title ? `<div><strong>Program:</strong> ${escapeHtml(r.title)}</div>` : ""}
+              ${r.status ? `<div><strong>Status:</strong> ${escapeHtml(r.status)}</div>` : ""}
+              ${r.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(r.notes)}</div>` : ""}
+            </div>
+          `).addTo(dots);
 
           const s = r.status.toLowerCase();
           if (s.includes("implement")) counts.imp++;
@@ -188,10 +241,9 @@
       }
     })();
 
-    /* === Helpers === */
     async function loadSheet(url){
       const res = await fetch(url, { cache:'no-store' });
-      if (!res.ok) throw new Error("CSV fetch failed");
+      if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
       const text = await res.text();
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
       // Expecting headers: Countries, Title, Status, Description
@@ -202,49 +254,6 @@
         notes:      String(row["Description"]||"").trim()
       })).filter(r => r.countryRaw);
     }
-
-    function splitCountries(cell){
-      return String(cell)
-        .replace(/・/g, ',')
-        .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
-        .map(s=>s.trim())
-        .filter(Boolean);
-    }
-
-    function normalizeCountry(s){
-      const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9 ]+/gi,' ')
-        .replace(/\s+/g,' ')
-        .toLowerCase().trim();
-      return COUNTRY_ALIASES.get(k) || k;
-    }
-
-    function detectNameKey(props){
-      const candidates = ["ADMIN","NAME_EN","name_en","NAME","name","name_long","NAME_LONG","formal_en","SOVEREIGNT","sovereignt"];
-      return candidates.find(k => k in props) || Object.keys(props).find(k => /name/i.test(k));
-    }
-
-    function popupHtml(countryName, rec){
-      return `
-        <div style="min-width:240px">
-          <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(countryName)}</h3>
-          ${rec.title ? `<div><strong>Program:</strong> ${escapeHtml(rec.title)}</div>` : ""}
-          ${rec.status ? `<div><strong>Status:</strong> ${escapeHtml(rec.status)}</div>` : ""}
-          ${rec.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(rec.notes)}</div>` : ""}
-        </div>
-      `;
-    }
-
-    function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){
-      const n = parseInt(hex.replace('#',''),16);
-      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
-      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
-    }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
   </script>
 </body>
 </html>
