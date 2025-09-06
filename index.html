@@ -140,7 +140,7 @@
 
     <div class="hr"></div>
 
-    <!-- NEW: Country shading toggle -->
+    <!-- Country shading toggle -->
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="shadeImp" checked />
@@ -225,15 +225,32 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    // Accurate centroid overrides for tricky cases
+    /* Precise centroid overrides for tricky geographies */
     const CENTROID_OVERRIDES = new Map([
-      ["spain",         [40.4168, -3.7038]],
-      ["italy",         [42.5, 12.5]],
-      ["denmark",       [56.2639, 9.5019]],
-      ["united kingdom",[52.3555,-1.1743]],
-      ["serbia",        [44.0165, 21.0059]],
-      ["united states", [39.8283,-98.5795]],
-      ["canada",        [56.1304,-106.3468]]
+      ["spain",          [40.4168, -3.7038]],
+      ["italy",          [42.5, 12.5]],
+      ["denmark",        [56.2639, 9.5019]],
+      ["united kingdom", [52.3555, -1.1743]],
+      ["serbia",         [44.0165, 21.0059]],
+      ["united states",  [39.8283, -98.5795]],
+      ["canada",         [56.1304, -106.3468]],
+      ["costa rica",     [9.7489, -83.7534]],
+      ["japan",          [36.2048, 138.2529]],
+      ["south korea",    [36.5, 127.75]],
+      ["morocco",        [31.7917, -7.0926]]
+    ]);
+
+    /* Extremely robust region getter + fallback mapping for your country set */
+    const REGION_FALLBACK = new Map([
+      ["argentina","Americas"],["armenia","Asia"],["austria","Europe"],["belgium","Europe"],["brazil","Americas"],["canada","Americas"],
+      ["china","Asia"],["costa rica","Americas"],["denmark","Europe"],["estonia","Europe"],["ethiopia","Africa"],["finland","Europe"],
+      ["france","Europe"],["germany","Europe"],["guatemala","Americas"],["india","Asia"],["indonesia","Asia"],["israel","Asia"],
+      ["italy","Europe"],["japan","Asia"],["kazakhstan","Asia"],["kenya","Africa"],["malawi","Africa"],["mauritania","Africa"],
+      ["mexico","Americas"],["morocco","Africa"],["namibia","Africa"],["nigeria","Africa"],["norway","Europe"],["pakistan","Asia"],
+      ["philippines","Asia"],["poland","Europe"],["saudi arabia","Asia"],["serbia","Europe"],["singapore","Asia"],["somalia","Africa"],
+      ["south korea","Asia"],["spain","Europe"],["sri lanka","Asia"],["switzerland","Europe"],["thailand","Asia"],["turkey","Asia"],
+      ["united arab emirates","Asia"],["united kingdom","Europe"],["ukraine","Europe"],["uruguay","Americas"],["united states","Americas"],
+      ["vietnam","Asia"]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -279,7 +296,7 @@
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
 
-    // NEW: country outline + implemented-shade layers
+    // country outline + implemented-shade layers
     let outlineLayer = null;
     let shadeLayer = null;
 
@@ -299,7 +316,6 @@
 
     const searchInput = document.getElementById('searchCountry');
     const searchBtn = document.getElementById('btnSearch');
-    const dataList = document.getElementById('countryList');
     const regionSelect = document.getElementById('regionSelect');
     const yearRow = document.getElementById('yearRow');
     const yearMin = document.getElementById('yearMin');
@@ -312,15 +328,13 @@
     drawerRefresh.addEventListener('click', ()=> location.reload());
 
     // state
-    let implementedCoords = [];
-    let devCoords = [];
     let entries = [];
     let regionMap = {};
     let allRegions = new Set();
     let yearBounds = null;
 
     // for shading
-    let geoRef = null; // store polygons GeoJSON
+    let geoRef = null; // polygons
     let centroidByKey = {}; // key->LatLng
 
     /* ----------- Build pipeline ----------- */
@@ -344,17 +358,18 @@
 
       function getName(props){
         if (!props) return null;
-        if (typeof props.name === 'string') return props.name;
-        if (props.ADMIN) return props.ADMIN;
+        if (typeof props.name === 'string') return props.name;                      // some sources
+        if (props.ADMIN) return props.ADMIN;                                       // datasets/geo-countries
         if (props.NAME_EN) return props.NAME_EN;
         if (props.NAME) return props.NAME;
-        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
+        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common; // world-countries
         if (props.SOVEREIGNT) return props.SOVEREIGNT;
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
       }
       function getRegion(props){
-        return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
+        // cast the net WIDE across different data sources
+        return props.region || props.REGION_UN || props.Region || props.Subregion || props.subregion || props.SUBREGION || null;
       }
       function centroidInside(feature){
         try {
@@ -384,36 +399,48 @@
       // build centroid + region lookup
       centroidByKey = {};
       regionMap = {};
+      const tmpRegions = new Set();
+
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
+
+        // Lat/Lng
         if (CENTROID_OVERRIDES.has(nm)){
           const [lat,lng] = CENTROID_OVERRIDES.get(nm);
           centroidByKey[nm] = L.latLng(lat,lng);
         } else {
           centroidByKey[nm] = centroidInside(l.feature);
         }
-        const reg = getRegion(l.feature.properties) || 'Other';
+
+        // Region (robust)
+        let reg = getRegion(l.feature.properties);
+        if (!reg || reg === 'Undefined' || reg === 'UNDEFINED') {
+          // try our manual fallback for your set
+          reg = REGION_FALLBACK.get(nm) || 'Other';
+        }
         regionMap[nm] = reg;
-        allRegions.add(reg);
-        // store the normalized key for shading lookups
+        tmpRegions.add(reg);
+
+        // store normalized key for shading lookups
         l.feature.properties._key = nm;
       });
 
+      allRegions = new Set([...tmpRegions].filter(Boolean));
       // Build region options
       [...[...allRegions].sort()].forEach(r=>{
         const opt=document.createElement('option');
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
-      // Add subtle mint outline layer
+      // Add subtle outline layer
       outlineLayer = L.geoJSON(geo, {
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
       }).addTo(map);
 
       // Prepare shading layer (style updated after we read the sheet)
       shadeLayer = L.geoJSON(geo, {
-        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) // start off
+        style: () => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
       // 2) sheet
@@ -431,7 +458,6 @@
       entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
-      implementedCoords=[]; devCoords=[];
       let yMin=Infinity, yMax=-Infinity;
 
       function pickYear(row){
@@ -461,7 +487,8 @@
           }
           if (!pt){ unmatched.add(raw); continue; }
 
-          const reg = regionMap[key] || 'Other';
+          // region from map, with final fallback
+          const reg = regionMap[key] || REGION_FALLBACK.get(key) || 'Other';
           const isImplemented = /implement/i.test(status);
           const isDev = /develop|discussion/i.test(status);
           const obj = {
@@ -469,9 +496,7 @@
             status, isImplemented, isDev, title, notes, year: yr, region: reg
           };
           entries.push(obj);
-
-          if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
-          else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
+          if (isImplemented) counts.imp++; else if (isDev) counts.dev++;
         }
       }
 
@@ -536,7 +561,7 @@
           .setContent(`<b>${escapeHtml(hit.country)}</b><br>${escapeHtml(hit.status)}`)
           .openOn(map);
       }
-      searchBtn.addEventListener('click', runSearch);
+      document.getElementById('btnSearch').addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
       // draw first time
@@ -582,7 +607,7 @@
         const color = e.isImplemented ? red : orange;
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
-        const m = L.circleMarker([e.lat, e.lng], {
+        L.circleMarker([e.lat, e.lng], {
           radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
         })
         .bindTooltip(`${e.country}: ${e.status}`, {direction:'top', offset:[0,-6]})
