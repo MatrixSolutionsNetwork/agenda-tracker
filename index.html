@@ -31,6 +31,7 @@
       --orange:#ff9900; /* In development */
       --red:#ff3333;    /* Implemented */
       --mint:#7be2b1;   /* Outline */
+      --matrix:#21ff9d; /* Matrix green for brand */
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
@@ -61,14 +62,17 @@
     }
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .drawer-title{ margin:0; font-size:14px; }
-    .brand{ color:var(--mint); font-weight:700; font-size:12px; letter-spacing:.3px }
+    .brand{ color:var(--matrix); font-weight:700; font-size:13px; letter-spacing:.3px }
+    .subtitle{ color:#cfe9dc; opacity:.85; font-weight:600; font-size:12px; line-height:1.1; margin-top:2px; }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
       background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0;
     }
+    /* Make the Close more obvious */
+    #drawerClose{ border-color:var(--matrix); color:var(--matrix); font-weight:800; }
+
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
@@ -89,10 +93,39 @@
       background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
       padding:6px 10px;font:600 13px Inter,ui-sans-serif; cursor:pointer;
     }
+
+    /* Mobile hint */
+    #touchHint{
+      position:absolute; left:50%; transform:translateX(-50%);
+      top:10px; z-index:1003; background:#0b1216; border:1px solid #22313a;
+      color:#cfe9dc; font:600 12px Inter,ui-sans-serif; padding:6px 10px;
+      border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
+    }
+
+    /* ------- Mobile tweaks ------- */
+    @media (max-width: 720px){
+      #drawer{
+        left:10px; right:10px; bottom:66px;
+        width:auto; max-width:calc(100vw - 20px);
+        max-height:58vh;  /* smaller, avoids covering full screen */
+        border-radius:12px;
+      }
+      .brand{ font-size:14px; }
+      .subtitle{ font-size:12px; }
+      .icon-btn{ width:34px; height:34px; font-size:18px; }
+      #fab{ font-size:12px; padding:8px 10px; }
+      #touchHint{ display:block; }
+    }
+
+    /* Subtle hover on clickable countries */
+    .country-hover { cursor:pointer; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+
+  <!-- Mobile hint -->
+  <div id="touchHint">Tap a country or dot for details</div>
 
   <!-- Tiny toolbar -->
   <div id="fab" aria-label="Open stats panel">
@@ -102,13 +135,15 @@
   </div>
 
   <!-- Drawer -->
-  <div id="drawer" class="open" role="dialog" aria-modal="false" aria-label="Status overview">
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Matrix Solutions Network — Digital ID Status">
     <div class="drawer-head">
-      <h3 class="drawer-title">Status Overview</h3>
-      <div class="brand">Matrix Solutions Network</div>
+      <div>
+        <div class="brand">Matrix Solutions Network</div>
+        <div class="subtitle">Digital ID Status</div>
+      </div>
       <div style="display:flex;gap:6px;">
         <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
-        <button id="drawerClose" class="icon-btn" title="Close">✕</button>
+        <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
       </div>
     </div>
 
@@ -192,7 +227,7 @@
     </div>
 
     <div id="debug" class="debug"></div>
-    <div class="hint" style="margin-top:6px;">Click a dot for country details.</div>
+    <div class="hint" style="margin-top:6px;">Click a dot or country for details.</div>
   </div>
 
   <script>
@@ -225,32 +260,17 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    /* Precise centroid overrides for tricky geographies */
+    // Accurate centroid overrides for tricky cases
     const CENTROID_OVERRIDES = new Map([
-      ["spain",          [40.4168, -3.7038]],
-      ["italy",          [42.5, 12.5]],
-      ["denmark",        [56.2639, 9.5019]],
-      ["united kingdom", [52.3555, -1.1743]],
-      ["serbia",         [44.0165, 21.0059]],
-      ["united states",  [39.8283, -98.5795]],
-      ["canada",         [56.1304, -106.3468]],
-      ["costa rica",     [9.7489, -83.7534]],
-      ["japan",          [36.2048, 138.2529]],
-      ["south korea",    [36.5, 127.75]],
-      ["morocco",        [31.7917, -7.0926]]
-    ]);
-
-    /* Extremely robust region getter + fallback mapping for your country set */
-    const REGION_FALLBACK = new Map([
-      ["argentina","Americas"],["armenia","Asia"],["austria","Europe"],["belgium","Europe"],["brazil","Americas"],["canada","Americas"],
-      ["china","Asia"],["costa rica","Americas"],["denmark","Europe"],["estonia","Europe"],["ethiopia","Africa"],["finland","Europe"],
-      ["france","Europe"],["germany","Europe"],["guatemala","Americas"],["india","Asia"],["indonesia","Asia"],["israel","Asia"],
-      ["italy","Europe"],["japan","Asia"],["kazakhstan","Asia"],["kenya","Africa"],["malawi","Africa"],["mauritania","Africa"],
-      ["mexico","Americas"],["morocco","Africa"],["namibia","Africa"],["nigeria","Africa"],["norway","Europe"],["pakistan","Asia"],
-      ["philippines","Asia"],["poland","Europe"],["saudi arabia","Asia"],["serbia","Europe"],["singapore","Asia"],["somalia","Africa"],
-      ["south korea","Asia"],["spain","Europe"],["sri lanka","Asia"],["switzerland","Europe"],["thailand","Asia"],["turkey","Asia"],
-      ["united arab emirates","Asia"],["united kingdom","Europe"],["ukraine","Europe"],["uruguay","Americas"],["united states","Americas"],
-      ["vietnam","Asia"]
+      ["spain",         [40.4168, -3.7038]],
+      ["italy",         [42.5, 12.5]],
+      ["denmark",       [56.2639, 9.5019]],
+      ["united kingdom",[52.3555,-1.1743]],
+      ["serbia",        [44.0165, 21.0059]],
+      ["united states", [39.8283,-98.5795]],
+      ["canada",        [56.1304,-106.3468]],
+      ["costa rica",    [9.7489, -83.7534]],
+      ["japan",         [36.2048, 138.2529]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -283,6 +303,7 @@
       const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
       return 2*R*Math.asin(Math.sqrt(s1));
     }
+    const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
 
     /* ---------- Map ---------- */
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
@@ -296,9 +317,10 @@
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
 
-    // country outline + implemented-shade layers
-    let outlineLayer = null;
-    let shadeLayer = null;
+    // country layers
+    let outlineLayer = null;   // thin mint outlines
+    let shadeLayer = null;     // implemented shading (fill)
+    let hitLayer = null;       // invisible interactive layer for taps
 
     // UI refs
     const fab = document.getElementById('fab');
@@ -316,6 +338,7 @@
 
     const searchInput = document.getElementById('searchCountry');
     const searchBtn = document.getElementById('btnSearch');
+    const dataList = document.getElementById('countryList');
     const regionSelect = document.getElementById('regionSelect');
     const yearRow = document.getElementById('yearRow');
     const yearMin = document.getElementById('yearMin');
@@ -323,19 +346,55 @@
     const btnExport = document.getElementById('btnExport');
     const lastUpdated = document.getElementById('lastUpdated');
 
+    // Drawer initial state: closed on mobile, open on desktop
+    if (!isMobile()) drawer.classList.add('open');
+
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
 
     // state
+    let implementedCoords = [];
+    let devCoords = [];
     let entries = [];
     let regionMap = {};
     let allRegions = new Set();
     let yearBounds = null;
 
-    // for shading
-    let geoRef = null; // polygons
+    // for shading & taps
+    let geoRef = null; // polygons GeoJSON
     let centroidByKey = {}; // key->LatLng
+
+    function openCountryPopup(countryKey){
+      const rows = entries.filter(e=>e.key===countryKey);
+      if (!rows.length){
+        const pt = centroidByKey[countryKey];
+        if (pt) L.popup().setLatLng(pt).setContent("No record in dataset.").openOn(map);
+        return;
+      }
+      const pt = centroidByKey[countryKey] || L.latLng(rows[0].lat, rows[0].lng);
+      // Prefer Implemented row; else first one
+      const primary = rows.find(r=>r.isImplemented) || rows[0];
+
+      let list = rows.map(r=>{
+        const bits = [];
+        if (r.title) bits.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
+        if (r.status) bits.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
+        if (Number.isInteger(r.year)) bits.push(`<strong>Year:</strong> ${r.year}`);
+        if (r.notes) bits.push(`<span style="color:${getCSS('--muted')}">${escapeHtml(r.notes)}</span>`);
+        return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
+      }).join("");
+
+      const html = `
+        <div style="min-width:240px">
+          <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(primary.country)}</h3>
+          ${list}
+        </div>`;
+      L.popup({autoClose:true, closeOnClick:true})
+        .setLatLng(pt)
+        .setContent(html)
+        .openOn(map);
+    }
 
     /* ----------- Build pipeline ----------- */
     (async function init(){
@@ -358,18 +417,17 @@
 
       function getName(props){
         if (!props) return null;
-        if (typeof props.name === 'string') return props.name;                      // some sources
-        if (props.ADMIN) return props.ADMIN;                                       // datasets/geo-countries
+        if (typeof props.name === 'string') return props.name;
+        if (props.ADMIN) return props.ADMIN;
         if (props.NAME_EN) return props.NAME_EN;
         if (props.NAME) return props.NAME;
-        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common; // world-countries
+        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
         if (props.SOVEREIGNT) return props.SOVEREIGNT;
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
       }
       function getRegion(props){
-        // cast the net WIDE across different data sources
-        return props.region || props.REGION_UN || props.Region || props.Subregion || props.subregion || props.SUBREGION || null;
+        return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
       }
       function centroidInside(feature){
         try {
@@ -399,48 +457,44 @@
       // build centroid + region lookup
       centroidByKey = {};
       regionMap = {};
-      const tmpRegions = new Set();
-
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
-
-        // Lat/Lng
         if (CENTROID_OVERRIDES.has(nm)){
           const [lat,lng] = CENTROID_OVERRIDES.get(nm);
           centroidByKey[nm] = L.latLng(lat,lng);
         } else {
           centroidByKey[nm] = centroidInside(l.feature);
         }
-
-        // Region (robust)
-        let reg = getRegion(l.feature.properties);
-        if (!reg || reg === 'Undefined' || reg === 'UNDEFINED') {
-          // try our manual fallback for your set
-          reg = REGION_FALLBACK.get(nm) || 'Other';
-        }
+        const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
-        tmpRegions.add(reg);
-
-        // store normalized key for shading lookups
-        l.feature.properties._key = nm;
+        l.feature.properties._key = nm; // store normalized key
       });
 
-      allRegions = new Set([...tmpRegions].filter(Boolean));
       // Build region options
       [...[...allRegions].sort()].forEach(r=>{
         const opt=document.createElement('option');
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
-      // Add subtle outline layer
+      // Subtle mint outline layer
       outlineLayer = L.geoJSON(geo, {
-        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
+        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // Prepare shading layer (style updated after we read the sheet)
+      // Implemented shading (fill updated later)
       shadeLayer = L.geoJSON(geo, {
-        style: () => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
+        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) // start off
+      }).addTo(map);
+
+      // Invisible interactive layer for taps/clicks
+      hitLayer = L.geoJSON(geo, {
+        style: { color:'#0000', weight:0, fillOpacity:0 },
+        onEachFeature: (f, layer) => {
+          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
+          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
+          layer.on('click', () => openCountryPopup((f.properties&&f.properties._key)||""));
+        }
       }).addTo(map);
 
       // 2) sheet
@@ -458,6 +512,7 @@
       entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
+      implementedCoords=[]; devCoords=[];
       let yMin=Infinity, yMax=-Infinity;
 
       function pickYear(row){
@@ -487,8 +542,7 @@
           }
           if (!pt){ unmatched.add(raw); continue; }
 
-          // region from map, with final fallback
-          const reg = regionMap[key] || REGION_FALLBACK.get(key) || 'Other';
+          const reg = regionMap[key] || 'Other';
           const isImplemented = /implement/i.test(status);
           const isDev = /develop|discussion/i.test(status);
           const obj = {
@@ -496,7 +550,9 @@
             status, isImplemented, isDev, title, notes, year: yr, region: reg
           };
           entries.push(obj);
-          if (isImplemented) counts.imp++; else if (isDev) counts.dev++;
+
+          if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
+          else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
         }
       }
 
@@ -556,12 +612,9 @@
         const hit = entries.find(e=>e.country.toLowerCase()===q) || entries.find(e=>e.country.toLowerCase().includes(q));
         if (!hit) return;
         map.flyTo([hit.lat, hit.lng], 4, {duration:.6});
-        L.popup({autoClose:true, closeOnClick:true})
-          .setLatLng([hit.lat,hit.lng])
-          .setContent(`<b>${escapeHtml(hit.country)}</b><br>${escapeHtml(hit.status)}`)
-          .openOn(map);
+        openCountryPopup(hit.key);
       }
-      document.getElementById('btnSearch').addEventListener('click', runSearch);
+      searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
       // draw first time
@@ -570,6 +623,11 @@
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
+      }
+
+      // Hide hint after a few seconds on mobile
+      if (isMobile()){
+        setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
       }
     })();
 
@@ -610,16 +668,9 @@
         L.circleMarker([e.lat, e.lng], {
           radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
         })
+        .on('click', ()=> openCountryPopup(e.key))
         .bindTooltip(`${e.country}: ${e.status}`, {direction:'top', offset:[0,-6]})
-        .bindPopup(`
-          <div style="min-width:240px">
-            <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(e.country)}</h3>
-            ${e.title ? `<div><strong>Program:</strong> ${escapeHtml(e.title)}</div>` : ""}
-            ${e.status ? `<div><strong>Status:</strong> ${escapeHtml(e.status)}</div>` : ""}
-            ${Number.isInteger(e.year) ? `<div><strong>Year:</strong> ${e.year}</div>` : ""}
-            ${e.notes ? `<div style="margin-top:6px;color:${getCSS('--muted')}">${escapeHtml(e.notes)}</div>` : ""}
-          </div>
-        `).addTo(layer);
+        .addTo(layer);
 
         if (e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(e.key); }
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
