@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Digital ID</title>
+  <title>Matrix Solutions Network — CBDC Status</title>
 
-  <!-- Inter (Notion-y font) -->
+  <!-- Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
@@ -35,7 +35,6 @@
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
-    /* Slightly brighter tiles for readability */
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 
     /* Bottom-left chip */
@@ -70,7 +69,6 @@
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0;
     }
-    /* Make the Close more obvious */
     #drawerClose{ border-color:var(--matrix); color:var(--matrix); font-weight:800; }
 
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
@@ -84,7 +82,6 @@
     .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
     .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
 
-    /* Inputs */
     .textfield, .select, .num {
       background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
       padding:6px 8px;font:500 13px Inter,ui-sans-serif; outline:none; width:100%;
@@ -102,12 +99,11 @@
       border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
     }
 
-    /* ------- Mobile tweaks ------- */
     @media (max-width: 720px){
       #drawer{
         left:10px; right:10px; bottom:66px;
         width:auto; max-width:calc(100vw - 20px);
-        max-height:58vh;  /* smaller, avoids covering full screen */
+        max-height:58vh;
         border-radius:12px;
       }
       .brand{ font-size:14px; }
@@ -117,7 +113,6 @@
       #touchHint{ display:block; }
     }
 
-    /* Subtle hover on clickable countries */
     .country-hover { cursor:pointer; }
   </style>
 </head>
@@ -129,17 +124,17 @@
 
   <!-- Tiny toolbar -->
   <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.85;">Digital ID Overview — <u>click to open</u></span>
+    <span style="opacity:.85;">CBDC Overview — <u>click to open</u></span>
     <span class="dot d-red" title="Implemented"></span>
     <span class="dot d-org" title="In development"></span>
   </div>
 
   <!-- Drawer -->
-  <div id="drawer" role="dialog" aria-modal="false" aria-label="Matrix Solutions Network — Digital ID Status">
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Matrix Solutions Network — CBDC Status">
     <div class="drawer-head">
       <div>
         <div class="brand">Matrix Solutions Network</div>
-        <div class="subtitle">Digital ID Status</div>
+        <div class="subtitle">CBDC Status</div>
       </div>
       <div style="display:flex;gap:6px;">
         <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
@@ -231,9 +226,8 @@
   </div>
 
   <script>
-    /* === YOUR PUBLISHED CSV LINK === */
-    const SHEET_PUBLISHED_LINK =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+    /* === PASTE YOUR CBDC TAB'S PUBLISHED CSV LINK HERE === */
+    const SHEET_PUBLISHED_LINK = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
 
     /* ---------- Helpers ---------- */
     function toCsvUrl(u){
@@ -258,6 +252,15 @@
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
+    ]);
+
+    /* Expanders for regional/union entries in CBDC sheets */
+    const UNION_EXPANSIONS = new Map([
+      ["eastern caribbean", [
+        "Antigua and Barbuda","Dominica","Grenada","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines"
+        /* Anguilla & Montserrat are UK territories and may not exist as separate polygons in your GeoJSON */
+      ]]
+      // Add more if you choose to track unions as single rows (e.g., "Euro Area", "West African Monetary Union", etc.)
     ]);
 
     // Accurate centroid overrides for tricky cases
@@ -346,9 +349,7 @@
     const btnExport = document.getElementById('btnExport');
     const lastUpdated = document.getElementById('lastUpdated');
 
-    // Drawer initial state: closed on mobile, open on desktop
     if (!isMobile()) drawer.classList.add('open');
-
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
@@ -373,7 +374,6 @@
         return;
       }
       const pt = centroidByKey[countryKey] || L.latLng(rows[0].lat, rows[0].lng);
-      // Prefer Implemented row; else first one
       const primary = rows.find(r=>r.isImplemented) || rows[0];
 
       let list = rows.map(r=>{
@@ -468,7 +468,8 @@
         }
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
-        l.feature.properties._key = nm; // store normalized key
+        l.feature.properties._key = nm;
+        allRegions.add(reg);
       });
 
       // Build region options
@@ -477,17 +478,17 @@
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
-      // Subtle mint outline layer
+      // Mint outline
       outlineLayer = L.geoJSON(geo, {
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // Implemented shading (fill updated later)
+      // Implemented shading
       shadeLayer = L.geoJSON(geo, {
-        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) // start off
+        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // Invisible interactive layer for taps/clicks
+      // Invisible interactive layer
       hitLayer = L.geoJSON(geo, {
         style: { color:'#0000', weight:0, fillOpacity:0 },
         onEachFeature: (f, layer) => {
@@ -523,6 +524,14 @@
         return null;
       }
 
+      // expand unions like "Eastern Caribbean (ECCU)" into real countries
+      function expandTokens(token){
+        const t = token.trim();
+        const norm = normalizeCountry(t).replace(/\s*\(.*?\)\s*/g,''); // strip brackets like (ECCU)
+        if (UNION_EXPANSIONS.has(norm)) return UNION_EXPANSIONS.get(norm);
+        return [t];
+      }
+
       for (const row of rawRows){
         const title = String(row["Title"]||"").trim();
         const status = String(row["Status"]||"").trim();
@@ -533,7 +542,10 @@
         const countriesCell = String(row["Countries"]||"").trim();
         if (!countriesCell) continue;
 
-        for (const raw of splitCountries(countriesCell)){
+        // split, then expand unions
+        const rawTokens = splitCountries(countriesCell).flatMap(expandTokens);
+
+        for (const raw of rawTokens){
           const key = normalizeCountry(raw);
           let pt = centroidByKey[key];
           if (!pt){
@@ -544,7 +556,8 @@
 
           const reg = regionMap[key] || 'Other';
           const isImplemented = /implement/i.test(status);
-          const isDev = /develop|discussion/i.test(status);
+          const isDev = /develop|discussion|pilot|prepar|proof|concept/i.test(status);
+
           const obj = {
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
             status, isImplemented, isDev, title, notes, year: yr, region: reg
@@ -575,7 +588,7 @@
           responsive:true,
           plugins:{
             legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
-            datalabels:{
+          datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
               formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
             }
@@ -625,7 +638,6 @@
         console.warn("Unmatched:", [...unmatched].sort());
       }
 
-      // Hide hint after a few seconds on mobile
       if (isMobile()){
         setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
       }
@@ -658,7 +670,7 @@
       };
 
       const impPts=[], devPts=[];
-      const implementedShown = new Set(); // for shading
+      const implementedShown = new Set();
 
       for (const e of entries){
         if (!filt(e)) continue;
@@ -688,7 +700,6 @@
         });
       }
 
-      // networks per filtered set
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
@@ -742,7 +753,7 @@
       const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href=url; a.download='digital-id-export.csv';
+      a.href=url; a.download='cbdc-export.csv';
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
   </script>
