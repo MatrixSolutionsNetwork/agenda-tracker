@@ -3,132 +3,264 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Trackers</title>
-  <meta name="color-scheme" content="dark">
+  <title>Matrix Solutions Network — Agenda Tracker</title>
+
+  <!-- Matrix-y mono font -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <!-- Papa Parse (CSV) -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
   <style>
     :root{
-      --bg:#0b0f12; --panel:#0f1418; --edge:#1a2229;
-      --text:#e6f3ea; --muted:#9bb3a8; --matrix:#21ff9d;
-      --chip:#0b1216;
+      /* Matrix theme */
+      --bg:#0a0f0d;
+      --panel:#0b1216;
+      --edge:#143328;
+      --text:#d9ffee;
+      --muted:#86b39f;
+
+      /* Matrix greens */
+      --matrix:#00ff80;         /* bright neon */
+      --matrix-dk:#00cc66;      /* darker accent */
+      --matrix-dimmer:#0a3;     /* subtle glow */
+      --red:#ff3333;
+      --orange:#ff9900;
     }
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-      font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
-    .wrap{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;}
-    .card{width:100%;max-width:940px;background:linear-gradient(180deg,rgba(21,27,33,.97),rgba(15,20,24,.98));
-      border:1px solid var(--edge);border-radius:14px;box-shadow:0 10px 28px rgba(0,0,0,.45);padding:18px;}
-    .hdr{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;}
-    .brand{font-weight:800;color:var(--matrix);letter-spacing:.3px}
-    .subtitle{opacity:.85;font-weight:600;color:#cfe9dc}
-    .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
-    .tile{display:flex;flex-direction:column;gap:10px;background:var(--chip);border:1px solid var(--edge);
-      border-radius:12px;padding:14px}
-    .tile h3{margin:0;font-size:16px}
-    .tile p{margin:0;color:var(--muted);font-size:13px;line-height:1.35}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
-      background:#0b1216;border:1px solid var(--edge);color:var(--text);
-      border-radius:10px;padding:8px 12px;font-weight:700;text-decoration:none}
-    .row{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
-    .hint{color:var(--muted);font-size:12px}
-    .dot{width:10px;height:10px;border-radius:50%}
-    .d-red{background:#ff3333}.d-org{background:#ff9900}
-    .kbd{font:600 11px/1 Inter,ui-sans-serif;background:#0b1216;border:1px solid var(--edge);
-      border-radius:6px;padding:2px 6px;color:#cfe9dc}
-    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+    *{ box-sizing:border-box }
+    html,body{ height:100%; margin:0; background:radial-gradient(1200px 1200px at 20% -10%, rgba(0,255,128,.08), transparent 60%), var(--bg); color:var(--text); font-family:'Share Tech Mono', monospace; letter-spacing:.2px }
+    a{ color:var(--matrix); text-decoration:none }
+    a:hover{ text-decoration:underline }
+
+    .wrap{ max-width:1200px; margin:0 auto; padding:22px 16px 40px }
+
+    .brand{
+      display:flex; align-items:baseline; gap:10px; margin-bottom:10px;
+    }
+    .brand .logo-dot{
+      width:12px; height:12px; border-radius:50%; background:var(--matrix);
+      box-shadow:0 0 10px var(--matrix), 0 0 20px var(--matrix);
+    }
+    .brand h1{
+      margin:0; font-size:22px; color:var(--matrix);
+      text-shadow:0 0 12px rgba(0,255,128,.35);
+    }
+    .brand .sub{
+      color:var(--muted); font-size:13px; margin-left:auto; opacity:.85
+    }
+
+    .grid{
+      display:grid; gap:16px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .tile{
+      grid-column: span 12;
+      background: linear-gradient(180deg, rgba(0, 30, 20, .40), rgba(6, 18, 14, .88));
+      border:1px solid var(--edge);
+      border-radius:14px; padding:16px;
+      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04);
+      position:relative; overflow:hidden;
+    }
+    .tile:before{
+      content:""; position:absolute; inset:-1px;
+      background:radial-gradient(500px 160px at -10% -20%, rgba(0,255,128,.08), transparent 35%);
+      pointer-events:none;
+    }
+    .tile:hover{
+      border-color:#1e5b45; box-shadow:0 20px 44px rgba(0,0,0,.4), 0 0 18px rgba(0,255,128,.08);
+      transform:translateY(-1px); transition:transform .18s ease;
+    }
+
+    .tile-head{ display:flex; gap:10px; align-items:center; margin-bottom:8px }
+    .tile h2{ margin:0; font-size:18px; color:var(--matrix) }
+    .pill{
+      margin-left:auto; font-size:11px; padding:5px 8px; border-radius:999px;
+      color:#04130c; background:var(--matrix); border:1px solid rgba(0,0,0,.5);
+      text-transform:uppercase; letter-spacing:.6px;
+    }
+
+    .stats{
+      display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+    }
+    .stat{
+      background:rgba(0,0,0,.25); border:1px solid var(--edge);
+      padding:10px 12px; border-radius:10px; min-width:150px;
+    }
+    .stat .k{ font-size:22px; color:var(--matrix) }
+    .stat .lbl{ font-size:12px; color:var(--muted) }
+
+    .chartbox{ width:140px; height:140px }
+    .actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+    .btn{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid var(--matrix-dk); color:var(--matrix); background:#0a1411;
+      padding:8px 12px; border-radius:10px; text-decoration:none; font-weight:600;
+      box-shadow:0 0 0 0 rgba(0,255,128,.25); transition:box-shadow .2s, transform .1s;
+    }
+    .btn:hover{ text-decoration:none; box-shadow:0 0 18px rgba(0,255,128,.18) }
+    .btn:active{ transform:translateY(1px) }
+
+    .footer{ margin-top:18px; color:var(--muted); font-size:12px }
+
+    @media (min-width:720px){
+      .tile{ grid-column: span 6; }
+    }
+    @media (min-width:1080px){
+      .tile{ grid-column: span 4; }
+    }
   </style>
-  <script>
-    const routes = {
-      "digital-id": "https://matrixsolutionsnetwork.github.io/agenda-tracker/digital-id/",
-      "cbdc":       "https://matrixsolutionsnetwork.github.io/agenda-tracker/cbdc/",
-      "social":     "https://matrixsolutionsnetwork.github.io/agenda-tracker/social-credit-system"
-    };
-
-    function go(key){ location.href = routes[key]; }
-
-    // Auto-redirect logic
-    (function(){
-      const params = new URLSearchParams(location.search);
-      const q = (params.get("go")||"").toLowerCase();
-      const saved = localStorage.getItem("msn.defaultApp"); // "digital-id" | "cbdc" | "social"
-      if (q && routes[q]) { go(q); return; }
-      if (saved && routes[saved]) { go(saved); return; }
-      // Otherwise, render launcher (do nothing here)
-    })();
-
-    function setDefault(key){
-      localStorage.setItem("msn.defaultApp", key);
-      const el = document.getElementById("defaultStatus");
-      el.textContent = `Default set to “${key.replace('-', ' ')}”. Next visit will open it automatically.`;
-      el.style.opacity = 1;
-      setTimeout(()=>{ el.style.opacity = .85; }, 1200);
-    }
-    function clearDefault(){
-      localStorage.removeItem("msn.defaultApp");
-      const el = document.getElementById("defaultStatus");
-      el.textContent = "Default cleared. This launcher will show first next time.";
-      el.style.opacity = 1;
-      setTimeout(()=>{ el.style.opacity = .85; }, 1200);
-    }
-
-    // Keyboard shortcuts
-    window.addEventListener('keydown', (e)=>{
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === '1') go('digital-id');
-      if (e.key === '2') go('cbdc');
-      if (e.key === '3') go('social');
-    });
-  </script>
 </head>
 <body>
   <div class="wrap">
-    <div class="card" role="main" aria-label="Matrix Solutions Network — Trackers">
-      <div class="hdr">
-        <div>
-          <div class="brand">Matrix Solutions Network</div>
-          <div class="subtitle">Open data dashboards</div>
-        </div>
-        <div class="hint">Shortcuts: <span class="kbd">1</span> Digital ID · <span class="kbd">2</span> CBDC · <span class="kbd">3</span> Social Credit</div>
-      </div>
+    <div class="brand">
+      <div class="logo-dot" aria-hidden="true"></div>
+      <h1>Matrix Solutions Network — Agenda Tracker</h1>
+      <div class="sub">Live overview • Implemented vs In development</div>
+    </div>
 
-      <div class="grid">
-        <div class="tile">
-          <h3>Digital ID</h3>
-          <p>Global rollout status of national digital identity programs.</p>
-          <div class="row">
-            <a class="btn" href="https://matrixsolutionsnetwork.github.io/agenda-tracker/digital-id/">Open map</a>
-            <button class="btn" onclick="setDefault('digital-id')" type="button">Set as default</button>
+    <div class="grid">
+
+      <!-- Digital ID -->
+      <section class="tile" id="tile-digid">
+        <div class="tile-head">
+          <h2>Digital ID</h2>
+          <span class="pill" id="pill-digid">Loading…</span>
+        </div>
+        <div class="stats">
+          <div class="chartbox"><canvas id="pie-digid" width="140" height="140" aria-label="Digital ID pie"></canvas></div>
+          <div class="stat"><div class="k" id="digid-total">—</div><div class="lbl">Total countries</div></div>
+          <div class="stat"><div class="k" id="digid-imp">—</div><div class="lbl">Implemented</div></div>
+          <div class="stat"><div class="k" id="digid-dev">—</div><div class="lbl">In development</div></div>
+          <div class="actions">
+            <a class="btn" href="./digital-id/" aria-label="Open Digital ID map">View map →</a>
           </div>
         </div>
+      </section>
 
-        <div class="tile">
-          <h3>CBDC</h3>
-          <p>Central bank digital currency — implemented & in-development projects.</p>
-          <div class="row">
-            <a class="btn" href="https://matrixsolutionsnetwork.github.io/agenda-tracker/cbdc/">Open map</a>
-            <button class="btn" onclick="setDefault('cbdc')" type="button">Set as default</button>
+      <!-- CBDC -->
+      <section class="tile" id="tile-cbdc">
+        <div class="tile-head">
+          <h2>CBDC</h2>
+          <span class="pill" id="pill-cbdc">Loading…</span>
+        </div>
+        <div class="stats">
+          <div class="chartbox"><canvas id="pie-cbdc" width="140" height="140" aria-label="CBDC pie"></canvas></div>
+          <div class="stat"><div class="k" id="cbdc-total">—</div><div class="lbl">Total countries</div></div>
+          <div class="stat"><div class="k" id="cbdc-imp">—</div><div class="lbl">Implemented</div></div>
+          <div class="stat"><div class="k" id="cbdc-dev">—</div><div class="lbl">In development</div></div>
+          <div class="actions">
+            <a class="btn" href="./cbdc/" aria-label="Open CBDC map">View map →</a>
           </div>
         </div>
+      </section>
 
-        <div class="tile">
-          <h3>Social Credit System</h3>
-          <p>Country-level status of social-credit-style scoring systems.</p>
-          <div class="row">
-            <a class="btn" href="https://matrixsolutionsnetwork.github.io/agenda-tracker/social-credit-system">Open map</a>
-            <button class="btn" onclick="setDefault('social')" type="button">Set as default</button>
+      <!-- Social Credit -->
+      <section class="tile" id="tile-scs">
+        <div class="tile-head">
+          <h2>Social Credit Systems</h2>
+          <span class="pill" id="pill-scs">Loading…</span>
+        </div>
+        <div class="stats">
+          <div class="chartbox"><canvas id="pie-scs" width="140" height="140" aria-label="Social Credit pie"></canvas></div>
+          <div class="stat"><div class="k" id="scs-total">—</div><div class="lbl">Total countries</div></div>
+          <div class="stat"><div class="k" id="scs-imp">—</div><div class="lbl">Implemented</div></div>
+          <div class="stat"><div class="k" id="scs-dev">—</div><div class="lbl">In development</div></div>
+          <div class="actions">
+            <a class="btn" href="./social-credit-system/" aria-label="Open Social Credit map">View map →</a>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="row" style="justify-content:space-between;margin-top:14px">
-        <div class="hint">
-          Status dots: <span class="dot d-red"></span> Implemented · <span class="dot d-org"></span> In development
-        </div>
-        <div class="row">
-          <button class="btn" onclick="clearDefault()" type="button">Clear default</button>
-        </div>
-      </div>
+    </div>
 
-      <div id="defaultStatus" class="hint" style="margin-top:8px;opacity:.85"></div>
+    <div class="footer">
+      Tip: stats auto-refresh when you reload. Only “Implemented” and “In development” are counted (rows marked “In discussion” are ignored).
     </div>
   </div>
+
+  <script>
+    // ====== 1) CSV LINKS (edit as needed) ======
+    // Digital ID (gid=0 from your original sheet)
+    const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+    // CBDC (paste the gid of your CBDC sheet here if different)
+    const CSV_CBDC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1344383755&single=true&output=csv";
+    // Social Credit Systems (your link with gid=1564220601)
+    const CSV_SCS  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
+
+    // ====== 2) Helpers ======
+    function fetchCSV(url){
+      return fetch(`${url}${url.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'})
+        .then(r=>{ if(!r.ok) throw new Error(r.status); return r.text(); })
+        .then(text => Papa.parse(text, { header:true, skipEmptyLines:true }).data)
+        .catch(_=>null);
+    }
+    function summarize(rows){
+      if(!rows) return {imp:0, dev:0, total:0};
+      let imp=0, dev=0;
+      for(const r of rows){
+        const status = String(r.Status||"").toLowerCase();
+        if (/implement/.test(status)) imp++;
+        else if (/develop/.test(status)) dev++;
+        // NOTE: "discussion" intentionally ignored here
+      }
+      return {imp, dev, total: imp+dev};
+    }
+    function makePie(canvasId, imp, dev){
+      const ctx = document.getElementById(canvasId);
+      if(!ctx) return;
+      Chart.register(ChartDataLabels);
+      new Chart(ctx, {
+        type:'pie',
+        data:{
+          labels:['Implemented','In development'],
+          datasets:[{
+            data:[imp, dev],
+            backgroundColor:['#ff3333','#ff9900'],
+            borderColor:'rgba(0,0,0,.45)', borderWidth:1
+          }]
+        },
+        options:{
+          responsive:false,
+          plugins:{
+            legend:{ display:false },
+            datalabels:{
+              color:'#04130c', font:{weight:'700', size:11},
+              formatter:(v,ctx)=>{
+                const ds = ctx.chart.data.datasets[0].data;
+                const total = Math.max(1, ds.reduce((a,b)=>a+b,0));
+                const pct = Math.round(v/total*100);
+                return `${v}\n${pct}%`;
+              }
+            }
+          }
+        }
+      });
+    }
+    function setTile(prefix, summary){
+      const {imp, dev, total} = summary;
+      const pill = document.getElementById(`pill-${prefix}`);
+      const tEl = document.getElementById(`${prefix}-total`);
+      const iEl = document.getElementById(`${prefix}-imp`);
+      const dEl = document.getElementById(`${prefix}-dev`);
+      if (pill) pill.textContent = total ? 'Live' : 'No data';
+      if (tEl) tEl.textContent = total || '—';
+      if (iEl) iEl.textContent = imp || '—';
+      if (dEl) dEl.textContent = dev || '—';
+      makePie(`pie-${prefix}`, imp, dev);
+    }
+
+    // ====== 3) Load all three ======
+    Promise.all([fetchCSV(CSV_DIGID), fetchCSV(CSV_CBDC), fetchCSV(CSV_SCS)])
+      .then(([digid, cbdc, scs])=>{
+        setTile('digid', summarize(digid));
+        setTile('cbdc',  summarize(cbdc));
+        setTile('scs',   summarize(scs));
+      })
+      .catch(console.error);
+  </script>
 </body>
 </html>
