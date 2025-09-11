@@ -26,25 +26,24 @@
   <style>
     :root{
       --bg:#07100b;
-      --text:#ffffff;          /* <-- all text is white now */
-      --muted:#b8ffd8;
+      --text:#ffffff;
       --chip:#061c13; --chipEdge:#10402b;
       --panel:#06130d; --panelEdge:#0b2a1c;
-      --orange:#ff9900;        /* In development */
-      --red:#ff3333;           /* Implemented */
-      --mint:#7be2b1;          /* Outline */
-      --matrix:#21ff9d;        /* Matrix green for brand */
-      --barH:58px;             /* top bar height */
+      --orange:#ff9900;
+      --red:#ff3333;
+      --mint:#7be2b1;
+      --matrix:#21ff9d;
+      --barH:72px; /* taller so nothing clips */
     }
     html,body{
       height:100%;margin:0;background:var(--bg);color:var(--text);
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== Top brand bar (now flush, full width) ===== */
+    /* ===== Top brand bar ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
       background:linear-gradient(180deg,rgba(10,30,20,.86),rgba(8,22,16,.98));
       border-bottom:1px solid var(--panelEdge);
       padding:10px 12px; box-shadow:0 10px 28px rgba(0,0,0,.45);
@@ -57,10 +56,16 @@
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
       box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
     }
-    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px; color:var(--matrix);} /* keep brand green */
-    .live{font-size:11px;color:#062715;background:var(--matrix);
-      padding:3px 8px;border-radius:999px;border:1px solid #74ffc7}
+    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px;}
+    #brandTitle .msn{color:var(--matrix)}
+    #brandTitle .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
+    #brandTitle .page{color:#ffffff} /* Digital ID Status in white */
+
+    /* LIVE pill in red */
+    .live{font-size:11px;color:#2b0000;background:var(--red);
+      padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
     .updated{margin-left:8px; font-size:12px; color:#ffffff; opacity:.9}
+    .inline-hint{margin-left:10px; font-size:12px; opacity:.8}
 
     .actions{
       margin-left:auto; display:flex; gap:8px; overflow:auto hidden;
@@ -73,13 +78,16 @@
       white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
-    .btn.matrix{color:var(--matrix)}  /* highlight actions if you want */
 
-    /* ===== Map is now positioned under the bar ===== */
+    /* ===== Map beneath bar ===== */
     #map{
       position:absolute; left:0; right:0; top:var(--barH); bottom:0;
     }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+
+    /* keep Leaflet zoom clear of bar */
+    .leaflet-top{ top:14px; } /* push container a bit */
+    .leaflet-control-zoom{ margin-top:6px; }
 
     /* ===== Drawer opener ===== */
     #fab{
@@ -106,8 +114,7 @@
     }
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-    .brand{ color:var(--matrix); font-weight:700; font-size:13px; letter-spacing:.3px }
-    .subtitle{ color:#ffffff; opacity:.95; font-weight:700; font-size:12px; line-height:1.1; margin-top:2px; }
+    .drawer-title{ font-weight:800; letter-spacing:.4px; }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
       background:#062015; color:#ffffff; font-size:14px; line-height:24px;
@@ -135,18 +142,11 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* Mobile hint (placed below the bar) */
-    #touchHint{
-      position:absolute; left:50%; transform:translateX(-50%);
-      top:calc(var(--barH) + 8px); z-index:1003; background:#062015; border:1px solid #1b5a3e;
-      color:#ffffff; font:700 12px "Share Tech Mono"; padding:6px 10px;
-      border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
-    }
+    /* Mobile hint (not used now – hint lives on the top bar) */
+    #touchHint{ display:none; }
 
-    /* Mobile tweaks */
     @media (max-width: 720px){
       #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
-      #touchHint{ display:block; }
       #brandTitle h1{font-size:16px}
       .actions{gap:6px}
       .btn{padding:7px 9px;font-size:12px}
@@ -160,13 +160,18 @@
   <div id="topbar" role="navigation" aria-label="Map header">
     <div id="brandTitle">
       <span class="dot" aria-hidden="true"></span>
-      <h1>Matrix Solutions Network — Digital ID Status</h1>
+      <h1>
+        <span class="msn">Matrix Solutions Network</span>
+        <span class="sep">—</span>
+        <span class="page">Digital ID Status</span>
+      </h1>
       <span class="live">LIVE</span>
       <span class="updated" id="updatedTop">Updated: …</span>
+      <span class="inline-hint">• Click a dot or country for details</span>
     </div>
     <div class="actions">
+      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
       <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
-      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">Open Dashboard ↗</a>
       <a class="btn" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
       <a class="btn" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
     </div>
@@ -174,23 +179,17 @@
 
   <div id="map" aria-label="Digital ID world map"></div>
 
-  <!-- Mobile hint -->
-  <div id="touchHint">Tap a country or dot for details</div>
-
-  <!-- Tiny toolbar -->
+  <!-- Bottom-left opener -->
   <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.95;">Digital ID Overview — <u>click to open</u></span>
+    <span style="opacity:.95;">Digital ID <b>stats</b> — <u>click to open</u></span>
     <span class="dot d-red" title="Implemented"></span>
     <span class="dot d-org" title="In development"></span>
   </div>
 
   <!-- Drawer -->
-  <div id="drawer" role="dialog" aria-modal="false" aria-label="Matrix Solutions Network — Digital ID Status">
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID statistics panel">
     <div class="drawer-head">
-      <div>
-        <div class="brand">Matrix Solutions Network</div>
-        <div class="subtitle">Digital ID Status</div>
-      </div>
+      <div class="drawer-title">Stats</div>
       <div style="display:flex;gap:6px;">
         <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
         <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
@@ -225,15 +224,13 @@
 
     <div class="hr"></div>
 
-    <!-- Country shading toggle -->
+    <!-- Toggles -->
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="shadeImp" checked />
         <span>Country shading — Implemented</span>
       </label>
     </div>
-
-    <!-- Show/Hide dots -->
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="showImpDots" checked />
@@ -277,7 +274,6 @@
     </div>
 
     <div id="debug" class="debug"></div>
-    <div class="hint" style="margin-top:6px;">Click a dot or country for details.</div>
   </div>
 
   <script>
@@ -285,7 +281,6 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    /* ---------- Helpers ---------- */
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
@@ -310,10 +305,10 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    /* Targeted centroid fixes for tricky countries */
+    /* Targeted centroid fixes */
     const CENTROID_OVERRIDES = new Map([
-      ["norway",[60.4720, 8.4689]],      // mainland (avoid Svalbard skew)
-      ["new zealand",[-41.0, 172.0]],    // balanced NZ centre
+      ["norway",[60.4720, 8.4689]],
+      ["new zealand",[-41.0, 172.0]],
       ["chile",[-35.6751, -71.5430]],
       ["mauritius",[-20.2000, 57.5000]],
       ["spain",[40.4168, -3.7038]],
@@ -350,7 +345,7 @@
         .filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
@@ -485,7 +480,6 @@
             if (feature.geometry.type==='Polygon'){
               coords=feature.geometry.coordinates;
             } else {
-              // largest mainland polygon
               let best=null,bestA=-1;
               for (const poly of feature.geometry.coordinates){
                 const a=turf.area(turf.polygon(poly));
@@ -526,15 +520,17 @@
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
-      // Subtle mint outline layer
+      // outline layer
       outlineLayer = L.geoJSON(geo, {
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
+      // implemented shading
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
+      // interactive layer
       hitLayer = L.geoJSON(geo, {
         style: { color:'#0000', weight:0, fillOpacity:0 },
         onEachFeature: (f, layer) => {
@@ -671,10 +667,6 @@
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
-      }
-
-      if (isMobile()){
-        setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
       }
     })();
 
