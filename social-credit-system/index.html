@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -319,7 +318,7 @@
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
-      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
+      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(Math.PI*(b[1]-a[1])/360)**2;
       return 2*R*Math.asin(Math.sqrt(s1));
     }
     const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
@@ -448,7 +447,7 @@
       }
       function centroidInside(feature){
         try {
-          if (feature.geometry and (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
+          if (feature.geometry && (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
             let coords=null;
             if (feature.geometry.type==='Polygon'){
               coords=feature.geometry.coordinates;
