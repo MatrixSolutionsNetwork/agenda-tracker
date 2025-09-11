@@ -33,7 +33,7 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
-      --barH:72px; /* desktop header height */
+      --barH:72px;
     }
     html,body{
       height:100%;margin:0;background:var(--bg);color:var(--text);
@@ -50,21 +50,16 @@
       backdrop-filter: blur(2px);
       min-height:var(--barH);
     }
-
-    /* Desktop brand layout (inline) */
-    #brandTitle{
-      display:flex; align-items:center; gap:10px; white-space:nowrap;
-    }
+    #brandTitle{display:flex; align-items:center; gap:10px; white-space:nowrap}
     #brandTitle .dot{
       width:14px;height:14px;border-radius:50%;
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
       box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
     }
-    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px; line-height:1.15;}
+    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px;}
     #brandTitle .msn{color:var(--matrix)}
     #brandTitle .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
-    #brandTitle .page{color:#ffffff} /* Digital ID Status in white */
-
+    #brandTitle .page{color:#ffffff}
     .live{font-size:11px;color:#ffffff;background:var(--red);
       padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
     .updated{margin-left:8px; font-size:12px; color:#ffffff; opacity:.9}
@@ -82,34 +77,23 @@
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
 
-    /* Mobile hamburger */
-    #hambtn{
-      display:none;
-      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
-      padding:8px 10px; border-radius:10px; font-weight:800; cursor:pointer;
-    }
-    #mobileMenu{
-      position:fixed; z-index:1101; left:0; right:0; top:var(--barH);
-      display:none; background:#081911; border-bottom:1px solid #123e2a;
-      box-shadow:0 10px 24px rgba(0,0,0,.5);
-    }
-    #mobileMenu.open{ display:block; }
-    #mobileMenu .mm-row{
-      display:flex; flex-direction:column; gap:10px; padding:12px;
-    }
-    #mobileMenu .btn{ width:100%; text-align:left; }
-
     /* ===== Map beneath bar ===== */
     #map{
       position:absolute; left:0; right:0; top:var(--barH); bottom:0;
     }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
-
-    /* keep Leaflet zoom clear of bar (desktop) */
     .leaflet-top{ top:14px; }
     .leaflet-control-zoom{ margin-top:6px; }
 
-    /* ===== Drawer opener ===== */
+    /* Recenter control */
+    .recenter-btn{
+      background:#062015; color:#fff; border:1px solid #1b5a3e;
+      border-radius:8px; padding:6px 9px; font:700 12px "Share Tech Mono",ui-monospace;
+      cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.35);
+    }
+    .recenter-btn:hover{box-shadow:0 0 14px rgba(33,255,157,.20)}
+
+    /* Drawer opener */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
@@ -122,7 +106,7 @@
     #fab .d-red{ background:var(--red) }
     #fab .d-org{ background:var(--orange) }
 
-    /* ===== Drawer ===== */
+    /* Drawer */
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
       width:360px; max-width:92vw; max-height:66vh; overflow:auto;
@@ -162,55 +146,11 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* ===== Mobile layout: centered header stack & safer zoom offset ===== */
     @media (max-width: 720px){
-      :root { --barH: 144px; }   /* taller header; pushes map down */
-      /* Center everything in the header */
-      #topbar{ justify-content:center; }
-      #brandTitle{
-        width:100%;
-        flex-direction:column;
-        align-items:center;
-        gap:6px;
-        text-align:center;
-      }
-      /* Row 1: MSN centered with dot on the RIGHT */
-      .brand-row{
-        display:flex; align-items:center; justify-content:center; gap:8px;
-      }
-      .brand-row .msn{ color:var(--matrix); }
-      .brand-row .dot{ order:2; } /* ensure dot shows on the right */
-
-      /* Row 2: page title centered */
-      .sub-row{ font-size:16px; color:#fff; }
-
-      /* Row 3: centered Menu + LIVE side-by-side */
-      .menu-row{
-        display:flex; align-items:center; justify-content:center; gap:10px;
-      }
-      #hambtn{ display:inline-flex; }
-
-      /* Row 4: centered Updated text */
-      .updated{
-        margin:0 auto;
-        display:block;
-      }
-
-      /* Hide separators/inline hint on mobile */
-      #brandTitle .sep{ display:none; }
-      .inline-hint{ display:none; }
-
-      /* Hide desktop actions; use burger */
-      .actions{ display:none; }
-
-      /* Drawer sizing */
-      #drawer{
-        left:10px; right:10px; bottom:66px; width:auto;
-        max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px;
-      }
-
-      /* Push map controls further down so they’re never under the header */
-      .leaflet-top{ top:88px; }
+      #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
+      #brandTitle h1{font-size:16px}
+      .actions{gap:6px}
+      .btn{padding:7px 9px;font-size:12px}
     }
 
     .country-hover { cursor:pointer; }
@@ -220,33 +160,16 @@
   <!-- ===== Top navigation / context bar ===== -->
   <div id="topbar" role="navigation" aria-label="Map header">
     <div id="brandTitle">
-      <!-- Row 1: brand centered with dot to the right on mobile -->
-      <div class="brand-row">
-        <h1 class="brand">
-          <span class="msn">Matrix Solutions Network</span>
-        </h1>
-        <span class="dot" aria-hidden="true"></span>
-      </div>
-
-      <!-- Row 2: page title -->
-      <div class="sub-row">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>
+        <span class="msn">Matrix Solutions Network</span>
+        <span class="sep">—</span>
         <span class="page">Digital ID Status</span>
-      </div>
-
-      <!-- Row 3: menu + live (mobile shows; desktop hides menu) -->
-      <div class="menu-row">
-        <button id="hambtn" aria-expanded="false" aria-controls="mobileMenu" title="Menu">☰ Menu</button>
-        <span class="live">LIVE</span>
-      </div>
-
-      <!-- Row 4: updated -->
+      </h1>
+      <span class="live">LIVE</span>
       <span class="updated" id="updatedTop">Updated: …</span>
-
-      <!-- Desktop-only inline hint -->
       <span class="inline-hint">• Click a dot or country for details</span>
     </div>
-
-    <!-- desktop actions -->
     <div class="actions">
       <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
       <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
@@ -254,16 +177,6 @@
       <a class="btn" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
     </div>
   </div>
-
-  <!-- Mobile dropdown menu -->
-  <nav id="mobileMenu" aria-label="Mobile map menu">
-    <div class="mm-row">
-      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
-      <a class="btn" href="../">← Back to Agenda Tracker</a>
-      <a class="btn" href="../cbdc/">Open CBDC Map</a>
-      <a class="btn" href="../social-credit-system/">Open Social Credit Map</a>
-    </div>
-  </nav>
 
   <div id="map" aria-label="Digital ID world map"></div>
 
@@ -443,10 +356,36 @@
     const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
 
     /* ---------- Map ---------- */
-    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
+    // Clamp panning to the world bounds (no endless wrap)
+    const maxBounds = L.latLngBounds(L.latLng(-85,-180), L.latLng(85,180));
+
+    const map = L.map('map', {
+      zoomControl:true,
+      preferCanvas:true,
+      worldCopyJump:false,          // do not duplicate worlds
+      maxBounds: maxBounds,         // hard clamp
+      maxBoundsViscosity: 1.0,      // elastic bounce
+      minZoom: 2                     // avoid over-zoomed world at init
+    }).setView([20,0], 2);
+
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8,
+      noWrap:true                     // stop tile repeating
     }).addTo(map);
+
+    // Custom "Re-center" control (bottom-right)
+    const Recenter = L.Control.extend({
+      options:{position:'bottomright'},
+      onAdd: function(){
+        const div = L.DomUtil.create('div','leaflet-bar');
+        const btn = L.DomUtil.create('button','recenter-btn',div);
+        btn.type='button'; btn.innerText='Re-center';
+        L.DomEvent.disableClickPropagation(btn);
+        btn.addEventListener('click', ()=> fitAllDots());
+        return div;
+      }
+    });
+    map.addControl(new Recenter());
 
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
@@ -482,16 +421,7 @@
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
 
-    /* mobile menu toggle */
-    const hambtn = document.getElementById('hambtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    hambtn?.addEventListener('click', () => {
-      const open = mobileMenu.classList.toggle('open');
-      hambtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-
     if (!isMobile()) drawer.classList.add('open');
-
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
@@ -506,6 +436,7 @@
 
     let geoRef = null;
     let centroidByKey = {};
+    let lastDotsBounds = null; // updated whenever dots are drawn
 
     function openCountryPopup(countryKey){
       const rows = entries.filter(e=>e.key===countryKey);
@@ -719,11 +650,7 @@
             legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
             datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
-              formatter:(v,ctx)=> {
-                const lbl = ctx.chart.data.labels[ctx.dataIndex] || '';
-                const pct = Math.round((v/total)*100);
-                return `${lbl}\n${v} (${pct}%)`;
-              }
+              formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
             }
           }
         }
@@ -741,28 +668,9 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
-      // listeners
-      showImpDots.addEventListener('change', applyFilters);
-      showDevDots.addEventListener('change', applyFilters);
-      shadeImp.addEventListener('change', applyFilters);
-      regionSelect.addEventListener('change', applyFilters);
-      netImp.addEventListener('change', applyNetworks);
-      netDev.addEventListener('change', applyNetworks);
-      kNeighborsInput.addEventListener('change', applyNetworks);
-      btnExport.addEventListener('click', exportCurrent);
-
-      function runSearch(){
-        const q = (searchInput.value||'').trim().toLowerCase();
-        if (!q) return;
-        const hit = entries.find(e=>e.country.toLowerCase()===q) || entries.find(e=>e.country.toLowerCase().includes(q));
-        if (!hit) return;
-        map.flyTo([hit.lat, hit.lng], 4, {duration:.6});
-        openCountryPopup(hit.key);
-      }
-      searchBtn.addEventListener('click', runSearch);
-      searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-
+      // initial draw + fit
       applyFilters();
+      fitAllDots();
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
@@ -827,6 +735,10 @@
       }
 
       rebuildNetworksWithPoints(impPts, devPts);
+
+      // update cached bounds for recenter
+      const bb = collectDotsBounds();
+      lastDotsBounds = bb;
     }
 
     function rebuildNetworksWithPoints(impPts, devPts){
@@ -850,6 +762,31 @@
           const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
           L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
         }
+      }
+    }
+
+    /* ---- Re-center helpers ---- */
+    function collectDotsBounds(){
+      const groups = [dotsImpLayer, dotsDevLayer];
+      let bounds = null;
+      groups.forEach(g=>{
+        g.eachLayer(l=>{
+          const latlng = l.getLatLng && l.getLatLng();
+          if (!latlng) return;
+          bounds = bounds ? bounds.extend(latlng) : L.latLngBounds(latlng, latlng);
+        });
+      });
+      return bounds;
+    }
+    function fitAllDots(){
+      const bb = lastDotsBounds || collectDotsBounds();
+      if (bb && bb.isValid()){
+        // Fit within clamped world bounds
+        const padded = bb.pad(0.25);
+        map.fitBounds(padded, { animate:true, maxZoom:4 });
+      } else {
+        // Fallback to whole world
+        map.fitBounds(maxBounds, { animate:true, maxZoom:2 });
       }
     }
 
