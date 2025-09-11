@@ -33,7 +33,7 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
-      --barH:72px; /* taller so nothing clips */
+      --barH:72px; /* header height */
     }
     html,body{
       height:100%;margin:0;background:var(--bg);color:var(--text);
@@ -56,7 +56,7 @@
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
       box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
     }
-    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px;}
+    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px; line-height:1.15;}
     #brandTitle .msn{color:var(--matrix)}
     #brandTitle .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
     #brandTitle .page{color:#ffffff} /* Digital ID Status in white */
@@ -79,6 +79,24 @@
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
 
+    /* Mobile hamburger */
+    #hambtn{
+      display:none;
+      margin-left:auto;
+      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
+      padding:8px 10px; border-radius:10px; font-weight:800; cursor:pointer;
+    }
+    #mobileMenu{
+      position:fixed; z-index:1101; left:0; right:0; top:var(--barH);
+      display:none; background:#081911; border-bottom:1px solid #123e2a;
+      box-shadow:0 10px 24px rgba(0,0,0,.5);
+    }
+    #mobileMenu.open{ display:block; }
+    #mobileMenu .mm-row{
+      display:flex; flex-direction:column; gap:10px; padding:12px;
+    }
+    #mobileMenu .btn{ width:100%; text-align:left; }
+
     /* ===== Map beneath bar ===== */
     #map{
       position:absolute; left:0; right:0; top:var(--barH); bottom:0;
@@ -86,7 +104,7 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 
     /* keep Leaflet zoom clear of bar */
-    .leaflet-top{ top:14px; } /* push container a bit */
+    .leaflet-top{ top:14px; } /* offset inside the map container */
     .leaflet-control-zoom{ margin-top:6px; }
 
     /* ===== Drawer opener ===== */
@@ -142,14 +160,19 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* Mobile hint (not used now – hint lives on the top bar) */
-    #touchHint{ display:none; }
-
+    /* Mobile tweaks */
     @media (max-width: 720px){
-      #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
-      #brandTitle h1{font-size:16px}
-      .actions{gap:6px}
-      .btn{padding:7px 9px;font-size:12px}
+      /* Stack title lines and show burger */
+      #brandTitle .sep{ display:none; }
+      #brandTitle .msn, #brandTitle .page{ display:block; }
+      #brandTitle h1{ font-size:16px; }
+      #hambtn{ display:block; }
+      .actions{ display:none; }  /* hide desktop actions on mobile */
+
+      #drawer{
+        left:10px; right:10px; bottom:66px; width:auto;
+        max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px;
+      }
     }
 
     .country-hover { cursor:pointer; }
@@ -169,13 +192,28 @@
       <span class="updated" id="updatedTop">Updated: …</span>
       <span class="inline-hint">• Click a dot or country for details</span>
     </div>
+
+    <!-- desktop actions -->
     <div class="actions">
       <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
       <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
       <a class="btn" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
       <a class="btn" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
     </div>
+
+    <!-- mobile hamburger -->
+    <button id="hambtn" aria-expanded="false" aria-controls="mobileMenu" title="Menu">☰ Menu</button>
   </div>
+
+  <!-- Mobile dropdown menu -->
+  <nav id="mobileMenu" aria-label="Mobile map menu">
+    <div class="mm-row">
+      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
+      <a class="btn" href="../">← Back to Agenda Tracker</a>
+      <a class="btn" href="../cbdc/">Open CBDC Map</a>
+      <a class="btn" href="../social-credit-system/">Open Social Credit Map</a>
+    </div>
+  </nav>
 
   <div id="map" aria-label="Digital ID world map"></div>
 
@@ -393,6 +431,14 @@
     const btnExport = document.getElementById('btnExport');
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
+
+    /* mobile menu toggle */
+    const hambtn = document.getElementById('hambtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    hambtn?.addEventListener('click', () => {
+      const open = mobileMenu.classList.toggle('open');
+      hambtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
 
     if (!isMobile()) drawer.classList.add('open');
 
@@ -623,7 +669,11 @@
             legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
             datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
-              formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
+              formatter:(v,ctx)=> {
+                const lbl = ctx.chart.data.labels[ctx.dataIndex] || '';
+                const pct = Math.round((v/total)*100);
+                return `${lbl}\n${v} (${pct}%)`;
+              }
             }
           }
         }
