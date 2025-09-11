@@ -30,52 +30,51 @@
     .brand h1{margin:0;font-size:22px;color:var(--matrix);text-shadow:0 0 12px rgba(0,255,128,.35)}
     .sub{color:var(--muted);font-size:13px}
 
-    /* ===== GRID: fewer columns to keep tiles wide ===== */
+    /* ===== GRID of tiles ===== */
     .tiles{display:grid;gap:18px}
-    /* default: 1 per row */
-    @media (min-width:860px){ .tiles{grid-template-columns:repeat(2, 1fr);} }          /* 2 columns */
-    @media (min-width:1280px){ .tiles{grid-template-columns:repeat(3, 1fr);} }        /* 3 columns only when wide */
+    @media (min-width:860px){ .tiles{grid-template-columns:repeat(2, 1fr);} }
+    @media (min-width:1280px){ .tiles{grid-template-columns:repeat(3, 1fr);} }
 
     .tile{
       background:linear-gradient(180deg,rgba(0,30,20,.40),rgba(6,18,14,.88));
       border:1px solid var(--edge); border-radius:14px; padding:14px;
-      position:relative; min-height:540px; display:flex; flex-direction:column;
-      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04)
+      min-height:540px; display:flex; flex-direction:column;
+      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04);
+      position:relative; overflow:hidden;
     }
     .tile:hover{border-color:#1e5b45;box-shadow:0 20px 44px rgba(0,0,0,.4),0 0 18px rgba(0,255,128,.08)}
     .live{position:absolute;top:10px;right:12px;font-size:11px;padding:5px 8px;border-radius:999px;color:#04130c;background:var(--matrix);border:1px solid rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:.6px}
     .tile h2{margin:2px 36px 12px 6px;font-size:20px;color:var(--matrix)}
 
-    /* CONTENT: side-by-side on large tiles, stacked on smaller ones */
-    .tile-inner{flex:1;display:grid;gap:18px;align-items:start;grid-template-columns:1fr} /* stacked by default */
-    @media (min-width:1150px){ .tile-inner{grid-template-columns:360px 1fr;} }           /* side-by-side when there is room */
+    /* ===== STACKED CONTENT INSIDE EACH TILE ===== */
+    .tile-inner{display:flex;flex-direction:column;gap:16px;flex:1;min-width:0}
+    .chartbox{width:100%;display:flex;justify-content:center}
+    .chartbox canvas{width:min(360px, 100%) !important; height:min(360px, 64vw) !important;}
 
-    .leftcol{display:flex;flex-direction:column;align-items:center;gap:16px}
-    .chartbox{width:min(320px, 100%);height:320px}
-    @media (max-width:480px){ .chartbox{height:260px} }
-
-    .rightcol{display:flex;flex-direction:column;gap:12px;min-width:0}
-
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--matrix-dk);color:var(--matrix);background:#0a1411;padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;width:100%}
-    .btn:hover{text-decoration:none;box-shadow:0 0 18px rgba(0,255,128,.22)}
-    .tile-cta{margin-top:18px}
-    .tile-cta .btn{width:100%}
-
-    /* ===== STATS: locked row layout, numbers on right ===== */
-    .stats{display:flex;flex-direction:column;gap:12px;position:relative;max-width:420px}
+    /* ===== STATS stay INSIDE card, full width ===== */
+    .stats{display:flex;flex-direction:column;gap:12px;width:100%}
     .stat{
       background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:12px 14px;border-radius:10px;
-      display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:54px
+      display:flex;align-items:center;gap:12px;width:100%;min-height:54px;overflow:hidden;
     }
-    .stat .lbl{font-size:14px;color:var(--muted);white-space:nowrap}
-    .stat .k{font-size:24px;color:var(--matrix)}
+    .stat .lbl{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .stat .k{font-size:24px;color:var(--matrix);margin-left:auto;flex:0 0 auto}
+
     .stat.clickable{cursor:pointer}
-    .pop{position:absolute;left:0;right:0;margin-top:6px;background:#06120e;border:1px solid var(--edge);border-radius:12px;max-height:220px;overflow:auto;display:none;z-index:5;box-shadow:0 14px 30px rgba(0,0,0,.45)}
+    .pop{position:relative;margin-top:-6px;background:#06120e;border:1px solid var(--edge);border-radius:12px;max-height:220px;overflow:auto;display:none;z-index:2;box-shadow:0 14px 30px rgba(0,0,0,.45)}
     .pop header{position:sticky;top:0;background:#071610;padding:8px 10px;border-bottom:1px solid #163a2d;display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
     .pop ul{list-style:none;margin:0;padding:6px 10px 10px 14px}
     .pop li{padding:4px 0;border-bottom:1px dashed rgba(32,88,68,.35)}
     .pop li:last-child{border-bottom:none}
     .close{border:1px solid #1c4;color:var(--matrix);background:#0b1216;border-radius:8px;padding:2px 6px;cursor:pointer}
+
+    .tile-cta{margin-top:auto} /* push button to bottom consistently */
+    .btn{
+      display:flex;align-items:center;justify-content:center;gap:8px;
+      border:1px solid var(--matrix-dk);color:var(--matrix);background:#0a1411;
+      padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;width:100%
+    }
+    .btn:hover{text-decoration:none;box-shadow:0 0 18px rgba(0,255,128,.22)}
 
     .footer{margin-top:18px;color:var(--muted);font-size:12px}
   </style>
@@ -103,23 +102,20 @@
         <h2>Digital ID Updates</h2>
 
         <div class="tile-inner">
-          <div class="leftcol">
-            <div class="chartbox"><canvas id="pie-digid" width="320" height="320"></canvas></div>
-          </div>
-          <div class="rightcol">
-            <div class="stats" id="stats-digid">
-              <div class="stat clickable" data-pop="digid-imp-pop"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
-              <div class="stat clickable" data-pop="digid-dev-pop"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
-              <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
+          <div class="chartbox"><canvas id="pie-digid" width="360" height="360"></canvas></div>
 
-              <div class="pop" id="digid-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-              <div class="pop" id="digid-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            </div>
-          </div>
-        </div>
+          <div class="stats" id="stats-digid">
+            <div class="stat clickable" data-pop="digid-imp-pop"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
+            <div class="stat clickable" data-pop="digid-dev-pop"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
 
-        <div class="tile-cta">
-          <a class="btn" href="./digital-id/">View Live Map</a>
+            <div class="pop" id="digid-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="digid-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+          </div>
+
+          <div class="tile-cta">
+            <a class="btn" href="./digital-id/">View Live Map</a>
+          </div>
         </div>
       </section>
 
@@ -129,23 +125,20 @@
         <h2>Central Bank Digital Currency (CBDC) Updates</h2>
 
         <div class="tile-inner">
-          <div class="leftcol">
-            <div class="chartbox"><canvas id="pie-cbdc" width="320" height="320"></canvas></div>
-          </div>
-          <div class="rightcol">
-            <div class="stats" id="stats-cbdc">
-              <div class="stat clickable" data-pop="cbdc-imp-pop"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
-              <div class="stat clickable" data-pop="cbdc-dev-pop"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
-              <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
+          <div class="chartbox"><canvas id="pie-cbdc" width="360" height="360"></canvas></div>
 
-              <div class="pop" id="cbdc-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-              <div class="pop" id="cbdc-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            </div>
-          </div>
-        </div>
+          <div class="stats" id="stats-cbdc">
+            <div class="stat clickable" data-pop="cbdc-imp-pop"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
+            <div class="stat clickable" data-pop="cbdc-dev-pop"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
 
-        <div class="tile-cta">
-          <a class="btn" href="./cbdc/">View Live Map</a>
+            <div class="pop" id="cbdc-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="cbdc-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+          </div>
+
+          <div class="tile-cta">
+            <a class="btn" href="./cbdc/">View Live Map</a>
+          </div>
         </div>
       </section>
 
@@ -155,23 +148,20 @@
         <h2>Social Credit System Updates</h2>
 
         <div class="tile-inner">
-          <div class="leftcol">
-            <div class="chartbox"><canvas id="pie-scs" width="320" height="320"></canvas></div>
-          </div>
-          <div class="rightcol">
-            <div class="stats" id="stats-scs">
-              <div class="stat clickable" data-pop="scs-imp-pop"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
-              <div class="stat clickable" data-pop="scs-dev-pop"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
-              <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
+          <div class="chartbox"><canvas id="pie-scs" width="360" height="360"></canvas></div>
 
-              <div class="pop" id="scs-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-              <div class="pop" id="scs-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            </div>
-          </div>
-        </div>
+          <div class="stats" id="stats-scs">
+            <div class="stat clickable" data-pop="scs-imp-pop"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
+            <div class="stat clickable" data-pop="scs-dev-pop"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
 
-        <div class="tile-cta">
-          <a class="btn" href="./social-credit-system/">View Live Map</a>
+            <div class="pop" id="scs-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="scs-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+          </div>
+
+          <div class="tile-cta">
+            <a class="btn" href="./social-credit-system/">View Live Map</a>
+          </div>
         </div>
       </section>
 
@@ -183,6 +173,7 @@
   </div>
 
   <script>
+    /* CSV sources */
     const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
     const CSV_CBDC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
     const CSV_SCS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
@@ -224,7 +215,7 @@
         data:{ labels:['Implemented','In development'],
           datasets:[{ data:[imp,dev], backgroundColor:['#ff3333','#ff9900'], borderColor:'rgba(0,0,0,.45)', borderWidth:1 }]},
         options:{
-          responsive:false,
+          responsive:true,
           plugins:{
             legend:{display:false},
             datalabels:{
@@ -257,6 +248,7 @@
         applyTile('scs',   bucketize(scs));
       });
 
+    /* Pop open/close */
     function closeAll(){ document.querySelectorAll('.pop').forEach(p=>p.style.display='none'); }
     document.addEventListener('click', (e)=>{
       if(e.target.matches('[data-close]')){ closeAll(); return; }
@@ -264,7 +256,8 @@
       if(stat && stat.dataset.pop){
         const pop = document.getElementById(stat.dataset.pop);
         if(!pop) return;
-        stat.parentElement.appendChild(pop);
+        /* keep popup within stats box */
+        stat.insertAdjacentElement('afterend', pop);
         pop.style.display = (pop.style.display==='block') ? 'none' : 'block';
       }else if(!e.target.closest('.pop')){ closeAll(); }
     });
