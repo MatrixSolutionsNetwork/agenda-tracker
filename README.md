@@ -1,4 +1,3 @@
-All Credit goes to AI for making these. 
 
 Context Snapshot for future chats:
 
