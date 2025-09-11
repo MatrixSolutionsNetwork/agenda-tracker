@@ -1,1 +1,769 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Matrix Solutions Network — Social Credit Systems</title>
+
+  <!-- Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- CSV -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <!-- Chart.js (+labels) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <!-- Turf + polylabel for robust centroids -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
+
+  <style>
+    :root{
+      --bg:#0b0f12; --text:#e6f3ea; --muted:#8aa39a;
+      --chip:#0b1216; --chipEdge:#22313a;
+      --panel:#0f1418; --panelEdge:#151b21;
+      --orange:#ff9900; /* In development */
+      --red:#ff3333;    /* Implemented */
+      --mint:#7be2b1;   /* Outline */
+      --matrix:#21ff9d; /* Matrix green for brand */
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
+    #map{height:100%;width:100%}
+    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+
+    /* Bottom-left chip */
+    #fab{
+      position:absolute; left:12px; bottom:12px; z-index:1002;
+      display:inline-flex; align-items:center; gap:10px;
+      background:var(--chip); border:1px solid var(--chipEdge); color:#cfe9dc;
+      border-radius:999px; padding:10px 12px; cursor:pointer;
+      font:600 13px Inter,ui-sans-serif,system-ui;
+      box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
+    }
+    #fab .dot{width:10px;height:10px;border-radius:50%}
+    #fab .d-red{ background:var(--red) }
+    #fab .d-org{ background:var(--orange) }
+
+    /* Drawer */
+    #drawer{
+      position:absolute; left:12px; bottom:56px; z-index:1001;
+      width:360px; max-width:92vw; max-height:66vh; overflow:auto;
+      background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
+      border:1px solid var(--panelEdge); border-radius:12px;
+      padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
+      backdrop-filter: blur(1px);
+    }
+    #drawer.open{ display:block }
+    .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .brand{ color:var(--matrix); font-weight:700; font-size:13px; letter-spacing:.3px }
+    .subtitle{ color:#cfe9dc; opacity:.85; font-weight:600; font-size:12px; line-height:1.1; margin-top:2px; }
+    .icon-btn{
+      width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
+      background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
+      display:inline-flex; align-items:center; justify-content:center;
+      cursor:pointer; padding:0;
+    }
+    #drawerClose{ border-color:var(--matrix); color:var(--matrix); font-weight:800; }
+
+    .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
+    .sw{width:12px;height:12px;border-radius:50%}
+    .count{margin-left:auto;color:var(--muted);font-weight:700}
+    .hr{border:none;border-top:1px solid #182126;margin:8px 0}
+    .hint{font-size:12px;color:var(--muted)}
+    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+
+    .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
+    .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
+    .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
+
+    .textfield, .select, .num {
+      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
+      padding:6px 8px;font:500 13px Inter,ui-sans-serif; outline:none; width:100%;
+    }
+    .btn {
+      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
+      padding:6px 10px;font:600 13px Inter,ui-sans-serif; cursor:pointer;
+    }
+
+    /* Mobile hint */
+    #touchHint{
+      position:absolute; left:50%; transform:translateX(-50%);
+      top:10px; z-index:1003; background:#0b1216; border:1px solid #22313a;
+      color:#cfe9dc; font:600 12px Inter,ui-sans-serif; padding:6px 10px;
+      border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
+    }
+
+    @media (max-width: 720px){
+      #drawer{
+        left:10px; right:10px; bottom:66px;
+        width:auto; max-width:calc(100vw - 20px);
+        max-height:58vh;
+        border-radius:12px;
+      }
+      .brand{ font-size:14px; }
+      .subtitle{ font-size:12px; }
+      .icon-btn{ width:34px; height:34px; font-size:18px; }
+      #fab{ font-size:12px; padding:8px 10px; }
+      #touchHint{ display:block; }
+    }
+
+    .country-hover { cursor:pointer; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Mobile hint -->
+  <div id="touchHint">Tap a country or dot for details</div>
+
+  <!-- Tiny toolbar -->
+  <div id="fab" aria-label="Open stats panel">
+    <span style="opacity:.85;">Social Credit Overview — <u>click to open</u></span>
+    <span class="dot d-red" title="Implemented"></span>
+    <span class="dot d-org" title="In development"></span>
+  </div>
+
+  <!-- Drawer -->
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Matrix Solutions Network — Social Credit Status">
+    <div class="drawer-head">
+      <div>
+        <div class="brand">Matrix Solutions Network</div>
+        <div class="subtitle">Social Credit Status</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
+        <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="row" style="gap:8px;align-items:center;">
+      <input id="searchCountry" class="textfield" list="countryList" placeholder="Search country… (Enter)" />
+      <datalist id="countryList"></datalist>
+      <button id="btnSearch" class="btn">Go</button>
+    </div>
+
+    <!-- Region -->
+    <div class="row" style="gap:8px;align-items:center;">
+      <select id="regionSelect" class="select" title="Region">
+        <option value="__all">All regions</option>
+      </select>
+    </div>
+
+    <!-- Min year (auto-shown only if Year exists) -->
+    <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
+      <label style="white-space:nowrap;">Min year:</label>
+      <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
+      <span id="yearMinVal" style="width:44px;text-align:right;">Any</span>
+    </div>
+
+    <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
+
+    <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+
+    <div class="hr"></div>
+
+    <!-- Country shading toggle -->
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="shadeImp" checked />
+        <span>Country shading — Implemented</span>
+      </label>
+    </div>
+
+    <!-- Show/Hide dots -->
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showImpDots" checked />
+        <span>Show dots — Implemented</span>
+      </label>
+    </div>
+    <div class="row" style="gap:12px;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="showDevDots" checked />
+        <span>Show dots — In development</span>
+      </label>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Local networks -->
+    <div class="row" style="gap:12px; align-items:center;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="netImp" checked />
+        <span>Local network — Implemented</span>
+      </label>
+    </div>
+    <div class="row" style="gap:12px; align-items:center;">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+        <input type="checkbox" id="netDev" />
+        <span>Local network — In development</span>
+      </label>
+    </div>
+    <div class="row" style="gap:8px; align-items:center; font-size:12px;">
+      <label>Neighbors:</label>
+      <input type="number" id="kNeighbors" min="1" max="6" value="4" class="num" style="width:56px;">
+      <span class="hint">(nearest per dot)</span>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Export -->
+    <div class="row" style="gap:8px;">
+      <button id="btnExport" class="btn" title="Download current view as CSV">Export CSV</button>
+      <span class="hint" id="lastUpdated" style="margin-left:auto;"></span>
+    </div>
+
+    <div id="debug" class="debug"></div>
+    <div class="hint" style="margin-top:6px;">Click a dot or country for details.</div>
+  </div>
+
+  <script>
+    /* === SOCIAL CREDIT SHEET (your link) === */
+    const SHEET_PUBLISHED_LINK =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
+
+    /* ---------- Helpers ---------- */
+    function toCsvUrl(u){
+      if (!u) return u;
+      if (/output=csv/i.test(u)) return u;
+      if (/\/pubhtml/i.test(u)){ const url = new URL(u); url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single"))url.searchParams.set("single","true"); return url.toString(); }
+      if (/\/spreadsheets\/d\//i.test(u)){ const m = u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
+      return u;
+    }
+    const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
+
+    /* Name normalizer + aliases */
+    const COUNTRY_ALIASES = new Map([
+      ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
+      ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
+      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
+      ["türkiye","turkey"], ["turkiye","turkey"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["south korea (republic of)","south korea"],
+      ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
+      ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
+      ["macedonia","north macedonia"], ["lao pdr","laos"],
+      ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
+      ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
+      ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
+      ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"],
+      ["bosnia & herzegovina","bosnia and herzegovina"], ["bosnia-herzegovina","bosnia and herzegovina"],
+      ["trinidad & tobago","trinidad and tobago"], ["saint kitts & nevis","saint kitts and nevis"],
+      ["sao tome & principe","sao tome and principe"], ["antigua & barbuda","antigua and barbuda"],
+      ["st vincent and the grenadines","saint vincent and the grenadines"], ["st kitts and nevis","saint kitts and nevis"], ["st lucia","saint lucia"],
+      ["east timor","timor-leste"], ["cape verde","cabo verde"]
+    ]);
+
+    // Accurate centroid overrides for tricky cases (lat, lng)
+    const CENTROID_OVERRIDES = new Map([
+      ["russia",        [61.5240, 105.3188]],
+      ["china",         [35.0000, 103.0000]],
+      ["kazakhstan",    [48.0000, 68.0000]],
+      ["mongolia",      [46.8625, 103.8467]],
+      ["australia",     [-25.2744, 133.7751]],
+      ["canada",        [56.1304, -106.3468]],
+      ["united states", [39.8283, -98.5795]],
+      ["brazil",        [-10.0000, -55.0000]],
+      ["argentina",     [-38.4161, -63.6167]],
+      ["indonesia",     [-2.0000, 118.0000]],
+      ["saudi arabia",  [23.8859, 45.0792]],
+      ["iran",          [32.4279, 53.6880]],
+      ["venezuela",     [7.0000, -66.0000]],
+      ["ghana",         [7.9465, -1.0232]],
+      ["nigeria",       [9.0820, 8.6753]],
+      ["mexico",        [23.6345, -102.5528]],
+      ["south africa",  [-30.5595, 22.9375]],
+      ["india",         [22.9734, 78.6569]],
+      ["japan",         [36.2048, 138.2529]],
+      ["united kingdom",[52.3555,-1.1743]],
+      ["spain",         [40.4168, -3.7038]],
+      ["italy",         [42.5, 12.5]],
+      ["denmark",       [56.2639, 9.5019]],
+      ["serbia",        [44.0165, 21.0059]],
+      ["costa rica",    [9.7489, -83.7534]]
+    ]);
+
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){
+      const n = parseInt(hex.replace('#',''),16);
+      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
+    }
+    function normalizeCountry(s){
+      const k = String(s||"")
+        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/[^a-z0-9 ]+/gi,' ')
+        .replace(/\s+/g,' ')
+        .toLowerCase().trim();
+      return COUNTRY_ALIASES.get(k) || k;
+    }
+    function splitCountries(cell){
+      // DO NOT split on the word 'and' to keep composite names intact
+      return String(cell)
+        .replace(/・/g, ',')
+        .split(/\s*(?:,|;|\/|&)\s*/i)
+        .map(s=>s.trim())
+        .filter(Boolean);
+    }
+    function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function haversine(a, b){
+      const toRad = d => d * Math.PI/180, R=6371;
+      const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
+      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
+      return 2*R*Math.asin(Math.sqrt(s1));
+    }
+    const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
+
+    /* ---------- Map ---------- */
+    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+    }).addTo(map);
+
+    // dot and line layers
+    const dotsImpLayer = L.layerGroup().addTo(map);
+    const dotsDevLayer = L.layerGroup().addTo(map);
+    const linesImpLayer = L.layerGroup().addTo(map);
+    const linesDevLayer = L.layerGroup().addTo(map);
+
+    // country layers
+    let outlineLayer = null;   // thin mint outlines
+    let shadeLayer = null;     // implemented shading (fill)
+    let hitLayer = null;       // invisible interactive layer for taps
+
+    // UI refs
+    const fab = document.getElementById('fab');
+    const drawer = document.getElementById('drawer');
+    const drawerClose = document.getElementById('drawerClose');
+    const drawerRefresh = document.getElementById('drawerRefresh');
+    const netImp = document.getElementById('netImp');
+    const netDev = document.getElementById('netDev');
+    const kNeighborsInput = document.getElementById('kNeighbors');
+    const showImpDots = document.getElementById('showImpDots');
+    const showDevDots = document.getElementById('showDevDots');
+    const shadeImp = document.getElementById('shadeImp');
+    const dbgEl = document.getElementById('debug');
+    const dbg = (m)=>{ dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + m; };
+
+    const searchInput = document.getElementById('searchCountry');
+    const searchBtn = document.getElementById('btnSearch');
+    const dataList = document.getElementById('countryList');
+    const regionSelect = document.getElementById('regionSelect');
+    const yearRow = document.getElementById('yearRow');
+    const yearMin = document.getElementById('yearMin');
+    const yearMinVal = document.getElementById('yearMinVal');
+    const btnExport = document.getElementById('btnExport');
+    const lastUpdated = document.getElementById('lastUpdated');
+
+    if (!isMobile()) drawer.classList.add('open');
+
+    fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
+    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
+    drawerRefresh.addEventListener('click', ()=> location.reload());
+
+    // state
+    let implementedCoords = [];
+    let devCoords = [];
+    let entries = [];
+    let regionMap = {};
+    let allRegions = new Set();
+    let yearBounds = null;
+
+    // for shading & taps
+    let geoRef = null; // polygons GeoJSON
+    let centroidByKey = {}; // key->LatLng
+
+    function openCountryPopup(countryKey){
+      const rows = entries.filter(e=>e.key===countryKey);
+      if (!rows.length){
+        const pt = centroidByKey[countryKey];
+        if (pt) L.popup().setLatLng(pt).setContent("No record in dataset.").openOn(map);
+        return;
+      }
+      const pt = centroidByKey[countryKey] || L.latLng(rows[0].lat, rows[0].lng);
+      const primary = rows.find(r=>r.isImplemented) || rows[0];
+
+      let list = rows.map(r=>{
+        const bits = [];
+        if (r.title) bits.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
+        if (r.status) bits.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
+        if (Number.isInteger(r.year)) bits.push(`<strong>Year:</strong> ${r.year}`);
+        if (r.notes) bits.push(`<span style="color:${getCSS('--muted')}">${escapeHtml(r.notes)}</span>`);
+        return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
+      }).join("");
+
+      const html = `
+        <div style="min-width:240px">
+          <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(primary.country)}</h3>
+          ${list}
+        </div>`;
+      L.popup({autoClose:true, closeOnClick:true})
+        .setLatLng(pt)
+        .setContent(html)
+        .openOn(map);
+    }
+
+    /* ----------- Build pipeline ----------- */
+    (async function init(){
+      // 1) polygons
+      let geo=null, lastErr=null;
+      const SOURCES=[
+        'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
+        'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
+        'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
+      ];
+      for (const src of SOURCES){
+        try{
+          const r=await fetch(src,{cache:'default',mode:'cors'}); if(!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j=await r.json(); if(!j || !j.features || j.features.length<100) throw new Error('Bad geojson');
+          geo=j; break;
+        }catch(e){ lastErr=e; }
+      }
+      if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
+      geoRef = geo;
+
+      function getName(props){
+        if (!props) return null;
+        if (typeof props.name === 'string') return props.name;
+        if (props.ADMIN) return props.ADMIN;
+        if (props.NAME_EN) return props.NAME_EN;
+        if (props.NAME) return props.NAME;
+        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
+        if (props.SOVEREIGNT) return props.SOVEREIGNT;
+        for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
+        return null;
+      }
+      function getRegion(props){
+        return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
+      }
+      function centroidInside(feature){
+        try {
+          if (feature.geometry and (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
+            let coords=null;
+            if (feature.geometry.type==='Polygon'){
+              coords=feature.geometry.coordinates;
+            } else {
+              let best=null,bestA=-1;
+              for (const poly of feature.geometry.coordinates){
+                const a=turf.area(turf.polygon(poly));
+                if(a>bestA){ bestA=a; best=poly; }
+              }
+              coords=best;
+            }
+            const p=polylabel(coords, 1.0); // [lng,lat]
+            return L.latLng(p[1], p[0]);
+          }
+        }catch(e){}
+        try {
+          const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
+          return L.latLng(c[1], c[0]);
+        }catch(e){}
+        return L.geoJSON(feature).getBounds().getCenter();
+      }
+
+      // build centroid + region lookup
+      centroidByKey = {};
+      regionMap = {};
+      L.geoJSON(geo).eachLayer(l=>{
+        const nm = normalizeCountry(getName(l.feature.properties));
+        if (!nm) return;
+        if (CENTROID_OVERRIDES.has(nm)){
+          const [lat,lng] = CENTROID_OVERRIDES.get(nm);
+          centroidByKey[nm] = L.latLng(lat,lng);
+        } else {
+          centroidByKey[nm] = centroidInside(l.feature);
+        }
+        const reg = getRegion(l.feature.properties) || 'Other';
+        regionMap[nm] = reg;
+        l.feature.properties._key = nm;
+        allRegions.add(reg);
+      });
+
+      // Build region options
+      [...[...allRegions].sort()].forEach(r=>{
+        const opt=document.createElement('option');
+        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
+      });
+
+      // Subtle mint outline layer
+      outlineLayer = L.geoJSON(geo, {
+        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
+      }).addTo(map);
+
+      // Implemented shading (fill updated later)
+      shadeLayer = L.geoJSON(geo, {
+        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
+      }).addTo(map);
+
+      // Invisible interactive layer for taps/clicks
+      hitLayer = L.geoJSON(geo, {
+        style: { color:'#0000', weight:0, fillOpacity:0 },
+        onEachFeature: (f, layer) => {
+          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
+          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
+          layer.on('click', () => openCountryPopup((f.properties&&f.properties._key)||""));
+        }
+      }).addTo(map);
+
+      // 2) sheet
+      let rawRows;
+      try{
+        const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
+        if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+        lastUpdated.textContent = 'Updated: ' + (res.headers.get('Date') || 'now');
+        const text = await res.text();
+        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+        rawRows = parsed.data;
+      }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
+
+      // 3) normalize + collect years
+      entries = [];
+      const counts={imp:0, dev:0};
+      const unmatched = new Set();
+      implementedCoords=[]; devCoords=[];
+      let yMin=Infinity, yMax=-Infinity;
+
+      function pickYear(row){
+        const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
+        for (const k of keys){
+          if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
+        }
+        return null;
+      }
+
+      for (const row of rawRows){
+        const title = String(row["Title"]||"").trim();
+        const status = String(row["Status"]||"").trim();
+        const notes = String(row["Description"]||"").trim();
+        const yr = pickYear(row);
+        if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
+
+        const countriesCell = String(row["Countries"]||"").trim();
+        if (!countriesCell) continue;
+
+        for (const raw of splitCountries(countriesCell)){
+          const key = normalizeCountry(raw);
+          let pt = centroidByKey[key];
+          if (!pt){
+            const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
+            pt = centroidByKey[alt];
+          }
+          if (!pt){ unmatched.add(raw); continue; }
+
+          const reg = regionMap[key] || 'Other';
+          const isImplemented = /implement/i.test(status);
+          const isDev = /develop|discussion|pilot|trial|poc|proof|concept|prepar/i.test(status);
+
+          const obj = {
+            key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
+            status, isImplemented, isDev, title, notes, year: yr, region: reg
+          };
+          entries.push(obj);
+
+          if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
+          else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
+        }
+      }
+
+      // UI: pie + counters
+      document.getElementById('c-imp').textContent = counts.imp;
+      document.getElementById('c-dev').textContent = counts.dev;
+      const total = Math.max(1, counts.imp + counts.dev);
+      Chart.register(ChartDataLabels);
+      new Chart(document.getElementById('statusPie'), {
+        type:'pie',
+        data:{
+          labels:['Implemented','In development'],
+          datasets:[{
+            data:[counts.imp, counts.dev],
+            backgroundColor:[getCSS('--red'), getCSS('--orange')],
+            borderColor:'rgba(0,0,0,.45)', borderWidth:1
+          }]
+        },
+        options:{
+          responsive:true,
+          plugins:{
+            legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            datalabels:{
+              color:'#0b0f12', font:{weight:'700', size:11},
+              formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
+            }
+          }
+        }
+      });
+
+      // Search list
+      const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
+      document.getElementById('countryList').innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
+
+      // Timeline control (only if any year)
+      if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
+        yearBounds = {min:yMin, max:yMax};
+        yearRow.style.display='flex';
+        yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
+        yearMinVal.textContent = 'Any';
+        yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
+      }
+
+      // listeners
+      showImpDots.addEventListener('change', applyFilters);
+      showDevDots.addEventListener('change', applyFilters);
+      shadeImp.addEventListener('change', applyFilters);
+      regionSelect.addEventListener('change', applyFilters);
+      netImp.addEventListener('change', applyNetworks);
+      netDev.addEventListener('change', applyNetworks);
+      kNeighborsInput.addEventListener('change', applyNetworks);
+      btnExport.addEventListener('click', exportCurrent);
+
+      function runSearch(){
+        const q = (searchInput.value||'').trim().toLowerCase();
+        if (!q) return;
+        const hit = entries.find(e=>e.country.toLowerCase()===q) || entries.find(e=>e.country.toLowerCase().includes(q));
+        if (!hit) return;
+        map.flyTo([hit.lat, hit.lng], 4, {duration:.6});
+        openCountryPopup(hit.key);
+      }
+      searchBtn.addEventListener('click', runSearch);
+      searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
+
+      // draw first time
+      applyFilters();
+
+      if (unmatched.size){
+        dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
+        console.warn("Unmatched:", [...unmatched].sort());
+      }
+
+      // Hide hint after a few seconds on mobile
+      if (isMobile()){
+        setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
+      }
+    })();
+
+    function currentFilters(){
+      const showImp = document.getElementById('showImpDots').checked;
+      const showDev = document.getElementById('showDevDots').checked;
+      const shadeOn = document.getElementById('shadeImp').checked;
+      const region = document.getElementById('regionSelect').value || '__all';
+      const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
+      const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
+      return {showImp, showDev, shadeOn, region, minYear, hasYearUI};
+    }
+
+    function applyFilters(){
+      const {showImp, showDev, shadeOn, region, minYear, hasYearUI} = currentFilters();
+
+      dotsImpLayer.clearLayers();
+      dotsDevLayer.clearLayers();
+
+      const red = getCSS('--red'), orange=getCSS('--orange');
+
+      const filt = e => {
+        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
+        if (e.isImplemented && !showImp) return false;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
+      };
+
+      const impPts=[], devPts=[];
+      const implementedShown = new Set(); // for shading
+
+      for (const e of entries){
+        if (!filt(e)) continue;
+        const color = e.isImplemented ? red : orange;
+        const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
+
+        L.circleMarker([e.lat, e.lng], {
+          radius: 6.5, color: darken(color,30), weight:1.2, fillColor: color, fillOpacity:.95
+        })
+        .on('click', ()=> openCountryPopup(e.key))
+        .bindTooltip(`${e.country}: ${e.status}`, {direction:'top', offset:[0,-6]})
+        .addTo(layer);
+
+        if (e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(e.key); }
+        else if (e.isDev) { devPts.push([e.lat,e.lng]); }
+      }
+
+      // Shade implemented countries that are visible
+      if (shadeLayer){
+        const fill = getCSS('--red');
+        shadeLayer.setStyle(f=>{
+          const key = (f.properties && f.properties._key) || '';
+          if (!shadeOn) return {fillOpacity:0, color:'#0000', weight:0};
+          return implementedShown.has(key)
+            ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
+            : {fillOpacity:0, color:'#0000', weight:0};
+        });
+      }
+
+      // networks per filtered set
+      rebuildNetworksWithPoints(impPts, devPts);
+    }
+
+    function rebuildNetworksWithPoints(impPts, devPts){
+      const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
+      linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
+
+      if (netImp.checked && impPts.length>1) buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
+      if (netDev.checked && devPts.length>1) buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
+    }
+    function applyNetworks(){ applyFilters(); }
+
+    function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
+      const n=coords.length; if(n<2) return;
+      const seen=new Set();
+      for(let i=0;i<n;i++){
+        const dists=[];
+        for(let j=0;j<n;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
+        dists.sort((a,b)=>a.d-b.d);
+        const limit=Math.min(k, dists.length);
+        for(let t=0;t<limit;t++){
+          const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
+          L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
+        }
+      }
+    }
+
+    function exportCurrent(){
+      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
+      const rows = entries.filter(e=>{
+        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
+        if (e.isImplemented && !showImp) return false;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
+      }).map(e=>({
+        Country:e.country, Title:e.title, Status:e.status, Year:e.year||"",
+        Region:e.region||"", Lat:e.lat, Lng:e.lng, Notes:e.notes||""
+      }));
+
+      const header = Object.keys(rows[0]||{
+        Country:"",Title:"",Status:"",Year:"",Region:"",Lat:"",Lng:"",Notes:""
+      });
+      const csv = [header.join(",")]
+        .concat(rows.map(r=>header.map(k=>{
+          const v = String(r[k]??"").replace(/"/g,'""');
+          return `"${v}"`;
+        }).join(",")))
+        .join("\n");
+
+      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href=url; a.download='social-credit-export.csv';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
