@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <!-- Inter (Notion-y font) -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- Share Tech Mono (dashboard font) -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -25,37 +25,67 @@
 
   <style>
     :root{
-      --bg:#0b0f12; --text:#e6f3ea; --muted:#8aa39a;
-      --chip:#0b1216; --chipEdge:#22313a;
-      --panel:#0f1418; --panelEdge:#151b21;
+      --bg:#07100b; --text:#b8ffd8; --muted:#6cd7a3;
+      --chip:#061c13; --chipEdge:#10402b;
+      --panel:#06130d; --panelEdge:#0b2a1c;
       --orange:#ff9900; /* In development */
       --red:#ff3333;    /* Implemented */
       --mint:#7be2b1;   /* Outline */
       --matrix:#21ff9d; /* Matrix green for brand */
     }
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
+    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+      font-family:"Share Tech Mono",ui-monospace,monospace;}
     #map{height:100%;width:100%}
-    /* Slightly brighter tiles for readability */
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 
-    /* Bottom-left chip */
+    /* ===== Top brand bar ===== */
+    #topbar{
+      position:fixed; z-index:1100; left:12px; right:12px; top:12px;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      background:linear-gradient(180deg,rgba(10,30,20,.78),rgba(8,22,16,.94));
+      border:1px solid var(--panelEdge); border-radius:12px;
+      padding:10px 12px; box-shadow:0 10px 28px rgba(0,0,0,.45);
+      backdrop-filter: blur(2px);
+    }
+    #brandTitle{display:flex; align-items:center; gap:10px; white-space:nowrap}
+    #brandTitle .dot{width:14px;height:14px;border-radius:50%;
+      background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
+      box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)}
+    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px}
+    .live{font-size:11px;color:#062715;background:var(--matrix);
+      padding:3px 8px;border-radius:999px;border:1px solid #74ffc7}
+
+    .actions{
+      margin-left:auto; display:flex; gap:8px; overflow:auto hidden;
+      scrollbar-width:none;
+    }
+    .actions::-webkit-scrollbar{display:none}
+    .btn{
+      background:#062015; border:1px solid #1b5a3e; color:var(--matrix);
+      padding:8px 10px; border-radius:10px; text-decoration:none;
+      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
+    }
+    .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
+    .btn.secondary{color:var(--text); border-color:#163c2a}
+
+    /* ===== Bottom-left chip to open drawer ===== */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
       background:var(--chip); border:1px solid var(--chipEdge); color:#cfe9dc;
       border-radius:999px; padding:10px 12px; cursor:pointer;
-      font:600 13px Inter,ui-sans-serif,system-ui;
+      font-weight:700;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
     }
     #fab .dot{width:10px;height:10px;border-radius:50%}
     #fab .d-red{ background:var(--red) }
     #fab .d-org{ background:var(--orange) }
 
-    /* Drawer */
+    /* ===== Drawer ===== */
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
       width:360px; max-width:92vw; max-height:66vh; overflow:auto;
-      background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
+      background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
       backdrop-filter: blur(1px);
@@ -63,66 +93,74 @@
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .brand{ color:var(--matrix); font-weight:700; font-size:13px; letter-spacing:.3px }
-    .subtitle{ color:#cfe9dc; opacity:.85; font-weight:600; font-size:12px; line-height:1.1; margin-top:2px; }
+    .subtitle{ color:#cfe9dc; opacity:.85; font-weight:700; font-size:12px; line-height:1.1; margin-top:2px; }
     .icon-btn{
-      width:26px;height:26px;border-radius:8px;border:1px solid #22313a;
-      background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
+      width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
+      background:#062015; color:var(--matrix); font-size:14px; line-height:24px;
       display:inline-flex; align-items:center; justify-content:center;
-      cursor:pointer; padding:0;
+      cursor:pointer; padding:0; font-weight:800;
     }
-    /* Make the Close more obvious */
-    #drawerClose{ border-color:var(--matrix); color:var(--matrix); font-weight:800; }
 
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:var(--muted);font-weight:700}
-    .hr{border:none;border-top:1px solid #182126;margin:8px 0}
+    .hr{border:none;border-top:1px solid #0f3524;margin:8px 0}
     .hint{font-size:12px;color:var(--muted)}
     .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
 
-    .leaflet-popup-content-wrapper{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
-    .leaflet-popup-tip{background:#0e1512;border:1px solid #1b3a2e;}
-    .leaflet-tooltip{background:#0e1512;color:var(--text);border:1px solid #1b3a2e;}
+    .leaflet-popup-content-wrapper{background:#0a1c14;color:var(--text);border:1px solid #174d35;}
+    .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
+    .leaflet-tooltip{background:#0a1c14;color:var(--text);border:1px solid #174d35;}
 
-    /* Inputs */
     .textfield, .select, .num {
-      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
-      padding:6px 8px;font:500 13px Inter,ui-sans-serif; outline:none; width:100%;
+      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#e6f3ea;
+      padding:6px 8px;font:600 13px "Share Tech Mono",ui-monospace; outline:none; width:100%;
     }
-    .btn {
-      background:#0b1216;border:1px solid #22313a;border-radius:8px;color:#e6f3ea;
-      padding:6px 10px;font:600 13px Inter,ui-sans-serif; cursor:pointer;
+    .btn-ghost {
+      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#e6f3ea;
+      padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
     /* Mobile hint */
     #touchHint{
       position:absolute; left:50%; transform:translateX(-50%);
-      top:10px; z-index:1003; background:#0b1216; border:1px solid #22313a;
-      color:#cfe9dc; font:600 12px Inter,ui-sans-serif; padding:6px 10px;
+      top:66px; z-index:1003; background:#062015; border:1px solid #1b5a3e;
+      color:#cfe9dc; font:700 12px "Share Tech Mono"; padding:6px 10px;
       border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
     }
 
-    /* ------- Mobile tweaks ------- */
+    /* Mobile tweaks */
     @media (max-width: 720px){
-      #drawer{
-        left:10px; right:10px; bottom:66px;
-        width:auto; max-width:calc(100vw - 20px);
-        max-height:58vh;  /* smaller, avoids covering full screen */
-        border-radius:12px;
-      }
-      .brand{ font-size:14px; }
-      .subtitle{ font-size:12px; }
-      .icon-btn{ width:34px; height:34px; font-size:18px; }
-      #fab{ font-size:12px; padding:8px 10px; }
+      #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
       #touchHint{ display:block; }
+      #brandTitle h1{font-size:16px}
+      .actions{gap:6px}
+      .btn{padding:7px 9px;font-size:12px}
     }
 
-    /* Subtle hover on clickable countries */
     .country-hover { cursor:pointer; }
   </style>
 </head>
 <body>
-  <div id="map"></div>
+  <!-- ===== Top navigation / context bar ===== -->
+  <div id="topbar" role="navigation" aria-label="Map header">
+    <div id="brandTitle">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>Matrix Solutions Network — Digital ID Status</h1>
+      <span class="live">LIVE</span>
+    </div>
+    <div class="actions">
+      <!-- Back to the agenda overview -->
+      <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
+      <!-- Cross-links to other maps -->
+      <a class="btn secondary" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
+      <a class="btn secondary" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
+      <!-- Notion dashboard -->
+      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener" title="Open the Matrix Solutions Network Dashboard">Open Dashboard ↗</a>
+    </div>
+  </div>
+
+  <div id="map" aria-label="Digital ID world map"></div>
 
   <!-- Mobile hint -->
   <div id="touchHint">Tap a country or dot for details</div>
@@ -151,7 +189,7 @@
     <div class="row" style="gap:8px;align-items:center;">
       <input id="searchCountry" class="textfield" list="countryList" placeholder="Search country… (Enter)" />
       <datalist id="countryList"></datalist>
-      <button id="btnSearch" class="btn">Go</button>
+      <button id="btnSearch" class="btn-ghost">Go</button>
     </div>
 
     <!-- Region -->
@@ -222,7 +260,7 @@
 
     <!-- Export -->
     <div class="row" style="gap:8px;">
-      <button id="btnExport" class="btn" title="Download current view as CSV">Export CSV</button>
+      <button id="btnExport" class="btn-ghost" title="Download current view as CSV">Export CSV</button>
       <span class="hint" id="lastUpdated" style="margin-left:auto;"></span>
     </div>
 
@@ -262,15 +300,10 @@
 
     // Accurate centroid overrides for tricky cases
     const CENTROID_OVERRIDES = new Map([
-      ["spain",         [40.4168, -3.7038]],
-      ["italy",         [42.5, 12.5]],
-      ["denmark",       [56.2639, 9.5019]],
-      ["united kingdom",[52.3555,-1.1743]],
-      ["serbia",        [44.0165, 21.0059]],
-      ["united states", [39.8283,-98.5795]],
-      ["canada",        [56.1304,-106.3468]],
-      ["costa rica",    [9.7489, -83.7534]],
-      ["japan",         [36.2048, 138.2529]]
+      ["spain",[40.4168,-3.7038]], ["italy",[42.5,12.5]], ["denmark",[56.2639,9.5019]],
+      ["united kingdom",[52.3555,-1.1743]], ["serbia",[44.0165,21.0059]],
+      ["united states",[39.8283,-98.5795]], ["canada",[56.1304,-106.3468]],
+      ["costa rica",[9.7489,-83.7534]], ["japan",[36.2048,138.2529]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -296,7 +329,7 @@
         .filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&gt;','&quot;':'&quot;', "'":'&#39;'}[s])); }
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
@@ -373,7 +406,6 @@
         return;
       }
       const pt = centroidByKey[countryKey] || L.latLng(rows[0].lat, rows[0].lng);
-      // Prefer Implemented row; else first one
       const primary = rows.find(r=>r.isImplemented) || rows[0];
 
       let list = rows.map(r=>{
@@ -469,6 +501,7 @@
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
         l.feature.properties._key = nm; // store normalized key
+        allRegions.add(reg);
       });
 
       // Build region options
@@ -484,7 +517,7 @@
 
       // Implemented shading (fill updated later)
       shadeLayer = L.geoJSON(geo, {
-        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) // start off
+        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
       // Invisible interactive layer for taps/clicks
@@ -544,7 +577,7 @@
 
           const reg = regionMap[key] || 'Other';
           const isImplemented = /implement/i.test(status);
-          const isDev = /develop|discussion/i.test(status);
+          const isDev = /develop|discussion|pilot|trial|poc|concept/i.test(status);
           const obj = {
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
             status, isImplemented, isDev, title, notes, year: yr, region: reg
@@ -625,7 +658,6 @@
         console.warn("Unmatched:", [...unmatched].sort());
       }
 
-      // Hide hint after a few seconds on mobile
       if (isMobile()){
         setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
       }
