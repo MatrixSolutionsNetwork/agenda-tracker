@@ -31,7 +31,7 @@
       --orange:#ff9900; /* In development */
       --red:#ff3333;    /* Implemented */
       --mint:#7be2b1;   /* Outline */
-      --matrix:#21ff9d; /* Matrix green for brand & “In discussion” */
+      --matrix:#21ff9d; /* Brand accent */
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
@@ -45,6 +45,7 @@
       border-radius:999px; padding:10px 12px; cursor:pointer;
       font:600 13px Inter,ui-sans-serif,system-ui;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
+      transform: translateZ(0);
     }
     #fab .dot{width:10px;height:10px;border-radius:50%}
     #fab .d-red{ background:var(--red) }
@@ -54,10 +55,14 @@
     #drawer{
       position:absolute; left:12px; bottom:56px; z-index:1001;
       width:360px; max-width:92vw; max-height:66vh; overflow:auto;
-      background:linear-gradient(180deg,rgba(21,27,33,.94),rgba(15,20,24,.96));
+      background:linear-gradient(180deg,rgba(21,27,33,.97),rgba(15,20,24,.98));
       border:1px solid var(--panelEdge); border-radius:12px;
-      padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
-      backdrop-filter: blur(1px);
+      padding:12px; display:none;
+      /* performance: avoid backdrop-filter & heavy shadow */
+      box-shadow:0 8px 20px rgba(0,0,0,.35);
+      will-change: transform, opacity;
+      transform: translateZ(0);
+      backface-visibility: hidden;
     }
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
@@ -167,7 +172,6 @@
 
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development <span class="count" id="c-dev">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--matrix)"></span> In discussion <span class="count" id="c-disc">0</span></div>
 
     <div class="hr"></div>
 
@@ -189,7 +193,7 @@
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="showDevDots" checked />
-        <span>Show dots — In development / discussion</span>
+        <span>Show dots — In development</span>
       </label>
     </div>
 
@@ -205,7 +209,7 @@
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netDev" />
-        <span>Local network — In development / discussion</span>
+        <span>Local network — In development</span>
       </label>
     </div>
     <div class="row" style="gap:8px; align-items:center; font-size:12px;">
@@ -229,7 +233,7 @@
   <script>
     /* === YOUR PUBLISHED CBDC CSV LINK === */
     const SHEET_PUBLISHED_LINK =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
+      "PUT_YOUR_CBDC_PUBLISHED_CSV_URL_HERE";
 
     /* ---------- Helpers ---------- */
     function toCsvUrl(u){
@@ -241,19 +245,15 @@
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
-    /* Name normalizer + aliases */
+    /* Aliases */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"],
       ["united states of america","united states"], ["united states (us)","united states"],
-
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
       ["wales","united kingdom"], ["northern ireland","united kingdom"],
-
-      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"], ["uae (united arab emirates)","united arab emirates"],
+      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
-
-      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["south korea (republic of)","south korea"],
-
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
       ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
       ["macedonia","north macedonia"], ["lao pdr","laos"],
@@ -261,81 +261,32 @@
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
       ["republic of serbia","serbia"], ["canada (ca)","canada"],
-
-      // Caribbean & small states, “&” forms, etc.
-      ["bosnia & herzegovina","bosnia and herzegovina"],
-      ["bosnia-herzegovina","bosnia and herzegovina"],
-      ["trinidad & tobago","trinidad and tobago"],
-      ["saint kitts & nevis","saint kitts and nevis"],
-      ["st kitts and nevis","saint kitts and nevis"],
-      ["st lucia","saint lucia"], ["st. lucia","saint lucia"],
-      ["st vincent and the grenadines","saint vincent and the grenadines"],
-      ["st. vincent and the grenadines","saint vincent and the grenadines"],
-      ["antigua & barbuda","antigua and barbuda"],
-      ["sao tome & principe","sao tome and principe"],
-      ["cape verde","cabo verde"],
-
-      // Other frequently mistyped
-      ["east timor","timor-leste"]
+      ["bosnia & herzegovina","bosnia and herzegovina"], ["bosnia-herzegovina","bosnia and herzegovina"],
+      ["trinidad & tobago","trinidad and tobago"], ["st lucia","saint lucia"], ["st. lucia","saint lucia"],
+      ["st vincent and the grenadines","saint vincent and the grenadines"], ["antigua & barbuda","antigua and barbuda"],
+      ["sao tome & principe","sao tome and principe"], ["cape verde","cabo verde"], ["east timor","timor-leste"]
     ]);
 
-    // Accurate centroid overrides for tricky cases (lat, lng)
+    /* Precise centroids (lat,lng) inc. islands & tricky ones */
     const CENTROID_OVERRIDES = new Map([
-      // Big/complex geographies
-      ["united states", [39.8283, -98.5795]],
-      ["canada",        [56.1304, -106.3468]],
-      ["mexico",        [23.6345, -102.5528]],
-      ["brazil",        [-10.0, -55.0]],
-      ["argentina",     [-38.4161, -63.6167]],
-      ["chile",         [-35.6751, -71.5430]],
-      ["united kingdom",[52.3555,-1.1743]],
-      ["spain",         [40.4168, -3.7038]],
-      ["italy",         [42.5, 12.5]],
-      ["denmark",       [56.2639, 9.5019]],
-      ["serbia",        [44.0165, 21.0059]],
-      ["costa rica",    [9.7489, -83.7534]],
-      ["japan",         [36.2048, 138.2529]],
-      ["india",         [22.9734, 78.6569]],
-      ["saudi arabia",  [23.8859, 45.0792]],
-      ["iran",          [32.4279, 53.6880]],
-      ["kazakhstan",    [48.0, 68.0]],
-      ["mongolia",      [46.8625, 103.8467]],
-      ["russia",        [61.5240, 105.3188]],
-      ["china",         [35.0, 103.0]],
-      ["indonesia",     [-2.0, 118.0]],
-      ["south africa",  [-30.5595, 22.9375]],
-      ["new zealand",   [-41.0, 174.0]],
-
-      // --- Small islands & Caribbean ---
-      ["bahamas",                     [24.25, -76.00]],
-      ["barbados",                    [13.1939, -59.5432]],
-      ["trinidad and tobago",         [10.6918, -61.2225]],
-      ["jamaica",                     [18.1096, -77.2975]],
-      ["antigua and barbuda",         [17.0608, -61.7964]],
-      ["saint kitts and nevis",       [17.3578, -62.7830]],
-      ["saint lucia",                 [13.9094, -60.9789]],
-      ["saint vincent and the grenadines", [12.9843, -61.2872]],
-      ["grenada",                     [12.1165, -61.6790]],
-      ["dominica",                    [15.4140, -61.3710]],
-
-      // Indian Ocean islands
-      ["mauritius",                   [-20.3484, 57.5522]],
-      ["seychelles",                  [-4.6796, 55.4920]],
-      ["comoros",                     [-11.6455, 43.3333]],
-      ["maldives",                    [3.2028, 73.2207]],
-      ["cabo verde",                  [15.1111, -23.6167]],
-      ["sao tome and principe",       [0.1864, 6.6131]],
-
-      // Pacific islands
-      ["fiji",                        [-17.7134, 178.0650]],
-      ["samoa",                       [-13.7590, -172.1046]],
-      ["tonga",                       [-21.1789, -175.1982]],
-      ["vanuatu",                     [-15.3767, 166.9592]],
-      ["solomon islands",             [-9.6457, 160.1562]],
-      ["papua new guinea",            [-6.3150, 143.9555]],
-      ["palau",                       [7.5150, 134.5825]],
-      ["micronesia",                  [6.8870, 158.2150]],
-      ["marshall islands",            [7.1315, 171.1845]]
+      ["united states", [39.8283, -98.5795]], ["canada",[56.1304,-106.3468]], ["mexico",[23.6345,-102.5528]],
+      ["brazil",[-10.0,-55.0]], ["argentina",[-38.4161,-63.6167]], ["chile",[-35.6751,-71.5430]],
+      ["united kingdom",[52.3555,-1.1743]], ["spain",[40.4168,-3.7038]], ["italy",[42.5,12.5]],
+      ["denmark",[56.2639,9.5019]], ["serbia",[44.0165,21.0059]], ["costa rica",[9.7489,-83.7534]],
+      ["japan",[36.2048,138.2529]], ["india",[22.9734,78.6569]], ["saudi arabia",[23.8859,45.0792]],
+      ["iran",[32.4279,53.6880]], ["kazakhstan",[48.0,68.0]], ["mongolia",[46.8625,103.8467]],
+      ["russia",[61.5240,105.3188]], ["china",[35.0,103.0]], ["indonesia",[-2.0,118.0]],
+      ["south africa",[-30.5595,22.9375]], ["new zealand",[-41.0,174.0]],
+      ["bahamas",[24.25,-76.00]], ["barbados",[13.1939,-59.5432]], ["trinidad and tobago",[10.6918,-61.2225]],
+      ["jamaica",[18.1096,-77.2975]], ["antigua and barbuda",[17.0608,-61.7964]], ["saint kitts and nevis",[17.3578,-62.7830]],
+      ["saint lucia",[13.9094,-60.9789]], ["saint vincent and the grenadines",[12.9843,-61.2872]],
+      ["grenada",[12.1165,-61.6790]], ["dominica",[15.4140,-61.3710]],
+      ["mauritius",[-20.3484,57.5522]], ["seychelles",[-4.6796,55.4920]], ["comoros",[-11.6455,43.3333]],
+      ["maldives",[3.2028,73.2207]], ["cabo verde",[15.1111,-23.6167]], ["sao tome and principe",[0.1864,6.6131]],
+      ["fiji",[-17.7134,178.0650]], ["samoa",[-13.7590,-172.1046]], ["tonga",[-21.1789,-175.1982]],
+      ["vanuatu",[-15.3767,166.9592]], ["solomon islands",[-9.6457,160.1562]],
+      ["papua new guinea",[-6.3150,143.9555]], ["palau",[7.5150,134.5825]],
+      ["micronesia",[6.8870,158.2150]], ["marshall islands",[7.1315,171.1845]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -354,7 +305,6 @@
       return COUNTRY_ALIASES.get(k) || k;
     }
     function splitCountries(cell){
-      // Keep composite names intact; split only on commas/semicolons/slashes/&
       return String(cell)
         .replace(/・/g, ',')
         .split(/\s*(?:,|;|\/|&)\s*/i)
@@ -384,9 +334,9 @@
     const linesDevLayer = L.layerGroup().addTo(map);
 
     // country layers
-    let outlineLayer = null;   // thin mint outlines
-    let shadeLayer = null;     // implemented shading (fill)
-    let hitLayer = null;       // invisible interactive layer for taps
+    let outlineLayer = null;
+    let shadeLayer = null;
+    let hitLayer = null;
 
     // UI refs
     const fab = document.getElementById('fab');
@@ -413,7 +363,6 @@
     const lastUpdated = document.getElementById('lastUpdated');
 
     if (!isMobile()) drawer.classList.add('open');
-
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
@@ -427,7 +376,6 @@
     let yearBounds = null;
 
     // for shading & taps
-    let geoRef = null; // polygons GeoJSON
     let centroidByKey = {}; // key->LatLng
 
     function openCountryPopup(countryKey){
@@ -462,7 +410,7 @@
 
     /* ----------- Build pipeline ----------- */
     (async function init(){
-      // 1) polygons
+      // polygons
       let geo=null, lastErr=null;
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -477,7 +425,6 @@
         }catch(e){ lastErr=e; }
       }
       if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
-      geoRef = geo;
 
       function getName(props){
         if (!props) return null;
@@ -524,45 +471,33 @@
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
-        if (CENTROID_OVERRIDES.has(nm)){
-          const [lat,lng] = CENTROID_OVERRIDES.get(nm);
-          centroidByKey[nm] = L.latLng(lat,lng);
-        } else {
-          centroidByKey[nm] = centroidInside(l.feature);
-        }
+        centroidByKey[nm] = CENTROID_OVERRIDES.get(nm)
+          ? L.latLng(...CENTROID_OVERRIDES.get(nm))
+          : centroidInside(l.feature);
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
         l.feature.properties._key = nm;
-        allRegions.add(reg);   // ensure Region filter populates
+        allRegions.add(reg);
       });
 
-      // Build region options
-      [...[...allRegions].sort()].forEach(r=>{
-        const opt=document.createElement('option');
-        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
-      });
-
-      // Subtle mint outline layer
-      outlineLayer = L.geoJSON(geo, {
-        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
-      }).addTo(map);
-
-      // Implemented shading (fill updated later)
-      shadeLayer = L.geoJSON(geo, {
-        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
-      }).addTo(map);
-
-      // Invisible interactive layer for taps/clicks
-      hitLayer = L.geoJSON(geo, {
-        style: { color:'#0000', weight:0, fillOpacity:0 },
-        onEachFeature: (f, layer) => {
-          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
-          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-          layer.on('click', () => openCountryPopup((f.properties&&f.properties._key)||""));
+      // outline + shading + hit layers
+      L.geoJSON(geo, { style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' } }).addTo(map);
+      shadeLayer = L.geoJSON(geo, { style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 }) }).addTo(map);
+      L.geoJSON(geo, {
+        style:{ color:'#0000', weight:0, fillOpacity:0 },
+        onEachFeature:(f,layer)=>{
+          layer.on('mouseover',()=>layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
+          layer.on('mouseout', ()=>layer.setStyle({weight:0, color:'#0000'}));
+          layer.on('click', ()=>openCountryPopup((f.properties&&f.properties._key)||""));
         }
       }).addTo(map);
 
-      // 2) sheet
+      // region options
+      [...[...allRegions].sort()].forEach(r=>{
+        const opt=document.createElement('option'); opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
+      });
+
+      // sheet
       let rawRows;
       try{
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
@@ -573,13 +508,11 @@
         rawRows = parsed.data;
       }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      // 3) normalize + collect years
+      // parse rows
       entries = [];
-      const counts={imp:0, dev:0, disc:0};
+      const counts={imp:0, dev:0};
       const unmatched = new Set();
-      implementedCoords=[]; devCoords=[];
       let yMin=Infinity, yMax=-Infinity;
-
       function pickYear(row){
         const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
         for (const k of keys){
@@ -590,13 +523,18 @@
 
       for (const row of rawRows){
         const title = String(row["Title"]||"").trim();
-        const status = String(row["Status"]||"").trim();
+        const statusRaw = String(row["Status"]||"").trim();
         const notes = String(row["Description"]||"").trim();
-        const yr = pickYear(row);
-        if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
+        const yr = pickYear(row); if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
 
         const countriesCell = String(row["Countries"]||"").trim();
         if (!countriesCell) continue;
+
+        // classify (drop "discussion" entirely)
+        const isImplemented = /^implement/i.test(statusRaw);
+        const isDev = !isImplemented && /(develop|pilot|trial|sandbox|poc|proof|concept|prepar)/i.test(statusRaw);
+        const isDiscussion = /discuss|consider/i.test(statusRaw);
+        if (!isImplemented && !isDev) continue; // skip discussions
 
         for (const raw of splitCountries(countriesCell)){
           const key = normalizeCountry(raw);
@@ -608,51 +546,45 @@
           if (!pt){ unmatched.add(raw); continue; }
 
           const reg = regionMap[key] || 'Other';
-
-          // classification
-          const isImplemented = /^implement/i.test(status);
-          const isDiscussion  = /discuss|consider/i.test(status);
-          const isDev         = !isImplemented && !isDiscussion &&
-                                /(develop|pilot|trial|sandbox|poc|proof|concept|prepar)/i.test(status);
-
           const obj = {
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
-            status, isImplemented, isDev, isDiscussion, title, notes, year: yr, region: reg
+            status: isImplemented ? "Implemented" : "In development",
+            isImplemented, isDev, title, notes, year: yr, region: reg
           };
           entries.push(obj);
 
           if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
-          else if (isDiscussion){ devCoords.push([pt.lat, pt.lng]); counts.disc++; } // discussion shown with dev dots
           else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
         }
       }
 
-      // UI: pie + counters (3 slices)
-      document.getElementById('c-imp').textContent  = counts.imp;
-      document.getElementById('c-dev').textContent  = counts.dev;
-      document.getElementById('c-disc').textContent = counts.disc;
-
-      const total = Math.max(1, counts.imp + counts.dev + counts.disc);
+      // pie (2 slices) — animations off, tooltips off
+      document.getElementById('c-imp').textContent = counts.imp;
+      document.getElementById('c-dev').textContent = counts.dev;
+      const total = Math.max(1, counts.imp + counts.dev);
       Chart.register(ChartDataLabels);
       new Chart(document.getElementById('statusPie'), {
         type:'pie',
         data:{
-          labels:['Implemented','In development','In discussion'],
+          labels:['Implemented','In development'],
           datasets:[{
-            data:[counts.imp, counts.dev, counts.disc],
-            backgroundColor:[getCSS('--red'), getCSS('--orange'), getCSS('--matrix')],
+            data:[counts.imp, counts.dev],
+            backgroundColor:[getCSS('--red'), getCSS('--orange')],
             borderColor:'rgba(0,0,0,.45)', borderWidth:1
           }]
         },
         options:{
           responsive:true,
+          animation:false,
           plugins:{
             legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            tooltip:{ enabled:false },
             datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
               formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
             }
-          }
+          },
+          hover:{mode:null}
         }
       });
 
@@ -695,7 +627,6 @@
 
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
-        console.warn("Unmatched:", [...unmatched].sort());
       }
 
       // Hide hint after a few seconds on mobile
@@ -726,16 +657,16 @@
         if (region !== '__all' && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
-        if (!e.isImplemented && !showDev) return false; // dev or discussion
-        return e.isImplemented || e.isDev || e.isDiscussion;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
       };
 
       const impPts=[], devPts=[];
-      const implementedShown = new Set(); // for shading
+      const implementedShown = new Set();
 
       for (const e of entries){
         if (!filt(e)) continue;
-        const color = e.isImplemented ? red : orange; // keep single color for all non-implemented dots for now
+        const color = e.isImplemented ? red : orange;
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
         L.circleMarker([e.lat, e.lng], {
@@ -761,7 +692,7 @@
         });
       }
 
-      // networks per filtered set
+      // networks
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
@@ -795,8 +726,8 @@
         if (region !== '__all' && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
-        if (!e.isImplemented && !showDev) return false;
-        return e.isImplemented || e.isDev || e.isDiscussion;
+        if (e.isDev && !showDev) return false;
+        return e.isImplemented || e.isDev;
       }).map(e=>({
         Country:e.country, Title:e.title, Status:e.status, Year:e.year||"",
         Region:e.region||"", Lat:e.lat, Lng:e.lng, Notes:e.notes||""
