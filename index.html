@@ -17,17 +17,14 @@
 
   <style>
     :root{
-      /* Matrix theme */
       --bg:#0a0f0d;
       --panel:#0b1216;
       --edge:#143328;
       --text:#d9ffee;
       --muted:#86b39f;
 
-      /* Matrix greens */
-      --matrix:#00ff80;         /* bright neon */
-      --matrix-dk:#00cc66;      /* darker accent */
-      --matrix-dimmer:#0a3;     /* subtle glow */
+      --matrix:#00ff80;
+      --matrix-dk:#00cc66;
       --red:#ff3333;
       --orange:#ff9900;
     }
@@ -50,8 +47,7 @@
     .brand .logo-dot{
       width:12px; height:12px; border-radius:50%; background:var(--matrix);
       box-shadow:0 0 10px var(--matrix), 0 0 20px var(--matrix), 0 0 40px rgba(0,255,128,.5);
-      animation: glow 2.2s ease-in-out infinite;
-      flex:0 0 12px;
+      animation: glow 2.2s ease-in-out infinite; flex:0 0 12px;
     }
     @keyframes glow{
       0%,100%{ box-shadow:0 0 8px var(--matrix), 0 0 18px var(--matrix), 0 0 38px rgba(0,255,128,.45); transform:scale(1) }
@@ -72,9 +68,9 @@
       grid-column: span 12;
       background: linear-gradient(180deg, rgba(0, 30, 20, .40), rgba(6, 18, 14, .88));
       border:1px solid var(--edge);
-      border-radius:14px; padding:16px;
+      border-radius:14px; padding:16px 16px 18px;
       box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04);
-      position:relative; overflow:hidden; min-height:280px;
+      position:relative; overflow:hidden; min-height:300px;
     }
     .tile:before{
       content:""; position:absolute; inset:-1px;
@@ -86,19 +82,20 @@
       transform:translateY(-1px); transition:transform .18s ease;
     }
 
-    /* Tile header centered with big CTA */
-    .tile-head{
-      display:flex; align-items:center; justify-content:center;
-      gap:12px; margin-bottom:12px; text-align:center;
-    }
-    .tile h2{ margin:0; font-size:18px; color:var(--matrix) }
-    .pill{
+    /* Pinned LIVE */
+    .live{
+      position:absolute; top:10px; right:12px;
       font-size:11px; padding:5px 8px; border-radius:999px;
       color:#04130c; background:var(--matrix); border:1px solid rgba(0,0,0,.5);
-      text-transform:uppercase; letter-spacing:.6px; margin-left:8px;
+      text-transform:uppercase; letter-spacing:.6px;
     }
 
-    /* Body layout: left pie, center CTA, right stats */
+    .tile-head{
+      text-align:center; margin:2px 36px 10px 36px;
+    }
+    .tile h2{ margin:0; font-size:18px; color:var(--matrix) }
+
+    /* Body layout: left pie, middle CTA, right stats */
     .tile-body{
       display:grid; align-items:center; gap:14px;
       grid-template-columns: 160px minmax(220px, 1fr) minmax(260px, 320px);
@@ -106,7 +103,7 @@
     .chartbox{ width:160px; height:160px; justify-self:center }
     .cta{
       display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
-      min-height:160px;
+      min-height:170px;
     }
     .btn{
       display:inline-flex; align-items:center; justify-content:center; gap:8px;
@@ -119,15 +116,34 @@
 
     .stats{
       display:flex; flex-direction:column; gap:10px; justify-self:stretch;
-      min-width:260px; /* <- prevents collapse */
+      min-width:260px; position:relative;
     }
     .stat{
       background:rgba(0,0,0,.25); border:1px solid var(--edge);
       padding:10px 12px; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
-      min-height:48px;
+      min-height:48px; cursor:default;
     }
+    .stat.clickable{ cursor:pointer }
     .k{ font-size:20px; color:var(--matrix) }
     .lbl{ font-size:12px; color:var(--muted) }
+
+    /* Small pop list */
+    .pop{
+      position:absolute; right:0; top:0;
+      background:#06120e; border:1px solid var(--edge); border-radius:12px;
+      width:100%; max-width:320px; max-height:220px; overflow:auto; display:none; z-index:5;
+      box-shadow:0 14px 30px rgba(0,0,0,.45);
+    }
+    .pop header{
+      position:sticky; top:0; background:#071610; padding:8px 10px; border-bottom:1px solid #163a2d;
+      display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted)
+    }
+    .pop ul{ list-style:none; margin:0; padding:6px 10px 10px 14px; }
+    .pop li{ padding:4px 0; border-bottom:1px dashed rgba(32,88,68,.35) }
+    .pop li:last-child{ border-bottom:none }
+    .close{
+      border:1px solid #1c4; color:var(--matrix); background:#0b1216; border-radius:8px; padding:2px 6px; cursor:pointer;
+    }
 
     .footer{ margin-top:18px; color:var(--muted); font-size:12px }
 
@@ -136,13 +152,10 @@
       .chartbox{ order:1; }
       .cta{ order:2; }
       .stats{ order:3; min-width:auto; }
+      .pop{ position:relative; max-width:none; }
     }
-    @media (min-width:720px){
-      .tile{ grid-column: span 6; }
-    }
-    @media (min-width:1080px){
-      .tile{ grid-column: span 4; }
-    }
+    @media (min-width:720px){ .tile{ grid-column: span 6 } }
+    @media (min-width:1080px){ .tile{ grid-column: span 4 } }
   </style>
 </head>
 <body>
@@ -153,7 +166,9 @@
         <h1>Matrix Solutions Network — Agenda Tracker</h1>
         <div class="sub">
           Live overview • Implemented vs In development •
-          <a href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">Open the Notion dashboard ↗</a>
+          <a href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">
+            Click here to open the Matrix Solutions Network Dashboard ↗
+          </a>
         </div>
       </div>
     </div>
@@ -162,10 +177,8 @@
 
       <!-- Digital ID -->
       <section class="tile" id="tile-digid">
-        <div class="tile-head">
-          <h2>Digital ID Updates</h2>
-          <span class="pill" id="pill-digid">Loading…</span>
-        </div>
+        <span class="live" id="pill-digid">Loading…</span>
+        <div class="tile-head"><h2>Digital ID Updates</h2></div>
         <div class="tile-body">
           <div class="chartbox"><canvas id="pie-digid" width="160" height="160" aria-label="Digital ID pie"></canvas></div>
 
@@ -174,19 +187,20 @@
           </div>
 
           <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
+            <div class="stat clickable" data-pop="digid-imp-pop"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
+            <div class="stat clickable" data-pop="digid-dev-pop"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
+
+            <div class="pop" id="digid-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="digid-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
         </div>
       </section>
 
       <!-- CBDC -->
       <section class="tile" id="tile-cbdc">
-        <div class="tile-head">
-          <h2>Central Bank Digital Currency (CBDC) Updates</h2>
-          <span class="pill" id="pill-cbdc">Loading…</span>
-        </div>
+        <span class="live" id="pill-cbdc">Loading…</span>
+        <div class="tile-head"><h2>Central Bank Digital Currency (CBDC) Updates</h2></div>
         <div class="tile-body">
           <div class="chartbox"><canvas id="pie-cbdc" width="160" height="160" aria-label="CBDC pie"></canvas></div>
 
@@ -195,19 +209,20 @@
           </div>
 
           <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
+            <div class="stat clickable" data-pop="cbdc-imp-pop"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
+            <div class="stat clickable" data-pop="cbdc-dev-pop"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
+
+            <div class="pop" id="cbdc-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="cbdc-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
         </div>
       </section>
 
       <!-- Social Credit -->
       <section class="tile" id="tile-scs">
-        <div class="tile-head">
-          <h2>Social Credit System Updates</h2>
-          <span class="pill" id="pill-scs">Loading…</span>
-        </div>
+        <span class="live" id="pill-scs">Loading…</span>
+        <div class="tile-head"><h2>Social Credit System Updates</h2></div>
         <div class="tile-body">
           <div class="chartbox"><canvas id="pie-scs" width="160" height="160" aria-label="Social Credit pie"></canvas></div>
 
@@ -216,9 +231,12 @@
           </div>
 
           <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
+            <div class="stat clickable" data-pop="scs-imp-pop"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
+            <div class="stat clickable" data-pop="scs-dev-pop"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
+
+            <div class="pop" id="scs-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
+            <div class="pop" id="scs-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
         </div>
       </section>
@@ -232,11 +250,8 @@
 
   <script>
     // ====== CSV LINKS ======
-    // Digital ID
     const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
-    // CBDC (your updated link)
     const CSV_CBDC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
-    // Social Credit Systems
     const CSV_SCS  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
 
     // ====== Helpers ======
@@ -246,17 +261,26 @@
         .then(text => Papa.parse(text, { header:true, skipEmptyLines:true }).data)
         .catch(_=>null);
     }
-    function summarize(rows){
-      if(!rows) return {imp:0, dev:0, total:0};
-      let imp=0, dev=0;
-      for(const r of rows){
+    function bucketize(rows){
+      const imp = new Set(), dev = new Set();
+      if (!rows) return {imp, dev};
+      for (const r of rows){
+        const c = String(r.Countries||r.Country||"").trim();
         const s = String(r.Status||"").toLowerCase();
-        if (/implement/.test(s)) imp++;
-        else if (/develop/.test(s)) dev++;
-        // "discussion" intentionally ignored
+        if (/implement/.test(s)) imp.add(c);
+        else if (/develop/.test(s)) dev.add(c);
+        // ignore "discussion"
       }
-      return {imp, dev, total: imp+dev};
+      return {imp, dev};
     }
+    function setLists(prefix, buckets){
+      const impList = document.querySelector(`#${prefix}-imp-pop ul`);
+      const devList = document.querySelector(`#${prefix}-dev-pop ul`);
+      if (impList){ impList.innerHTML = [...buckets.imp].sort().map(x=>`<li>${x}</li>`).join("") || "<li>—</li>"; }
+      if (devList){ devList.innerHTML = [...buckets.dev].sort().map(x=>`<li>${x}</li>`).join("") || "<li>—</li>"; }
+    }
+    function countsFrom(buckets){ return {imp:buckets.imp.size, dev:buckets.dev.size, total:buckets.imp.size + buckets.dev.size}; }
+
     function makePie(canvasId, imp, dev){
       const ctx = document.getElementById(canvasId);
       if(!ctx) return;
@@ -288,27 +312,50 @@
         }
       });
     }
-    function setTile(prefix, summary){
-      const {imp, dev, total} = summary;
+    function setTile(prefix, buckets){
+      const {imp, dev, total} = countsFrom(buckets);
       const pill = document.getElementById(`pill-${prefix}`);
       const tEl = document.getElementById(`${prefix}-total`);
       const iEl = document.getElementById(`${prefix}-imp`);
       const dEl = document.getElementById(`${prefix}-dev`);
-      if (pill) pill.textContent = (imp+dev)>0 ? 'LIVE' : 'NO DATA';
+      if (pill) pill.textContent = (total>0) ? 'LIVE' : 'NO DATA';
       if (tEl) tEl.textContent = total || '—';
       if (iEl) iEl.textContent = imp || '—';
       if (dEl) dEl.textContent = dev || '—';
       makePie(`pie-${prefix}`, imp, dev);
+      setLists(prefix, buckets);
     }
 
     // Load all three in parallel
     Promise.all([fetchCSV(CSV_DIGID), fetchCSV(CSV_CBDC), fetchCSV(CSV_SCS)])
-      .then(([digid, cbdc, scs])=>{
-        setTile('digid', summarize(digid));
-        setTile('cbdc',  summarize(cbdc));
-        setTile('scs',   summarize(scs));
+      .then(([digidRows, cbdcRows, scsRows])=>{
+        setTile('digid', bucketize(digidRows));
+        setTile('cbdc',  bucketize(cbdcRows));
+        setTile('scs',   bucketize(scsRows));
       })
       .catch(console.error);
+
+    // Toggle small lists
+    function closeAllPops(){
+      document.querySelectorAll('.pop').forEach(p=> p.style.display='none');
+    }
+    document.addEventListener('click', (e)=>{
+      // close buttons
+      if (e.target.matches('[data-close]')){ closeAllPops(); return; }
+      // open pop for stat
+      const stat = e.target.closest('.stat.clickable');
+      if (stat && stat.dataset.pop){
+        const id = stat.dataset.pop;
+        const pop = document.getElementById(id);
+        if (!pop) return;
+        const isOpen = pop.style.display === 'block';
+        closeAllPops();
+        pop.style.display = isOpen ? 'none' : 'block';
+      } else {
+        // click outside -> close
+        if (!e.target.closest('.pop')) closeAllPops();
+      }
+    });
   </script>
 </body>
 </html>
