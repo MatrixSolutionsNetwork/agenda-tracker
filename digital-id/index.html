@@ -33,7 +33,7 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
-      --barH:72px; /* header height */
+      --barH:72px; /* desktop header height */
     }
     html,body{
       height:100%;margin:0;background:var(--bg);color:var(--text);
@@ -50,7 +50,11 @@
       backdrop-filter: blur(2px);
       min-height:var(--barH);
     }
-    #brandTitle{display:flex; align-items:center; gap:10px; white-space:nowrap}
+
+    /* Desktop brand layout (inline) */
+    #brandTitle{
+      display:flex; align-items:center; gap:10px; white-space:nowrap;
+    }
     #brandTitle .dot{
       width:14px;height:14px;border-radius:50%;
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
@@ -61,7 +65,6 @@
     #brandTitle .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
     #brandTitle .page{color:#ffffff} /* Digital ID Status in white */
 
-    /* LIVE pill in red */
     .live{font-size:11px;color:#ffffff;background:var(--red);
       padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
     .updated{margin-left:8px; font-size:12px; color:#ffffff; opacity:.9}
@@ -82,7 +85,6 @@
     /* Mobile hamburger */
     #hambtn{
       display:none;
-      margin-left:auto;
       background:#062015; border:1px solid #1b5a3e; color:#ffffff;
       padding:8px 10px; border-radius:10px; font-weight:800; cursor:pointer;
     }
@@ -103,8 +105,8 @@
     }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 
-    /* keep Leaflet zoom clear of bar */
-    .leaflet-top{ top:14px; } /* offset inside the map container */
+    /* keep Leaflet zoom clear of bar (desktop) */
+    .leaflet-top{ top:14px; }
     .leaflet-control-zoom{ margin-top:6px; }
 
     /* ===== Drawer opener ===== */
@@ -160,19 +162,55 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* Mobile tweaks */
+    /* ===== Mobile layout: centered header stack & safer zoom offset ===== */
     @media (max-width: 720px){
-      /* Stack title lines and show burger */
-      #brandTitle .sep{ display:none; }
-      #brandTitle .msn, #brandTitle .page{ display:block; }
-      #brandTitle h1{ font-size:16px; }
-      #hambtn{ display:block; }
-      .actions{ display:none; }  /* hide desktop actions on mobile */
+      :root { --barH: 144px; }   /* taller header; pushes map down */
+      /* Center everything in the header */
+      #topbar{ justify-content:center; }
+      #brandTitle{
+        width:100%;
+        flex-direction:column;
+        align-items:center;
+        gap:6px;
+        text-align:center;
+      }
+      /* Row 1: MSN centered with dot on the RIGHT */
+      .brand-row{
+        display:flex; align-items:center; justify-content:center; gap:8px;
+      }
+      .brand-row .msn{ color:var(--matrix); }
+      .brand-row .dot{ order:2; } /* ensure dot shows on the right */
 
+      /* Row 2: page title centered */
+      .sub-row{ font-size:16px; color:#fff; }
+
+      /* Row 3: centered Menu + LIVE side-by-side */
+      .menu-row{
+        display:flex; align-items:center; justify-content:center; gap:10px;
+      }
+      #hambtn{ display:inline-flex; }
+
+      /* Row 4: centered Updated text */
+      .updated{
+        margin:0 auto;
+        display:block;
+      }
+
+      /* Hide separators/inline hint on mobile */
+      #brandTitle .sep{ display:none; }
+      .inline-hint{ display:none; }
+
+      /* Hide desktop actions; use burger */
+      .actions{ display:none; }
+
+      /* Drawer sizing */
       #drawer{
         left:10px; right:10px; bottom:66px; width:auto;
         max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px;
       }
+
+      /* Push map controls further down so they’re never under the header */
+      .leaflet-top{ top:88px; }
     }
 
     .country-hover { cursor:pointer; }
@@ -182,14 +220,29 @@
   <!-- ===== Top navigation / context bar ===== -->
   <div id="topbar" role="navigation" aria-label="Map header">
     <div id="brandTitle">
-      <span class="dot" aria-hidden="true"></span>
-      <h1>
-        <span class="msn">Matrix Solutions Network</span>
-        <span class="sep">—</span>
+      <!-- Row 1: brand centered with dot to the right on mobile -->
+      <div class="brand-row">
+        <h1 class="brand">
+          <span class="msn">Matrix Solutions Network</span>
+        </h1>
+        <span class="dot" aria-hidden="true"></span>
+      </div>
+
+      <!-- Row 2: page title -->
+      <div class="sub-row">
         <span class="page">Digital ID Status</span>
-      </h1>
-      <span class="live">LIVE</span>
+      </div>
+
+      <!-- Row 3: menu + live (mobile shows; desktop hides menu) -->
+      <div class="menu-row">
+        <button id="hambtn" aria-expanded="false" aria-controls="mobileMenu" title="Menu">☰ Menu</button>
+        <span class="live">LIVE</span>
+      </div>
+
+      <!-- Row 4: updated -->
       <span class="updated" id="updatedTop">Updated: …</span>
+
+      <!-- Desktop-only inline hint -->
       <span class="inline-hint">• Click a dot or country for details</span>
     </div>
 
@@ -200,9 +253,6 @@
       <a class="btn" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
       <a class="btn" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
     </div>
-
-    <!-- mobile hamburger -->
-    <button id="hambtn" aria-expanded="false" aria-controls="mobileMenu" title="Menu">☰ Menu</button>
   </div>
 
   <!-- Mobile dropdown menu -->
