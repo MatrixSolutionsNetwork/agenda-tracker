@@ -68,8 +68,9 @@
       background:#0b1216; color:#cfe9dc; font-size:14px; line-height:24px;
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0;
+      transition:transform .12s ease; will-change:transform;
     }
-    #drawerClose{ border-color:var(--matrix); color:var(--matrix); font-weight:800; }
+    .icon-btn:hover{ transform:translateY(-1px) }
 
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
@@ -166,7 +167,7 @@
     <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
 
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development <span class="count" id="c-dev">0</span></div>
 
     <div class="hr"></div>
 
@@ -226,7 +227,7 @@
   </div>
 
   <script>
-    /* === SOCIAL CREDIT SHEET (your link) === */
+    /* === SOCIAL CREDIT SHEET === */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
 
@@ -244,13 +245,14 @@
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
-      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
+      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"], ["emirates","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
       ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["south korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
       ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
       ["macedonia","north macedonia"], ["lao pdr","laos"],
-      ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
+      ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"], ["congo-kinshasa","democratic republic of the congo"],
+      ["congo-brazzaville","congo"],
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"],
@@ -258,11 +260,14 @@
       ["trinidad & tobago","trinidad and tobago"], ["saint kitts & nevis","saint kitts and nevis"],
       ["sao tome & principe","sao tome and principe"], ["antigua & barbuda","antigua and barbuda"],
       ["st vincent and the grenadines","saint vincent and the grenadines"], ["st kitts and nevis","saint kitts and nevis"], ["st lucia","saint lucia"],
-      ["east timor","timor-leste"], ["cape verde","cabo verde"]
+      ["east timor","timor-leste"], ["cape verde","cabo verde"],
+      ["hong kong sar","hong kong"], ["macau sar","macau"], ["eswatini (swaziland)","eswatini"],
+      ["new zealand (nz)","new zealand"], ["côte d’ivoire","cote d ivoire"]
     ]);
 
     // Accurate centroid overrides for tricky cases (lat, lng)
     const CENTROID_OVERRIDES = new Map([
+      // Very large or multi-part
       ["russia",        [61.5240, 105.3188]],
       ["china",         [35.0000, 103.0000]],
       ["kazakhstan",    [48.0000, 68.0000]],
@@ -272,16 +277,36 @@
       ["united states", [39.8283, -98.5795]],
       ["brazil",        [-10.0000, -55.0000]],
       ["argentina",     [-38.4161, -63.6167]],
-      ["indonesia",     [-2.0000, 118.0000]],
+      ["india",         [22.9734, 78.6569]],
       ["saudi arabia",  [23.8859, 45.0792]],
       ["iran",          [32.4279, 53.6880]],
-      ["venezuela",     [7.0000, -66.0000]],
-      ["ghana",         [7.9465, -1.0232]],
-      ["nigeria",       [9.0820, 8.6753]],
-      ["mexico",        [23.6345, -102.5528]],
-      ["south africa",  [-30.5595, 22.9375]],
-      ["india",         [22.9734, 78.6569]],
+
+      // Islands & peninsulas (these are the usual “off” ones)
+      ["new zealand",   [-41.0, 174.0]],
+      ["mauritius",     [-20.2, 57.5]],
+      ["sri lanka",     [7.8731, 80.7718]],
+      ["iceland",       [64.9631, -19.0208]],
+      ["madagascar",    [-19.0, 47.0]],
+      ["philippines",   [12.8797, 121.7740]],
+      ["indonesia",     [-2.0, 118.0]],
       ["japan",         [36.2048, 138.2529]],
+      ["malaysia",      [4.2105, 101.9758]],
+      ["vietnam",       [14.0583, 108.2772]],
+      ["thailand",      [15.87, 100.9925]],
+      ["taiwan",        [23.6978, 120.9605]],
+      ["singapore",     [1.3521, 103.8198]],
+      ["bahrain",       [26.07, 50.55]],
+      ["qatar",         [25.2854, 51.5310]],
+      ["united arab emirates",[23.4241, 53.8478]],
+      ["ireland",       [53.1424, -7.6921]],
+      ["chile",         [-35.6751, -71.5430]],
+      ["morocco",       [31.7917, -7.0926]],
+      ["peru",          [-9.19, -75.0152]],
+      ["norway",        [64.5, 11.0]],
+      ["sweden",        [62.0, 15.0]],
+      ["finland",       [64.5, 26.0]],
+
+      // Your existing helpful set
       ["united kingdom",[52.3555,-1.1743]],
       ["spain",         [40.4168, -3.7038]],
       ["italy",         [42.5, 12.5]],
@@ -306,7 +331,7 @@
       return COUNTRY_ALIASES.get(k) || k;
     }
     function splitCountries(cell){
-      // DO NOT split on the word 'and' to keep composite names intact
+      // Keep composite names intact (don’t split on the word "and")
       return String(cell)
         .replace(/・/g, ',')
         .split(/\s*(?:,|;|\/|&)\s*/i)
@@ -318,7 +343,7 @@
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
-      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(Math.PI*(b[1]-a[1])/360)**2;
+      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
       return 2*R*Math.asin(Math.sqrt(s1));
     }
     const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
@@ -446,6 +471,7 @@
         return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
       }
       function centroidInside(feature){
+        // Prefer the largest polygon (mainland) then polylabel it for a point guaranteed inside.
         try {
           if (feature.geometry && (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
             let coords=null;
@@ -484,7 +510,7 @@
         }
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
-        l.feature.properties._key = nm;
+        l.feature.properties._key = nm; // store normalized key
         allRegions.add(reg);
       });
 
@@ -591,6 +617,7 @@
         },
         options:{
           responsive:true,
+          animation:false, /* smoother hover on panel */
           plugins:{
             legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
             datalabels:{
@@ -643,7 +670,6 @@
         console.warn("Unmatched:", [...unmatched].sort());
       }
 
-      // Hide hint after a few seconds on mobile
       if (isMobile()){
         setTimeout(()=>{ const h=document.getElementById('touchHint'); if(h) h.style.display='none'; }, 3500);
       }
