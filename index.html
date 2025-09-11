@@ -38,37 +38,29 @@
     .tile{
       background:linear-gradient(180deg,rgba(0,30,20,.40),rgba(6,18,14,.88));
       border:1px solid var(--edge); border-radius:14px; padding:14px;
-      min-height:540px; display:flex; flex-direction:column;
+      min-height:560px; display:flex; flex-direction:column;
       box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04);
       position:relative; overflow:hidden;
     }
     .tile:hover{border-color:#1e5b45;box-shadow:0 20px 44px rgba(0,0,0,.4),0 0 18px rgba(0,255,128,.08)}
     .live{position:absolute;top:10px;right:12px;font-size:11px;padding:5px 8px;border-radius:999px;color:#04130c;background:var(--matrix);border:1px solid rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:.6px}
-    .tile h2{margin:2px 36px 12px 6px;font-size:20px;color:var(--matrix)}
+    .tile h2{margin:2px auto 18px auto;font-size:20px;color:var(--matrix);text-align:center}
 
     /* ===== STACKED CONTENT INSIDE EACH TILE ===== */
-    .tile-inner{display:flex;flex-direction:column;gap:16px;flex:1;min-width:0}
+    .tile-inner{display:flex;flex-direction:column;gap:22px;flex:1;min-width:0}
     .chartbox{width:100%;display:flex;justify-content:center}
-    .chartbox canvas{width:min(360px, 100%) !important; height:min(360px, 64vw) !important;}
+    .chartbox canvas{width:min(340px, 100%) !important; height:min(340px, 64vw) !important;}
 
     /* ===== STATS stay INSIDE card, full width ===== */
-    .stats{display:flex;flex-direction:column;gap:12px;width:100%}
+    .stats{display:flex;flex-direction:column;gap:10px;width:100%}
     .stat{
-      background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:12px 14px;border-radius:10px;
-      display:flex;align-items:center;gap:12px;width:100%;min-height:54px;overflow:hidden;
+      background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:10px 14px;border-radius:10px;
+      display:flex;align-items:center;gap:12px;width:100%;min-height:48px;overflow:hidden;
     }
     .stat .lbl{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .stat .k{font-size:24px;color:var(--matrix);margin-left:auto;flex:0 0 auto}
+    .stat .k{font-size:22px;color:var(--matrix);margin-left:auto;flex:0 0 auto}
 
-    .stat.clickable{cursor:pointer}
-    .pop{position:relative;margin-top:-6px;background:#06120e;border:1px solid var(--edge);border-radius:12px;max-height:220px;overflow:auto;display:none;z-index:2;box-shadow:0 14px 30px rgba(0,0,0,.45)}
-    .pop header{position:sticky;top:0;background:#071610;padding:8px 10px;border-bottom:1px solid #163a2d;display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
-    .pop ul{list-style:none;margin:0;padding:6px 10px 10px 14px}
-    .pop li{padding:4px 0;border-bottom:1px dashed rgba(32,88,68,.35)}
-    .pop li:last-child{border-bottom:none}
-    .close{border:1px solid #1c4;color:var(--matrix);background:#0b1216;border-radius:8px;padding:2px 6px;cursor:pointer}
-
-    .tile-cta{margin-top:auto} /* push button to bottom consistently */
+    .tile-cta{margin-top:auto}
     .btn{
       display:flex;align-items:center;justify-content:center;gap:8px;
       border:1px solid var(--matrix-dk);color:var(--matrix);background:#0a1411;
@@ -95,76 +87,47 @@
     </div>
 
     <div class="tiles">
-
-      <!-- Digital ID -->
       <section class="tile" id="tile-digid">
         <span class="live" id="pill-digid">Loading…</span>
         <h2>Digital ID Updates</h2>
-
         <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-digid" width="360" height="360"></canvas></div>
-
-          <div class="stats" id="stats-digid">
-            <div class="stat clickable" data-pop="digid-imp-pop"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
-            <div class="stat clickable" data-pop="digid-dev-pop"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
+          <div class="chartbox"><canvas id="pie-digid"></canvas></div>
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
-
-            <div class="pop" id="digid-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            <div class="pop" id="digid-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
-
-          <div class="tile-cta">
-            <a class="btn" href="./digital-id/">View Live Map</a>
-          </div>
+          <div class="tile-cta"><a class="btn" href="./digital-id/">View Live Map</a></div>
         </div>
       </section>
 
-      <!-- CBDC -->
       <section class="tile" id="tile-cbdc">
         <span class="live" id="pill-cbdc">Loading…</span>
         <h2>Central Bank Digital Currency (CBDC) Updates</h2>
-
         <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-cbdc" width="360" height="360"></canvas></div>
-
-          <div class="stats" id="stats-cbdc">
-            <div class="stat clickable" data-pop="cbdc-imp-pop"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
-            <div class="stat clickable" data-pop="cbdc-dev-pop"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
+          <div class="chartbox"><canvas id="pie-cbdc"></canvas></div>
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
-
-            <div class="pop" id="cbdc-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            <div class="pop" id="cbdc-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
-
-          <div class="tile-cta">
-            <a class="btn" href="./cbdc/">View Live Map</a>
-          </div>
+          <div class="tile-cta"><a class="btn" href="./cbdc/">View Live Map</a></div>
         </div>
       </section>
 
-      <!-- Social Credit -->
       <section class="tile" id="tile-scs">
         <span class="live" id="pill-scs">Loading…</span>
         <h2>Social Credit System Updates</h2>
-
         <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-scs" width="360" height="360"></canvas></div>
-
-          <div class="stats" id="stats-scs">
-            <div class="stat clickable" data-pop="scs-imp-pop"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
-            <div class="stat clickable" data-pop="scs-dev-pop"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
+          <div class="chartbox"><canvas id="pie-scs"></canvas></div>
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
             <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
-
-            <div class="pop" id="scs-imp-pop"><header><span>Implemented — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
-            <div class="pop" id="scs-dev-pop"><header><span>In development — countries</span><button class="close" data-close>✕</button></header><ul></ul></div>
           </div>
-
-          <div class="tile-cta">
-            <a class="btn" href="./social-credit-system/">View Live Map</a>
-          </div>
+          <div class="tile-cta"><a class="btn" href="./social-credit-system/">View Live Map</a></div>
         </div>
       </section>
-
     </div>
 
     <div class="footer">
@@ -173,25 +136,21 @@
   </div>
 
   <script>
-    /* CSV sources */
     const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
     const CSV_CBDC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
     const CSV_SCS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
 
     function fetchCSV(url){
       return fetch(`${url}${url.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'})
-        .then(r=>{ if(!r.ok) throw new Error(r.status); return r.text(); })
-        .then(t=> Papa.parse(t, {header:true, skipEmptyLines:true}).data)
-        .catch(()=>null);
+        .then(r=>r.text()).then(t=>Papa.parse(t,{header:true,skipEmptyLines:true}).data);
     }
     function bucketize(rows){
-      const imp = new Set(), dev = new Set();
-      if(!rows) return {imp,dev};
+      const imp=new Set(), dev=new Set();
       for(const r of rows){
-        const raw = String(r.Countries||r.Country||"");
+        const raw=String(r.Countries||r.Country||"");
         if(!raw.trim()) continue;
-        const parts = raw.replace(/・/g, ',').split(/\s*(?:,|;|\/|&)\s*/).filter(Boolean);
-        const s = String(r.Status||"").toLowerCase();
+        const parts=raw.replace(/・/g, ',').split(/\s*(?:,|;|\/|&)\s*/).filter(Boolean);
+        const s=String(r.Status||"").toLowerCase();
         for(const p of parts){
           if(/implement/.test(s)) imp.add(p.trim());
           else if(/develop|pilot|trial|proof|concept|poc/.test(s)) dev.add(p.trim());
@@ -199,68 +158,44 @@
       }
       return {imp,dev};
     }
-    function setLists(prefix, buckets){
-      const impList = document.querySelector(`#${prefix}-imp-pop ul`);
-      const devList = document.querySelector(`#${prefix}-dev-pop ul`);
-      if(impList) impList.innerHTML = [...buckets.imp].sort().map(x=>`<li>${x}</li>`).join("") || "<li>—</li>";
-      if(devList) devList.innerHTML = [...buckets.dev].sort().map(x=>`<li>${x}</li>`).join("") || "<li>—</li>";
-    }
-    function counts(b){ return {imp:b.imp.size, dev:b.dev.size, total:b.imp.size+b.dev.size}; }
+    function counts(b){ return {imp:b.imp.size,dev:b.dev.size,total:b.imp.size+b.dev.size}; }
 
     function makePie(canvasId, imp, dev){
-      const ctx = document.getElementById(canvasId); if(!ctx) return;
+      const ctx=document.getElementById(canvasId);
       Chart.register(ChartDataLabels);
-      new Chart(ctx, {
+      new Chart(ctx,{
         type:'pie',
-        data:{ labels:['Implemented','In development'],
-          datasets:[{ data:[imp,dev], backgroundColor:['#ff3333','#ff9900'], borderColor:'rgba(0,0,0,.45)', borderWidth:1 }]},
+        data:{labels:['Implemented','In development'],
+          datasets:[{data:[imp,dev],backgroundColor:['#ff3333','#ff9900'],borderColor:'rgba(0,0,0,.45)',borderWidth:1}]},
         options:{
-          responsive:true,
           plugins:{
             legend:{display:false},
             datalabels:{
-              color:'#04130c', font:{weight:'700', size:13},
-              formatter:(v,ctx)=>{ const ds=ctx.chart.data.datasets[0].data; const tot=Math.max(1,ds[0]+ds[1]); return `${v}\n${Math.round(v/tot*100)}%`; }
-            },
-            tooltip:{enabled:false}
+              color:'#04130c', font:{weight:'700', size:12},
+              formatter:(v,ctx)=>{
+                const lbl=ctx.chart.data.labels[ctx.dataIndex];
+                const ds=ctx.chart.data.datasets[0].data; const tot=Math.max(1,ds[0]+ds[1]);
+                return `${lbl}\n${v} (${Math.round(v/tot*100)}%)`;
+              }
+            }
           }
         }
       });
     }
-    function applyTile(prefix, buckets){
-      const {imp,dev,total} = counts(buckets);
-      const pill = document.getElementById(`pill-${prefix}`);
-      const iEl  = document.getElementById(`${prefix}-imp`);
-      const dEl  = document.getElementById(`${prefix}-dev`);
-      const tEl  = document.getElementById(`${prefix}-total`);
-      if(pill) pill.textContent = total>0 ? "LIVE" : "NO DATA";
-      if(iEl) iEl.textContent = imp || "—";
-      if(dEl) dEl.textContent = dev || "—";
-      if(tEl) tEl.textContent = total || "—";
-      makePie(`pie-${prefix}`, imp, dev);
-      setLists(prefix, buckets);
+    function applyTile(prefix,b){
+      const {imp,dev,total}=counts(b);
+      document.getElementById(`pill-${prefix}`).textContent=total>0?"LIVE":"NO DATA";
+      document.getElementById(`${prefix}-imp`).textContent=imp||"—";
+      document.getElementById(`${prefix}-dev`).textContent=dev||"—";
+      document.getElementById(`${prefix}-total`).textContent=total||"—";
+      makePie(`pie-${prefix}`,imp,dev);
     }
-
-    Promise.all([fetchCSV(CSV_DIGID), fetchCSV(CSV_CBDC), fetchCSV(CSV_SCS)])
-      .then(([dig, cbdc, scs])=>{
-        applyTile('digid', bucketize(dig));
-        applyTile('cbdc',  bucketize(cbdc));
-        applyTile('scs',   bucketize(scs));
+    Promise.all([fetchCSV(CSV_DIGID),fetchCSV(CSV_CBDC),fetchCSV(CSV_SCS)])
+      .then(([d,c,s])=>{
+        applyTile('digid',bucketize(d));
+        applyTile('cbdc',bucketize(c));
+        applyTile('scs',bucketize(s));
       });
-
-    /* Pop open/close */
-    function closeAll(){ document.querySelectorAll('.pop').forEach(p=>p.style.display='none'); }
-    document.addEventListener('click', (e)=>{
-      if(e.target.matches('[data-close]')){ closeAll(); return; }
-      const stat = e.target.closest('.stat.clickable');
-      if(stat && stat.dataset.pop){
-        const pop = document.getElementById(stat.dataset.pop);
-        if(!pop) return;
-        /* keep popup within stats box */
-        stat.insertAdjacentElement('afterend', pop);
-        pop.style.display = (pop.style.display==='block') ? 'none' : 'block';
-      }else if(!e.target.closest('.pop')){ closeAll(); }
-    });
   </script>
 </body>
 </html>
