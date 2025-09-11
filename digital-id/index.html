@@ -25,35 +25,42 @@
 
   <style>
     :root{
-      --bg:#07100b; --text:#b8ffd8; --muted:#6cd7a3;
+      --bg:#07100b;
+      --text:#ffffff;          /* <-- all text is white now */
+      --muted:#b8ffd8;
       --chip:#061c13; --chipEdge:#10402b;
       --panel:#06130d; --panelEdge:#0b2a1c;
-      --orange:#ff9900; /* In development */
-      --red:#ff3333;    /* Implemented */
-      --mint:#7be2b1;   /* Outline */
-      --matrix:#21ff9d; /* Matrix green for brand */
+      --orange:#ff9900;        /* In development */
+      --red:#ff3333;           /* Implemented */
+      --mint:#7be2b1;          /* Outline */
+      --matrix:#21ff9d;        /* Matrix green for brand */
+      --barH:58px;             /* top bar height */
     }
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
-      font-family:"Share Tech Mono",ui-monospace,monospace;}
-    #map{height:100%;width:100%}
-    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+    html,body{
+      height:100%;margin:0;background:var(--bg);color:var(--text);
+      font-family:"Share Tech Mono",ui-monospace,monospace;
+    }
 
-    /* ===== Top brand bar ===== */
+    /* ===== Top brand bar (now flush, full width) ===== */
     #topbar{
-      position:fixed; z-index:1100; left:12px; right:12px; top:12px;
+      position:fixed; z-index:1100; left:0; right:0; top:0;
       display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      background:linear-gradient(180deg,rgba(10,30,20,.78),rgba(8,22,16,.94));
-      border:1px solid var(--panelEdge); border-radius:12px;
+      background:linear-gradient(180deg,rgba(10,30,20,.86),rgba(8,22,16,.98));
+      border-bottom:1px solid var(--panelEdge);
       padding:10px 12px; box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(2px);
+      min-height:var(--barH);
     }
     #brandTitle{display:flex; align-items:center; gap:10px; white-space:nowrap}
-    #brandTitle .dot{width:14px;height:14px;border-radius:50%;
+    #brandTitle .dot{
+      width:14px;height:14px;border-radius:50%;
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
-      box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)}
-    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px}
+      box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
+    }
+    #brandTitle h1{margin:0; font-size:18px; letter-spacing:.4px; color:var(--matrix);} /* keep brand green */
     .live{font-size:11px;color:#062715;background:var(--matrix);
       padding:3px 8px;border-radius:999px;border:1px solid #74ffc7}
+    .updated{margin-left:8px; font-size:12px; color:#ffffff; opacity:.9}
 
     .actions{
       margin-left:auto; display:flex; gap:8px; overflow:auto hidden;
@@ -61,18 +68,24 @@
     }
     .actions::-webkit-scrollbar{display:none}
     .btn{
-      background:#062015; border:1px solid #1b5a3e; color:var(--matrix);
+      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
       padding:8px 10px; border-radius:10px; text-decoration:none;
       white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
-    .btn.secondary{color:var(--text); border-color:#163c2a}
+    .btn.matrix{color:var(--matrix)}  /* highlight actions if you want */
 
-    /* ===== Bottom-left chip to open drawer ===== */
+    /* ===== Map is now positioned under the bar ===== */
+    #map{
+      position:absolute; left:0; right:0; top:var(--barH); bottom:0;
+    }
+    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+
+    /* ===== Drawer opener ===== */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
-      background:var(--chip); border:1px solid var(--chipEdge); color:#cfe9dc;
+      background:var(--chip); border:1px solid var(--chipEdge); color:var(--text);
       border-radius:999px; padding:10px 12px; cursor:pointer;
       font-weight:700;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
@@ -89,43 +102,44 @@
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
       backdrop-filter: blur(1px);
+      color:#ffffff;
     }
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .brand{ color:var(--matrix); font-weight:700; font-size:13px; letter-spacing:.3px }
-    .subtitle{ color:#cfe9dc; opacity:.85; font-weight:700; font-size:12px; line-height:1.1; margin-top:2px; }
+    .subtitle{ color:#ffffff; opacity:.95; font-weight:700; font-size:12px; line-height:1.1; margin-top:2px; }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
-      background:#062015; color:var(--matrix); font-size:14px; line-height:24px;
+      background:#062015; color:#ffffff; font-size:14px; line-height:24px;
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0; font-weight:800;
     }
 
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
-    .count{margin-left:auto;color:var(--muted);font-weight:700}
+    .count{margin-left:auto;color:#ffffff;font-weight:700}
     .hr{border:none;border-top:1px solid #0f3524;margin:8px 0}
-    .hint{font-size:12px;color:var(--muted)}
-    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#9ab3a8;display:none}
+    .hint{font-size:12px;color:#ffffff;opacity:.8}
+    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#ffffff;display:none}
 
-    .leaflet-popup-content-wrapper{background:#0a1c14;color:var(--text);border:1px solid #174d35;}
+    .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
-    .leaflet-tooltip{background:#0a1c14;color:var(--text);border:1px solid #174d35;}
+    .leaflet-tooltip{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
 
     .textfield, .select, .num {
-      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#e6f3ea;
-      padding:6px 8px;font:600 13px "Share Tech Mono",ui-monospace; outline:none; width:100%;
+      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
+      padding:6px 8px;font:700 13px "Share Tech Mono",ui-monospace; outline:none; width:100%;
     }
     .btn-ghost {
-      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#e6f3ea;
+      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* Mobile hint */
+    /* Mobile hint (placed below the bar) */
     #touchHint{
       position:absolute; left:50%; transform:translateX(-50%);
-      top:66px; z-index:1003; background:#062015; border:1px solid #1b5a3e;
-      color:#cfe9dc; font:700 12px "Share Tech Mono"; padding:6px 10px;
+      top:calc(var(--barH) + 8px); z-index:1003; background:#062015; border:1px solid #1b5a3e;
+      color:#ffffff; font:700 12px "Share Tech Mono"; padding:6px 10px;
       border-radius:999px; box-shadow:0 6px 18px rgba(0,0,0,.45); display:none;
     }
 
@@ -148,15 +162,13 @@
       <span class="dot" aria-hidden="true"></span>
       <h1>Matrix Solutions Network — Digital ID Status</h1>
       <span class="live">LIVE</span>
+      <span class="updated" id="updatedTop">Updated: …</span>
     </div>
     <div class="actions">
-      <!-- Back to the agenda overview -->
       <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
-      <!-- Cross-links to other maps -->
-      <a class="btn secondary" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
-      <a class="btn secondary" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
-      <!-- Notion dashboard -->
-      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener" title="Open the Matrix Solutions Network Dashboard">Open Dashboard ↗</a>
+      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">Open Dashboard ↗</a>
+      <a class="btn" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
+      <a class="btn" href="../social-credit-system/" title="Open the Social Credit System map">Open Social Credit Map</a>
     </div>
   </div>
 
@@ -167,7 +179,7 @@
 
   <!-- Tiny toolbar -->
   <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.85;">Digital ID Overview — <u>click to open</u></span>
+    <span style="opacity:.95;">Digital ID Overview — <u>click to open</u></span>
     <span class="dot d-red" title="Implemented"></span>
     <span class="dot d-org" title="In development"></span>
   </div>
@@ -261,7 +273,7 @@
     <!-- Export -->
     <div class="row" style="gap:8px;">
       <button id="btnExport" class="btn-ghost" title="Download current view as CSV">Export CSV</button>
-      <span class="hint" id="lastUpdated" style="margin-left:auto;"></span>
+      <span class="hint" id="lastUpdated" style="margin-left:auto;">Updated: …</span>
     </div>
 
     <div id="debug" class="debug"></div>
@@ -298,12 +310,21 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    // Accurate centroid overrides for tricky cases
+    /* Targeted centroid fixes for tricky countries */
     const CENTROID_OVERRIDES = new Map([
-      ["spain",[40.4168,-3.7038]], ["italy",[42.5,12.5]], ["denmark",[56.2639,9.5019]],
-      ["united kingdom",[52.3555,-1.1743]], ["serbia",[44.0165,21.0059]],
-      ["united states",[39.8283,-98.5795]], ["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489,-83.7534]], ["japan",[36.2048,138.2529]]
+      ["norway",[60.4720, 8.4689]],      // mainland (avoid Svalbard skew)
+      ["new zealand",[-41.0, 172.0]],    // balanced NZ centre
+      ["chile",[-35.6751, -71.5430]],
+      ["mauritius",[-20.2000, 57.5000]],
+      ["spain",[40.4168, -3.7038]],
+      ["italy",[42.5, 12.5]],
+      ["denmark",[56.2639, 9.5019]],
+      ["united kingdom",[52.3555,-1.1743]],
+      ["serbia",[44.0165, 21.0059]],
+      ["united states",[39.8283,-98.5795]],
+      ["canada",[56.1304,-106.3468]],
+      ["costa rica",[9.7489, -83.7534]],
+      ["japan",[36.2048, 138.2529]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -329,7 +350,7 @@
         .filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&gt;','&quot;':'&quot;', "'":'&#39;'}[s])); }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
@@ -344,16 +365,14 @@
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // dot and line layers
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
 
-    // country layers
-    let outlineLayer = null;   // thin mint outlines
-    let shadeLayer = null;     // implemented shading (fill)
-    let hitLayer = null;       // invisible interactive layer for taps
+    let outlineLayer = null;
+    let shadeLayer = null;
+    let hitLayer = null;
 
     // UI refs
     const fab = document.getElementById('fab');
@@ -378,8 +397,8 @@
     const yearMinVal = document.getElementById('yearMinVal');
     const btnExport = document.getElementById('btnExport');
     const lastUpdated = document.getElementById('lastUpdated');
+    const updatedTop = document.getElementById('updatedTop');
 
-    // Drawer initial state: closed on mobile, open on desktop
     if (!isMobile()) drawer.classList.add('open');
 
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
@@ -394,9 +413,8 @@
     let allRegions = new Set();
     let yearBounds = null;
 
-    // for shading & taps
-    let geoRef = null; // polygons GeoJSON
-    let centroidByKey = {}; // key->LatLng
+    let geoRef = null;
+    let centroidByKey = {};
 
     function openCountryPopup(countryKey){
       const rows = entries.filter(e=>e.key===countryKey);
@@ -413,7 +431,7 @@
         if (r.title) bits.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
         if (r.status) bits.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
         if (Number.isInteger(r.year)) bits.push(`<strong>Year:</strong> ${r.year}`);
-        if (r.notes) bits.push(`<span style="color:${getCSS('--muted')}">${escapeHtml(r.notes)}</span>`);
+        if (r.notes) bits.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
         return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
       }).join("");
 
@@ -428,7 +446,6 @@
         .openOn(map);
     }
 
-    /* ----------- Build pipeline ----------- */
     (async function init(){
       // 1) polygons
       let geo=null, lastErr=null;
@@ -468,6 +485,7 @@
             if (feature.geometry.type==='Polygon'){
               coords=feature.geometry.coordinates;
             } else {
+              // largest mainland polygon
               let best=null,bestA=-1;
               for (const poly of feature.geometry.coordinates){
                 const a=turf.area(turf.polygon(poly));
@@ -486,7 +504,6 @@
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
-      // build centroid + region lookup
       centroidByKey = {};
       regionMap = {};
       L.geoJSON(geo).eachLayer(l=>{
@@ -500,11 +517,10 @@
         }
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
-        l.feature.properties._key = nm; // store normalized key
+        l.feature.properties._key = nm;
         allRegions.add(reg);
       });
 
-      // Build region options
       [...[...allRegions].sort()].forEach(r=>{
         const opt=document.createElement('option');
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
@@ -515,12 +531,10 @@
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // Implemented shading (fill updated later)
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // Invisible interactive layer for taps/clicks
       hitLayer = L.geoJSON(geo, {
         style: { color:'#0000', weight:0, fillOpacity:0 },
         onEachFeature: (f, layer) => {
@@ -535,7 +549,10 @@
       try{
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
-        lastUpdated.textContent = 'Updated: ' + (res.headers.get('Date') || 'now');
+        const dateHdr = res.headers.get('Date') || '';
+        document.getElementById('updatedTop').textContent = 'Updated: ' + (dateHdr || 'now');
+        lastUpdated.textContent = 'Updated: ' + (dateHdr || 'now');
+
         const text = await res.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
         rawRows = parsed.data;
@@ -607,7 +624,7 @@
         options:{
           responsive:true,
           plugins:{
-            legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
+            legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
             datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
               formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
@@ -622,7 +639,6 @@
 
       // Timeline control (only if any year)
       if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
-        yearBounds = {min:yMin, max:yMax};
         yearRow.style.display='flex';
         yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
         yearMinVal.textContent = 'Any';
@@ -650,7 +666,6 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
-      // draw first time
       applyFilters();
 
       if (unmatched.size){
@@ -690,7 +705,7 @@
       };
 
       const impPts=[], devPts=[];
-      const implementedShown = new Set(); // for shading
+      const implementedShown = new Set();
 
       for (const e of entries){
         if (!filt(e)) continue;
@@ -708,7 +723,6 @@
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
-      // Shade implemented countries that are visible
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -720,7 +734,6 @@
         });
       }
 
-      // networks per filtered set
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
