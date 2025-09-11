@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <!-- Share Tech Mono (dashboard font) -->
+  <!-- Share Tech Mono -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
@@ -33,7 +33,7 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
-      --barH:84px;
+      --barH:84px; /* will be updated dynamically */
     }
     html,body{
       height:100%;margin:0;color:var(--text);
@@ -53,17 +53,13 @@
     }
     .top-inner{
       display:flex; align-items:center; gap:16px;
-      padding:10px 20px; /* extra L/R padding */
+      padding:10px 20px;
       min-height:var(--barH);
     }
     .head{ display:flex; flex-direction:column; gap:6px; }
     .brandline{
       display:flex; align-items:center; gap:10px; white-space:nowrap;
-    }
-    .brandline .dot{
-      width:14px;height:14px;border-radius:50%;
-      background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
-      box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
+      justify-content:flex-start;
     }
     .brandline h1{margin:0; font-size:18px; letter-spacing:.4px;}
     .msn{color:var(--matrix)}
@@ -111,35 +107,29 @@
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--barH); bottom:0; }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
-    .leaflet-top{ top:14px; }
-    .leaflet-control-zoom{ margin-top:6px; }
+    /* The controls sit inside #map, so they only need a small inset now */
+    .leaflet-top{ top:10px; }
+    .leaflet-control-zoom{ margin-top:0; }
 
-    /* Recenter control */
-    .recenter-btn{
-      background:#062015; color:#fff; border:1px solid #1b5a3e;
-      border-radius:8px; padding:6px 9px; font:700 12px "Share Tech Mono",ui-monospace;
-      cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.35);
-    }
-    .recenter-btn:hover{box-shadow:0 0 14px rgba(33,255,157,.20)}
-    .leaflet-bottom.leaflet-left{ margin-left:12px; }
-
-    /* FAB — brought closer to Recenter */
+    /* FAB — bottom-left, compact */
     #fab{
-      position:absolute; left:12px; bottom:56px; z-index:1002; /* closer */
-      display:inline-flex; align-items:center; gap:10px;
+      position:absolute; left:12px; bottom:12px; z-index:1002;
+      display:inline-flex; align-items:center; gap:8px;
       background:var(--chip); border:1px solid var(--chipEdge); color:var(--text);
-      border-radius:999px; padding:10px 12px; cursor:pointer;
+      border-radius:999px; padding:8px 10px; cursor:pointer;
       font-weight:700; box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
-      max-width:90vw;
+      max-width:90vw; font-size:12px;
     }
-    #fab .dot{width:10px;height:10px;border-radius:50%}
+    #fab .dot{width:9px;height:9px;border-radius:50%}
     #fab .d-red{ background:var(--red) }
     #fab .d-org{ background:var(--orange) }
 
-    /* Drawer follows FAB */
+    /* Drawer above FAB. Height respects header + safe gap. */
     #drawer{
-      position:absolute; left:12px; bottom:100px; z-index:1001;
-      width:360px; max-width:92vw; max-height:66vh; overflow:auto;
+      position:absolute; left:12px; bottom:56px; z-index:1001;
+      width:360px; max-width:92vw;
+      max-height: calc(100vh - var(--barH) - 110px); /* key change */
+      overflow:auto;
       background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
@@ -175,43 +165,41 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* ===== Mobile stack order ===== */
+    /* ===== Mobile stack & compact tweaks ===== */
     @media (max-width: 720px){
       .top-inner{
         flex-direction:column;
         align-items:center;
         gap:6px;
-        padding:8px 10px;
+        padding:8px 12px;
       }
-      /* Make the title two lines: MSN on top, Digital ID Status below */
       .brandline{
-        flex-direction:column;           /* <— stack */
-        align-items:center;
-        gap:2px;
+        gap:8px;
+        flex-wrap:wrap;
+        justify-content:center;
       }
-      .sep{ display:none; }              /* no dash on mobile */
+      .sep{ display:none; }
       .brandline h1{ font-size:16px; text-align:center; }
-      .msn, .page{ display:block; }      /* force their own lines */
+      .msn, .page{ display:inline; }
+      .live{ position:static; } /* live inline next to “Digital ID Status” */
 
-      /* Updated on its own line, then hint, then burger last */
       .subrow{
         flex-direction:column;
         gap:2px;
         align-items:center;
-        justify-content:center;
         text-align:center;
       }
 
-      /* Reorder to ensure burger after text stack */
-      .head{ order:1; }
-      .subrow{ order:2; }
-      #burger{ order:3; display:flex; align-self:center; }
+      #burger{ display:flex; align-self:center; }
+
       .actions{ display:none; }
 
-      .leaflet-top{ top:18px; }
-      .leaflet-control-zoom{ margin-top:8px; }
-      #fab{ font-size:11px; padding:7px 10px; bottom:56px; }
-      #drawer{ left:10px; right:10px; bottom:100px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
+      /* Compact FAB */
+      #fab{ font-size:11px; padding:7px 9px; }
+
+      /* Drawer: smaller padding, smaller font on mobile */
+      #drawer{ padding:10px; font-size:12px; left:10px; right:10px; bottom:56px; max-width:calc(100vw - 20px); }
+      .icon-btn{ width:24px; height:24px; font-size:13px; }
     }
 
     .country-hover { cursor:pointer; }
@@ -223,13 +211,12 @@
     <div class="top-inner">
       <div class="head">
         <div class="brandline">
-          <span class="dot" aria-hidden="true"></span>
           <h1>
             <span class="msn">Matrix Solutions Network</span>
             <span class="sep">—</span>
             <span class="page">Digital ID Status</span>
+            <span class="live">LIVE</span>
           </h1>
-          <span class="live">LIVE</span>
         </div>
         <div class="subrow">
           <span class="updated" id="updatedTop">Updated: …</span>
@@ -260,8 +247,6 @@
   </nav>
 
   <div id="map" aria-label="Digital ID world map"></div>
-
-  <!-- Recenter control (bottom-left) comes from JS -->
 
   <!-- Bottom-left opener -->
   <div id="fab" aria-label="Open stats panel">
@@ -361,6 +346,16 @@
   </div>
 
   <script>
+    /* Dynamically set --barH to prevent overlaps (zoom controls/top bar) */
+    function setBarHeightVar(){
+      const bar = document.getElementById('topbar');
+      if (!bar) return;
+      const h = bar.offsetHeight || 84;
+      document.documentElement.style.setProperty('--barH', h + 'px');
+    }
+    window.addEventListener('load', setBarHeightVar);
+    window.addEventListener('resize', setBarHeightVar);
+
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
@@ -388,6 +383,7 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
+    /* Centroid fixes (incl. Russia) */
     const CENTROID_OVERRIDES = new Map([
       ["norway",[60.4720, 8.4689]],
       ["new zealand",[-41.0, 172.0]],
@@ -401,7 +397,8 @@
       ["united states",[39.8283,-98.5795]],
       ["canada",[56.1304,-106.3468]],
       ["costa rica",[9.7489, -83.7534]],
-      ["japan",[36.2048, 138.2529]]
+      ["japan",[36.2048, 138.2529]],
+      ["russia",[61.524, 105.318]]   /* Russia corrected */
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -452,20 +449,6 @@
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8,
       noWrap:true
     }).addTo(map);
-
-    /* Recenter control */
-    const Recenter = L.Control.extend({
-      options:{position:'bottomleft'},
-      onAdd: function(){
-        const div = L.DomUtil.create('div','leaflet-bar');
-        const btn = L.DomUtil.create('button','recenter-btn',div);
-        btn.type='button'; btn.innerText='Re-center';
-        L.DomEvent.disableClickPropagation(btn);
-        btn.addEventListener('click', ()=> fitAllDots());
-        return div;
-      }
-    });
-    map.addControl(new Recenter());
 
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
@@ -533,7 +516,6 @@
     let entries = [];
     let regionMap = {};
     let allRegions = new Set();
-    let yearBounds = null;
 
     let centroidByKey = {};
     let lastDotsBounds = null;
@@ -870,12 +852,6 @@
           const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
           L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
         }
-      }
-    }
-
-    function fitAllDots(){
-      if (lastDotsBounds){
-        map.fitBounds(lastDotsBounds.pad(0.2), { animate:true });
       }
     }
 
