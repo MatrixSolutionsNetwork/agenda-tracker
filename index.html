@@ -1,201 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Agenda Tracker</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Matrix Solutions Network — Agenda Tracker</title>
 
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
-  <style>
-    :root{
-      --bg:#0a0f0d; --panel:#0b1216; --edge:#143328;
-      --text:#d9ffee; --muted:#86b39f;
-      --matrix:#00ff80; --matrix-dk:#00cc66;
-      --red:#ff3333; --orange:#ff9900;
-    }
-    html,body{height:100%;margin:0;background:radial-gradient(1200px 1100px at 20% -10%, rgba(0,255,128,.08), transparent 55%), var(--bg);color:var(--text);font-family:'Share Tech Mono', monospace}
-    *{box-sizing:border-box}
-    a{color:var(--matrix);text-decoration:none}
-    a:hover{text-decoration:underline}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-    .wrap{max-width:1280px;margin:0 auto;padding:22px 16px 40px}
+<style>
+  :root{
+    --bg:#07100b;
+    --panel:#06130d;
+    --panelEdge:#0b2a1c;
+    --text:#b8ffd8;
+    --muted:#6cd7a3;
+    --glow:#21ff9d;
+    --red:#ff3333;       /* Implemented */
+    --orange:#ff9900;    /* In development */
+    --gap:16px;
+    --round:18px;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
+  *{box-sizing:border-box}
 
-    .brand{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-    .logo-dot{width:12px;height:12px;border-radius:50%;background:var(--matrix);box-shadow:0 0 10px var(--matrix),0 0 20px var(--matrix),0 0 40px rgba(0,255,128,.55);animation:glow 2.2s ease-in-out infinite}
-    @keyframes glow{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-    .brand h1{margin:0;font-size:22px;color:var(--matrix);text-shadow:0 0 12px rgba(0,255,128,.35)}
-    .sub{color:var(--muted);font-size:13px}
+  .wrap{max-width:1280px;margin:32px auto;padding:0 18px}
+  .bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+  .dot{width:14px;height:14px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#6cffbf,var(--glow));box-shadow:0 0 10px var(--glow),0 0 24px rgba(33,255,157,.55)}
+  h1{font-size:28px;margin:0;letter-spacing:1px}
+  .sub{color:var(--muted);opacity:.85;font-size:14px}
+  .sub a{color:var(--glow);text-decoration:none}
+  .sub a:hover{text-decoration:underline}
 
-    /* ===== GRID of tiles ===== */
-    .tiles{display:grid;gap:18px}
-    @media (min-width:860px){ .tiles{grid-template-columns:repeat(2, 1fr);} }
-    @media (min-width:1280px){ .tiles{grid-template-columns:repeat(3, 1fr);} }
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{
+    position:relative;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,rgba(10,30,20,.66),rgba(8,22,16,.92));
+    border:1px solid var(--panelEdge);border-radius:var(--round);
+    box-shadow:0 14px 36px rgba(0,0,0,.45);
+    padding:18px;
+  }
+  .titleRow{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:8px;position:relative}
+  .live{font-size:12px;color:#062715;background:var(--glow);padding:3px 8px;border-radius:999px;border:1px solid #74ffc7}
+  .card h2{
+    margin:0;text-align:center;line-height:1.2;
+    font-size:20px;
+  }
 
-    .tile{
-      background:linear-gradient(180deg,rgba(0,30,20,.40),rgba(6,18,14,.88));
-      border:1px solid var(--edge); border-radius:14px; padding:14px;
-      min-height:560px; display:flex; flex-direction:column;
-      box-shadow:0 18px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,255,128,.04);
-      position:relative; overflow:hidden;
-    }
-    .tile:hover{border-color:#1e5b45;box-shadow:0 20px 44px rgba(0,0,0,.4),0 0 18px rgba(0,255,128,.08)}
-    .live{position:absolute;top:10px;right:12px;font-size:11px;padding:5px 8px;border-radius:999px;color:#04130c;background:var(--matrix);border:1px solid rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:.6px}
-    .tile h2{margin:2px auto 18px auto;font-size:20px;color:var(--matrix);text-align:center}
+  /* Chart area stays square, never stretched */
+  .chartBox{
+    width:100%;
+    aspect-ratio:1/1;   /* square on all screens */
+    display:flex;align-items:center;justify-content:center;
+    padding:10px 6px 0;
+  }
+  .chartBox canvas{width:100% !important;height:100% !important}
 
-    /* ===== STACKED CONTENT INSIDE EACH TILE ===== */
-    .tile-inner{display:flex;flex-direction:column;gap:22px;flex:1;min-width:0}
-    .chartbox{width:100%;display:flex;justify-content:center}
-    .chartbox canvas{width:min(340px, 100%) !important; height:min(340px, 64vw) !important;}
+  /* Stats block sits above the button, spacing is consistent */
+  .stats{display:flex;flex-direction:column;gap:10px;margin-top:auto;margin-bottom:var(--gap)}
+  .stat{
+    display:flex;align-items:center;justify-content:space-between;
+    border:1px solid var(--panelEdge);border-radius:12px;padding:10px 12px;
+    background:#061c13;
+  }
+  .stat label{opacity:.9}
+  .stat .val{font-weight:700;color:var(--glow)}
 
-    /* ===== STATS stay INSIDE card, full width ===== */
-    .stats{display:flex;flex-direction:column;gap:10px;width:100%}
-    .stat{
-      background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:10px 14px;border-radius:10px;
-      display:flex;align-items:center;gap:12px;width:100%;min-height:48px;overflow:hidden;
-    }
-    .stat .lbl{font-size:14px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .stat .k{font-size:22px;color:var(--matrix);margin-left:auto;flex:0 0 auto}
+  .btn{
+    display:block;width:100%;text-align:center;padding:12px 0;
+    border:1px solid #1b5a3e;border-radius:12px;background:#062015;
+    color:var(--glow);text-decoration:none;font-weight:700;letter-spacing:.5px;
+    box-shadow:0 0 0 0 rgba(33,255,157,.0); transition:box-shadow .15s ease, transform .04s ease;
+  }
+  .btn:hover{box-shadow:0 0 22px rgba(33,255,157,.22)}
+  .btn:active{transform:translateY(1px)}
 
-    .tile-cta{margin-top:auto}
-    .btn{
-      display:flex;align-items:center;justify-content:center;gap:8px;
-      border:1px solid var(--matrix-dk);color:var(--matrix);background:#0a1411;
-      padding:14px 20px;border-radius:12px;text-decoration:none;font-weight:700;font-size:16px;width:100%
-    }
-    .btn:hover{text-decoration:none;box-shadow:0 0 18px rgba(0,255,128,.22)}
+  .hint{margin-top:16px;color:var(--muted);font-size:12px}
 
-    .footer{margin-top:18px;color:var(--muted);font-size:12px}
-  </style>
+  /* --- Mobile tweaks --- */
+  @media (max-width: 1020px){
+    .grid{grid-template-columns:1fr;gap:22px}
+    h1{font-size:24px}
+    .dot{width:16px;height:16px} /* bigger and not cut off */
+    .sub{line-height:1.4}
+    .card h2{font-size:18px}
+  }
+</style>
 </head>
 <body>
   <div class="wrap">
-    <div class="brand">
-      <div class="logo-dot" aria-hidden="true"></div>
-      <div>
-        <h1>Matrix Solutions Network — Agenda Tracker</h1>
-        <div class="sub">
-          Live overview • Implemented vs In development •
-          <a href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">
-            Click here to open the Matrix Solutions Network Dashboard ↗
-          </a>
-        </div>
-      </div>
+    <div class="bar">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>Matrix Solutions Network — Agenda Tracker</h1>
+    </div>
+    <div class="sub">
+      Live overview • Implemented vs In development •
+      <a href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">Click here to open the Matrix Solutions Network Dashboard ↗</a>
     </div>
 
-    <div class="tiles">
-      <section class="tile" id="tile-digid">
-        <span class="live" id="pill-digid">Loading…</span>
-        <h2>Digital ID Updates</h2>
-        <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-digid"></canvas></div>
-          <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
-            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
-          </div>
-          <div class="tile-cta"><a class="btn" href="./digital-id/">View Live Map</a></div>
+    <div class="grid" id="grid">
+      <!-- Digital ID -->
+      <section class="card">
+        <div class="titleRow">
+          <h2>Digital ID Updates</h2>
+          <span class="live">LIVE</span>
         </div>
+        <div class="chartBox"><canvas id="c1"></canvas></div>
+
+        <div class="stats">
+          <div class="stat"><label>Implemented</label><span class="val" id="c1-imp">0</span></div>
+          <div class="stat"><label>In development</label><span class="val" id="c1-dev">0</span></div>
+          <div class="stat"><label>Total countries logged</label><span class="val" id="c1-total">0</span></div>
+        </div>
+
+        <a class="btn" href="./digital-id/" target="_blank" rel="noopener">View Live Map</a>
       </section>
 
-      <section class="tile" id="tile-cbdc">
-        <span class="live" id="pill-cbdc">Loading…</span>
-        <h2>Central Bank Digital Currency (CBDC) Updates</h2>
-        <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-cbdc"></canvas></div>
-          <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
-            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
-          </div>
-          <div class="tile-cta"><a class="btn" href="./cbdc/">View Live Map</a></div>
+      <!-- CBDC -->
+      <section class="card">
+        <div class="titleRow">
+          <h2>Central Bank Digital Currency (CBDC) Updates</h2>
+          <span class="live">LIVE</span>
         </div>
+        <div class="chartBox"><canvas id="c2"></canvas></div>
+
+        <div class="stats">
+          <div class="stat"><label>Implemented</label><span class="val" id="c2-imp">0</span></div>
+          <div class="stat"><label>In development</label><span class="val" id="c2-dev">0</span></div>
+          <div class="stat"><label>Total countries logged</label><span class="val" id="c2-total">0</span></div>
+        </div>
+
+        <a class="btn" href="./cbdc/" target="_blank" rel="noopener">View Live Map</a>
       </section>
 
-      <section class="tile" id="tile-scs">
-        <span class="live" id="pill-scs">Loading…</span>
-        <h2>Social Credit System Updates</h2>
-        <div class="tile-inner">
-          <div class="chartbox"><canvas id="pie-scs"></canvas></div>
-          <div class="stats">
-            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
-            <div class="stat"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
-            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
-          </div>
-          <div class="tile-cta"><a class="btn" href="./social-credit-system/">View Live Map</a></div>
+      <!-- SCS -->
+      <section class="card">
+        <div class="titleRow">
+          <h2>Social Credit System Updates</h2>
+          <span class="live">LIVE</span>
         </div>
+        <div class="chartBox"><canvas id="c3"></canvas></div>
+
+        <div class="stats">
+          <div class="stat"><label>Implemented</label><span class="val" id="c3-imp">0</span></div>
+          <div class="stat"><label>In development</label><span class="val" id="c3-dev">0</span></div>
+          <div class="stat"><label>Total countries logged</label><span class="val" id="c3-total">0</span></div>
+        </div>
+
+        <a class="btn" href="./social-credit-system/" target="_blank" rel="noopener">View Live Map</a>
       </section>
     </div>
 
-    <div class="footer">
+    <div class="hint">
       Stats auto-refresh on reload. “In discussion” rows are ignored here to keep the overview clean.
     </div>
   </div>
 
-  <script>
-    const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
-    const CSV_CBDC  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
-    const CSV_SCS   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
+<script>
+  // ====== LINKS (use the same CSVs you’ve been using) ======
+  const LINK_ID   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+  const LINK_CBDC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
+  const LINK_SCS  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
 
-    function fetchCSV(url){
-      return fetch(`${url}${url.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'})
-        .then(r=>r.text()).then(t=>Papa.parse(t,{header:true,skipEmptyLines:true}).data);
+  const COLOR_IMPLEMENTED = getCSS('--red');
+  const COLOR_DEVELOPMENT = getCSS('--orange');
+
+  function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function fetchCsv(url){
+    return fetch(url + (url.includes('?')?'&':'?')+'cb='+Date.now(), {cache:'no-store'})
+      .then(r=>r.text())
+      .then(t=>Papa.parse(t,{header:true,skipEmptyLines:true}).data);
+  }
+
+  // Count helper: implemented vs in-dev; ignore "discussion" for the index
+  function summarize(rows){
+    let imp=0, dev=0;
+    for(const row of rows){
+      const s = String(row.Status||row.status||"").toLowerCase();
+      if(!s) continue;
+      if(/implement/.test(s)) imp++;
+      else if(/develop|pilot|trial|poc|proof|concept/.test(s)) dev++;
+      // ignore 'discussion'
     }
-    function bucketize(rows){
-      const imp=new Set(), dev=new Set();
-      for(const r of rows){
-        const raw=String(r.Countries||r.Country||"");
-        if(!raw.trim()) continue;
-        const parts=raw.replace(/・/g, ',').split(/\s*(?:,|;|\/|&)\s*/).filter(Boolean);
-        const s=String(r.Status||"").toLowerCase();
-        for(const p of parts){
-          if(/implement/.test(s)) imp.add(p.trim());
-          else if(/develop|pilot|trial|proof|concept|poc/.test(s)) dev.add(p.trim());
+    return {imp, dev, total: imp+dev};
+  }
+
+  // Build a labeled pie (with label text inside each slice)
+  function pie(canvasId, imp, dev){
+    const total = Math.max(1, imp+dev);
+    const el = document.getElementById(canvasId);
+    Chart.register(ChartDataLabels);
+    return new Chart(el, {
+      type:'pie',
+      data:{
+        labels:['Implemented','In development'],
+        datasets:[{
+          data:[imp, dev],
+          backgroundColor:[COLOR_IMPLEMENTED, COLOR_DEVELOPMENT],
+          borderColor:'rgba(0,0,0,.5)', borderWidth:1
+        }]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:true,
+        aspectRatio:1,           // square; prevents stretch on mobile
+        layout:{padding:4},
+        plugins:{
+          legend:{ display:false },
+          datalabels:{
+            color:'#08150F',
+            font:{weight:'700', size:12},
+            formatter:(v,ctx)=>{
+              const lbl = ctx.chart.data.labels[ctx.dataIndex];
+              const pct = Math.round((v/total)*100);
+              return `${lbl}\n${v} (${pct}%)`;
+            }
+          },
+          tooltip:{enabled:true}
         }
       }
-      return {imp,dev};
-    }
-    function counts(b){ return {imp:b.imp.size,dev:b.dev.size,total:b.imp.size+b.dev.size}; }
+    });
+  }
 
-    function makePie(canvasId, imp, dev){
-      const ctx=document.getElementById(canvasId);
-      Chart.register(ChartDataLabels);
-      new Chart(ctx,{
-        type:'pie',
-        data:{labels:['Implemented','In development'],
-          datasets:[{data:[imp,dev],backgroundColor:['#ff3333','#ff9900'],borderColor:'rgba(0,0,0,.45)',borderWidth:1}]},
-        options:{
-          plugins:{
-            legend:{display:false},
-            datalabels:{
-              color:'#04130c', font:{weight:'700', size:12},
-              formatter:(v,ctx)=>{
-                const lbl=ctx.chart.data.labels[ctx.dataIndex];
-                const ds=ctx.chart.data.datasets[0].data; const tot=Math.max(1,ds[0]+ds[1]);
-                return `${lbl}\n${v} (${Math.round(v/tot*100)}%)`;
-              }
-            }
-          }
-        }
-      });
+  async function init(){
+    try{
+      const [idRows, cbdcRows, scsRows] = await Promise.all([
+        fetchCsv(LINK_ID), fetchCsv(LINK_CBDC), fetchCsv(LINK_SCS)
+      ]);
+
+      const A = summarize(idRows);
+      const B = summarize(cbdcRows);
+      const C = summarize(scsRows);
+
+      // Update counters
+      setNums('c1', A); setNums('c2', B); setNums('c3', C);
+
+      // Charts
+      pie('c1', A.imp, A.dev);
+      pie('c2', B.imp, B.dev);
+      pie('c3', C.imp, C.dev);
+
+    }catch(e){
+      console.error(e);
     }
-    function applyTile(prefix,b){
-      const {imp,dev,total}=counts(b);
-      document.getElementById(`pill-${prefix}`).textContent=total>0?"LIVE":"NO DATA";
-      document.getElementById(`${prefix}-imp`).textContent=imp||"—";
-      document.getElementById(`${prefix}-dev`).textContent=dev||"—";
-      document.getElementById(`${prefix}-total`).textContent=total||"—";
-      makePie(`pie-${prefix}`,imp,dev);
-    }
-    Promise.all([fetchCSV(CSV_DIGID),fetchCSV(CSV_CBDC),fetchCSV(CSV_SCS)])
-      .then(([d,c,s])=>{
-        applyTile('digid',bucketize(d));
-        applyTile('cbdc',bucketize(c));
-        applyTile('scs',bucketize(s));
-      });
-  </script>
+  }
+
+  function setNums(prefix, {imp,dev,total}){
+    document.getElementById(prefix+'-imp').textContent   = imp;
+    document.getElementById(prefix+'-dev').textContent   = dev;
+    document.getElementById(prefix+'-total').textContent = total;
+  }
+
+  init();
+</script>
 </body>
 </html>
