@@ -8,7 +8,7 @@
   <!-- Matrix-y mono font -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-  <!-- Chart.js -->
+  <!-- Chart.js + datalabels -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
@@ -32,18 +32,29 @@
       --orange:#ff9900;
     }
     *{ box-sizing:border-box }
-    html,body{ height:100%; margin:0; background:radial-gradient(1200px 1200px at 20% -10%, rgba(0,255,128,.08), transparent 60%), var(--bg); color:var(--text); font-family:'Share Tech Mono', monospace; letter-spacing:.2px }
+    html,body{
+      height:100%; margin:0;
+      background:
+        radial-gradient(1200px 1200px at 20% -10%, rgba(0,255,128,.08), transparent 60%),
+        var(--bg);
+      color:var(--text); font-family:'Share Tech Mono', monospace; letter-spacing:.2px
+    }
     a{ color:var(--matrix); text-decoration:none }
     a:hover{ text-decoration:underline }
 
     .wrap{ max-width:1200px; margin:0 auto; padding:22px 16px 40px }
 
     .brand{
-      display:flex; align-items:baseline; gap:10px; margin-bottom:10px;
+      display:flex; align-items:center; gap:12px; margin-bottom:14px;
     }
     .brand .logo-dot{
       width:12px; height:12px; border-radius:50%; background:var(--matrix);
-      box-shadow:0 0 10px var(--matrix), 0 0 20px var(--matrix);
+      box-shadow:0 0 10px var(--matrix), 0 0 20px var(--matrix), 0 0 40px rgba(0,255,128,.5);
+      animation: glow 2.2s ease-in-out infinite;
+    }
+    @keyframes glow{
+      0%,100%{ box-shadow:0 0 8px var(--matrix), 0 0 18px var(--matrix), 0 0 38px rgba(0,255,128,.45); transform:scale(1) }
+      50%{ box-shadow:0 0 12px var(--matrix), 0 0 26px var(--matrix), 0 0 56px rgba(0,255,128,.7); transform:scale(1.05) }
     }
     .brand h1{
       margin:0; font-size:22px; color:var(--matrix);
@@ -53,10 +64,8 @@
       color:var(--muted); font-size:13px; margin-left:auto; opacity:.85
     }
 
-    .grid{
-      display:grid; gap:16px;
-      grid-template-columns: repeat(12, 1fr);
-    }
+    .grid{ display:grid; gap:16px; grid-template-columns: repeat(12, 1fr); }
+
     .tile{
       grid-column: span 12;
       background: linear-gradient(180deg, rgba(0, 30, 20, .40), rgba(6, 18, 14, .88));
@@ -75,37 +84,54 @@
       transform:translateY(-1px); transition:transform .18s ease;
     }
 
-    .tile-head{ display:flex; gap:10px; align-items:center; margin-bottom:8px }
+    /* Tile header centered with big CTA */
+    .tile-head{
+      display:flex; align-items:center; justify-content:center;
+      gap:12px; margin-bottom:12px; text-align:center;
+    }
     .tile h2{ margin:0; font-size:18px; color:var(--matrix) }
     .pill{
-      margin-left:auto; font-size:11px; padding:5px 8px; border-radius:999px;
+      font-size:11px; padding:5px 8px; border-radius:999px;
       color:#04130c; background:var(--matrix); border:1px solid rgba(0,0,0,.5);
-      text-transform:uppercase; letter-spacing:.6px;
+      text-transform:uppercase; letter-spacing:.6px; margin-left:8px;
     }
 
+    /* Body layout: left pie, center CTA, right stats */
+    .tile-body{
+      display:grid; align-items:center; gap:14px;
+      grid-template-columns: 140px minmax(220px, 1fr) 1fr;
+    }
+    .chartbox{ width:140px; height:140px; justify-self:center }
+    .cta{
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+    }
+    .btn{
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      border:1px solid var(--matrix-dk); color:var(--matrix); background:#0a1411;
+      padding:10px 16px; border-radius:12px; text-decoration:none; font-weight:700; font-size:14px;
+      box-shadow:0 0 0 0 rgba(0,255,128,.25); transition:box-shadow .2s, transform .08s;
+    }
+    .btn:hover{ text-decoration:none; box-shadow:0 0 18px rgba(0,255,128,.22) }
+    .btn:active{ transform:translateY(1px) }
+
     .stats{
-      display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+      display:flex; flex-direction:column; gap:10px; justify-self:stretch;
     }
     .stat{
       background:rgba(0,0,0,.25); border:1px solid var(--edge);
-      padding:10px 12px; border-radius:10px; min-width:150px;
+      padding:10px 12px; border-radius:10px; display:flex; align-items:center; justify-content:space-between;
     }
-    .stat .k{ font-size:22px; color:var(--matrix) }
-    .stat .lbl{ font-size:12px; color:var(--muted) }
-
-    .chartbox{ width:140px; height:140px }
-    .actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
-    .btn{
-      display:inline-flex; align-items:center; gap:8px;
-      border:1px solid var(--matrix-dk); color:var(--matrix); background:#0a1411;
-      padding:8px 12px; border-radius:10px; text-decoration:none; font-weight:600;
-      box-shadow:0 0 0 0 rgba(0,255,128,.25); transition:box-shadow .2s, transform .1s;
-    }
-    .btn:hover{ text-decoration:none; box-shadow:0 0 18px rgba(0,255,128,.18) }
-    .btn:active{ transform:translateY(1px) }
+    .k{ font-size:20px; color:var(--matrix) }
+    .lbl{ font-size:12px; color:var(--muted) }
 
     .footer{ margin-top:18px; color:var(--muted); font-size:12px }
 
+    @media (max-width:820px){
+      .tile-body{ grid-template-columns: 1fr; }
+      .chartbox{ order:1; }
+      .cta{ order:2; }
+      .stats{ order:3; }
+    }
     @media (min-width:720px){
       .tile{ grid-column: span 6; }
     }
@@ -127,16 +153,20 @@
       <!-- Digital ID -->
       <section class="tile" id="tile-digid">
         <div class="tile-head">
-          <h2>Digital ID</h2>
+          <h2>Digital ID Updates</h2>
           <span class="pill" id="pill-digid">Loading…</span>
         </div>
-        <div class="stats">
+        <div class="tile-body">
           <div class="chartbox"><canvas id="pie-digid" width="140" height="140" aria-label="Digital ID pie"></canvas></div>
-          <div class="stat"><div class="k" id="digid-total">—</div><div class="lbl">Total countries</div></div>
-          <div class="stat"><div class="k" id="digid-imp">—</div><div class="lbl">Implemented</div></div>
-          <div class="stat"><div class="k" id="digid-dev">—</div><div class="lbl">In development</div></div>
-          <div class="actions">
-            <a class="btn" href="./digital-id/" aria-label="Open Digital ID map">View map →</a>
+
+          <div class="cta">
+            <a class="btn" href="./digital-id/" aria-label="Open Digital ID map">View Map</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="digid-total">—</span></div>
           </div>
         </div>
       </section>
@@ -144,16 +174,20 @@
       <!-- CBDC -->
       <section class="tile" id="tile-cbdc">
         <div class="tile-head">
-          <h2>CBDC</h2>
+          <h2>Central Bank Digital Currency (CBDC) Updates</h2>
           <span class="pill" id="pill-cbdc">Loading…</span>
         </div>
-        <div class="stats">
+        <div class="tile-body">
           <div class="chartbox"><canvas id="pie-cbdc" width="140" height="140" aria-label="CBDC pie"></canvas></div>
-          <div class="stat"><div class="k" id="cbdc-total">—</div><div class="lbl">Total countries</div></div>
-          <div class="stat"><div class="k" id="cbdc-imp">—</div><div class="lbl">Implemented</div></div>
-          <div class="stat"><div class="k" id="cbdc-dev">—</div><div class="lbl">In development</div></div>
-          <div class="actions">
-            <a class="btn" href="./cbdc/" aria-label="Open CBDC map">View map →</a>
+
+          <div class="cta">
+            <a class="btn" href="./cbdc/" aria-label="Open CBDC map">View Map</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="cbdc-total">—</span></div>
           </div>
         </div>
       </section>
@@ -161,16 +195,20 @@
       <!-- Social Credit -->
       <section class="tile" id="tile-scs">
         <div class="tile-head">
-          <h2>Social Credit Systems</h2>
+          <h2>Social Credit System Updates</h2>
           <span class="pill" id="pill-scs">Loading…</span>
         </div>
-        <div class="stats">
+        <div class="tile-body">
           <div class="chartbox"><canvas id="pie-scs" width="140" height="140" aria-label="Social Credit pie"></canvas></div>
-          <div class="stat"><div class="k" id="scs-total">—</div><div class="lbl">Total countries</div></div>
-          <div class="stat"><div class="k" id="scs-imp">—</div><div class="lbl">Implemented</div></div>
-          <div class="stat"><div class="k" id="scs-dev">—</div><div class="lbl">In development</div></div>
-          <div class="actions">
-            <a class="btn" href="./social-credit-system/" aria-label="Open Social Credit map">View map →</a>
+
+          <div class="cta">
+            <a class="btn" href="./social-credit-system/" aria-label="Open Social Credit map">View Map</a>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
+            <div class="stat"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
+            <div class="stat"><span class="lbl">Total countries logged</span><span class="k" id="scs-total">—</span></div>
           </div>
         </div>
       </section>
@@ -178,20 +216,20 @@
     </div>
 
     <div class="footer">
-      Tip: stats auto-refresh when you reload. Only “Implemented” and “In development” are counted (rows marked “In discussion” are ignored).
+      Stats auto-refresh on reload. “In discussion” rows are ignored here to keep the overview clean.
     </div>
   </div>
 
   <script>
-    // ====== 1) CSV LINKS (edit as needed) ======
-    // Digital ID (gid=0 from your original sheet)
+    // ====== CSV LINKS (edit as needed) ======
+    // Digital ID
     const CSV_DIGID = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
-    // CBDC (paste the gid of your CBDC sheet here if different)
-    const CSV_CBDC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
-    // Social Credit Systems (your link with gid=1564220601)
+    // CBDC (update gid if your CBDC sheet uses a different tab id)
+    const CSV_CBDC = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1344383755&single=true&output=csv";
+    // Social Credit Systems
     const CSV_SCS  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1564220601&single=true&output=csv";
 
-    // ====== 2) Helpers ======
+    // ====== Helpers ======
     function fetchCSV(url){
       return fetch(`${url}${url.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'})
         .then(r=>{ if(!r.ok) throw new Error(r.status); return r.text(); })
@@ -202,10 +240,10 @@
       if(!rows) return {imp:0, dev:0, total:0};
       let imp=0, dev=0;
       for(const r of rows){
-        const status = String(r.Status||"").toLowerCase();
-        if (/implement/.test(status)) imp++;
-        else if (/develop/.test(status)) dev++;
-        // NOTE: "discussion" intentionally ignored here
+        const s = String(r.Status||"").toLowerCase();
+        if (/implement/.test(s)) imp++;
+        else if (/develop/.test(s)) dev++;
+        // "discussion" intentionally ignored
       }
       return {imp, dev, total: imp+dev};
     }
@@ -246,14 +284,14 @@
       const tEl = document.getElementById(`${prefix}-total`);
       const iEl = document.getElementById(`${prefix}-imp`);
       const dEl = document.getElementById(`${prefix}-dev`);
-      if (pill) pill.textContent = total ? 'Live' : 'No data';
+      if (pill) pill.textContent = (imp+dev)>0 ? 'Live' : 'No data';
       if (tEl) tEl.textContent = total || '—';
       if (iEl) iEl.textContent = imp || '—';
       if (dEl) dEl.textContent = dev || '—';
       makePie(`pie-${prefix}`, imp, dev);
     }
 
-    // ====== 3) Load all three ======
+    // Load all three in parallel
     Promise.all([fetchCSV(CSV_DIGID), fetchCSV(CSV_CBDC), fetchCSV(CSV_SCS)])
       .then(([digid, cbdc, scs])=>{
         setTile('digid', summarize(digid));
