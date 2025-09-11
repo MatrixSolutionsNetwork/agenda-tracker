@@ -31,7 +31,7 @@
       --orange:#ff9900; /* In development */
       --red:#ff3333;    /* Implemented */
       --mint:#7be2b1;   /* Outline */
-      --matrix:#21ff9d; /* Matrix green for brand */
+      --matrix:#21ff9d; /* Matrix green for brand & “In discussion” */
     }
     html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;}
     #map{height:100%;width:100%}
@@ -166,7 +166,8 @@
     <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
 
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development <span class="count" id="c-dev">0</span></div>
+    <div class="row"><span class="sw" style="background:var(--matrix)"></span> In discussion <span class="count" id="c-disc">0</span></div>
 
     <div class="hr"></div>
 
@@ -188,7 +189,7 @@
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="showDevDots" checked />
-        <span>Show dots — In development</span>
+        <span>Show dots — In development / discussion</span>
       </label>
     </div>
 
@@ -204,7 +205,7 @@
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netDev" />
-        <span>Local network — In development</span>
+        <span>Local network — In development / discussion</span>
       </label>
     </div>
     <div class="row" style="gap:8px; align-items:center; font-size:12px;">
@@ -226,8 +227,7 @@
   </div>
 
   <script>
-    /* === YOUR PUBLISHED CBDC CSV LINK ===
-       Replace the placeholder below with your Google Sheets "Published to the web" CSV URL. */
+    /* === YOUR PUBLISHED CBDC CSV LINK === */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=1527883493&single=true&output=csv";
 
@@ -249,7 +249,7 @@
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"],
       ["wales","united kingdom"], ["northern ireland","united kingdom"],
 
-      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
+      ["uae","united arab emirates"], ["u.a.e.","united arab emirates"], ["uae (united arab emirates)","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
 
       ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["south korea (republic of)","south korea"],
@@ -262,7 +262,7 @@
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
       ["republic of serbia","serbia"], ["canada (ca)","canada"],
 
-      // Common Caribbean & small states
+      // Caribbean & small states, “&” forms, etc.
       ["bosnia & herzegovina","bosnia and herzegovina"],
       ["bosnia-herzegovina","bosnia and herzegovina"],
       ["trinidad & tobago","trinidad and tobago"],
@@ -287,6 +287,7 @@
       ["mexico",        [23.6345, -102.5528]],
       ["brazil",        [-10.0, -55.0]],
       ["argentina",     [-38.4161, -63.6167]],
+      ["chile",         [-35.6751, -71.5430]],
       ["united kingdom",[52.3555,-1.1743]],
       ["spain",         [40.4168, -3.7038]],
       ["italy",         [42.5, 12.5]],
@@ -303,6 +304,7 @@
       ["china",         [35.0, 103.0]],
       ["indonesia",     [-2.0, 118.0]],
       ["south africa",  [-30.5595, 22.9375]],
+      ["new zealand",   [-41.0, 174.0]],
 
       // --- Small islands & Caribbean ---
       ["bahamas",                     [24.25, -76.00]],
@@ -531,7 +533,7 @@
         const reg = getRegion(l.feature.properties) || 'Other';
         regionMap[nm] = reg;
         l.feature.properties._key = nm;
-        allRegions.add(reg);   // <— make sure Region filter populates
+        allRegions.add(reg);   // ensure Region filter populates
       });
 
       // Build region options
@@ -573,7 +575,7 @@
 
       // 3) normalize + collect years
       entries = [];
-      const counts={imp:0, dev:0};
+      const counts={imp:0, dev:0, disc:0};
       const unmatched = new Set();
       implementedCoords=[]; devCoords=[];
       let yMin=Infinity, yMax=-Infinity;
@@ -606,32 +608,39 @@
           if (!pt){ unmatched.add(raw); continue; }
 
           const reg = regionMap[key] || 'Other';
-          const isImplemented = /implement/i.test(status);
-          const isDev = /develop|discussion|pilot|trial|poc|proof|concept|prepar/i.test(status);
+
+          // classification
+          const isImplemented = /^implement/i.test(status);
+          const isDiscussion  = /discuss|consider/i.test(status);
+          const isDev         = !isImplemented && !isDiscussion &&
+                                /(develop|pilot|trial|sandbox|poc|proof|concept|prepar)/i.test(status);
 
           const obj = {
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
-            status, isImplemented, isDev, title, notes, year: yr, region: reg
+            status, isImplemented, isDev, isDiscussion, title, notes, year: yr, region: reg
           };
           entries.push(obj);
 
           if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
+          else if (isDiscussion){ devCoords.push([pt.lat, pt.lng]); counts.disc++; } // discussion shown with dev dots
           else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
         }
       }
 
-      // UI: pie + counters
-      document.getElementById('c-imp').textContent = counts.imp;
-      document.getElementById('c-dev').textContent = counts.dev;
-      const total = Math.max(1, counts.imp + counts.dev);
+      // UI: pie + counters (3 slices)
+      document.getElementById('c-imp').textContent  = counts.imp;
+      document.getElementById('c-dev').textContent  = counts.dev;
+      document.getElementById('c-disc').textContent = counts.disc;
+
+      const total = Math.max(1, counts.imp + counts.dev + counts.disc);
       Chart.register(ChartDataLabels);
       new Chart(document.getElementById('statusPie'), {
         type:'pie',
         data:{
-          labels:['Implemented','In development'],
+          labels:['Implemented','In development','In discussion'],
           datasets:[{
-            data:[counts.imp, counts.dev],
-            backgroundColor:[getCSS('--red'), getCSS('--orange')],
+            data:[counts.imp, counts.dev, counts.disc],
+            backgroundColor:[getCSS('--red'), getCSS('--orange'), getCSS('--matrix')],
             borderColor:'rgba(0,0,0,.45)', borderWidth:1
           }]
         },
@@ -717,8 +726,8 @@
         if (region !== '__all' && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
-        if (e.isDev && !showDev) return false;
-        return e.isImplemented || e.isDev;
+        if (!e.isImplemented && !showDev) return false; // dev or discussion
+        return e.isImplemented || e.isDev || e.isDiscussion;
       };
 
       const impPts=[], devPts=[];
@@ -726,7 +735,7 @@
 
       for (const e of entries){
         if (!filt(e)) continue;
-        const color = e.isImplemented ? red : orange;
+        const color = e.isImplemented ? red : orange; // keep single color for all non-implemented dots for now
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
         L.circleMarker([e.lat, e.lng], {
@@ -737,7 +746,7 @@
         .addTo(layer);
 
         if (e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(e.key); }
-        else if (e.isDev) { devPts.push([e.lat,e.lng]); }
+        else { devPts.push([e.lat,e.lng]); }
       }
 
       // Shade implemented countries that are visible
@@ -786,8 +795,8 @@
         if (region !== '__all' && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
-        if (e.isDev && !showDev) return false;
-        return e.isImplemented || e.isDev;
+        if (!e.isImplemented && !showDev) return false;
+        return e.isImplemented || e.isDev || e.isDiscussion;
       }).map(e=>({
         Country:e.country, Title:e.title, Status:e.status, Year:e.year||"",
         Region:e.region||"", Lat:e.lat, Lng:e.lng, Notes:e.notes||""
