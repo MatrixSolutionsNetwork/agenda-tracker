@@ -156,7 +156,7 @@
       </select>
     </div>
 
-    <!-- Min year (auto-shown only if Year exists) -->
+    <!-- Min year (auto) -->
     <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
       <label style="white-space:nowrap;">Min year:</label>
       <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
@@ -239,41 +239,63 @@
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
+    /* Name normalizer + aliases */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
       ["uae","united arab emirates"], ["u.a.e.","united arab emirates"],
       ["türkiye","turkey"], ["turkiye","turkey"],
-      ["republic of korea","south korea"], ["korea (republic of)","south korea"],
+      ["republic of korea","south korea"], ["korea (republic of)","south korea"], ["south korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"], ["côte d’ivoire","cote d ivoire"], ["cote d'ivoire","cote d ivoire"],
       ["czech republic","czechia"], ["swaziland","eswatini"], ["burma","myanmar"],
       ["macedonia","north macedonia"], ["lao pdr","laos"],
       ["democratic republic of congo","democratic republic of the congo"], ["drc","democratic republic of the congo"],
       ["russian federation","russia"], ["viet nam","vietnam"], ["iran (islamic republic of)","iran"],
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
-      ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
+      ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"],
+      /* composite names people often shorten */
+      ["bosnia & herzegovina","bosnia and herzegovina"], ["bosnia-herzegovina","bosnia and herzegovina"],
+      ["trinidad & tobago","trinidad and tobago"], ["saint kitts & nevis","saint kitts and nevis"],
+      ["sao tome & principe","sao tome and principe"], ["antigua & barbuda","antigua and barbuda"],
+      ["st vincent and the grenadines","saint vincent and the grenadines"], ["st kitts and nevis","saint kitts and nevis"], ["st lucia","saint lucia"],
+      ["east timor","timor-leste"], ["cape verde","cabo verde"]
     ]);
 
     /* Expanders for regional/union entries in CBDC sheets */
     const UNION_EXPANSIONS = new Map([
       ["eastern caribbean", [
         "Antigua and Barbuda","Dominica","Grenada","Saint Kitts and Nevis","Saint Lucia","Saint Vincent and the Grenadines"
-        /* Anguilla & Montserrat are UK territories and may not exist as separate polygons in your GeoJSON */
       ]]
-      // Add more if you choose to track unions as single rows (e.g., "Euro Area", "West African Monetary Union", etc.)
+      // Add more unions if you decide to store them as one row.
     ]);
 
-    // Accurate centroid overrides for tricky cases
+    // Accurate centroid overrides for tricky cases (lat, lng)
     const CENTROID_OVERRIDES = new Map([
+      ["russia",        [61.5240, 105.3188]],
+      ["china",         [35.0000, 103.0000]],
+      ["kazakhstan",    [48.0000, 68.0000]],
+      ["mongolia",      [46.8625, 103.8467]],
+      ["australia",     [-25.2744, 133.7751]],
+      ["canada",        [56.1304, -106.3468]],
+      ["united states", [39.8283, -98.5795]],
+      ["brazil",        [-10.0000, -55.0000]],
+      ["argentina",     [-38.4161, -63.6167]],
+      ["indonesia",     [-2.0000, 118.0000]],
+      ["saudi arabia",  [23.8859, 45.0792]],
+      ["iran",          [32.4279, 53.6880]],
+      ["venezuela",     [7.0000, -66.0000]],
+      ["ghana",         [7.9465, -1.0232]],
+      ["nigeria",       [9.0820, 8.6753]],
+      ["mexico",        [23.6345, -102.5528]],
+      ["south africa",  [-30.5595, 22.9375]],
+      ["india",         [22.9734, 78.6569]],
+      ["japan",         [36.2048, 138.2529]],
+      ["united kingdom",[52.3555,-1.1743]],
       ["spain",         [40.4168, -3.7038]],
       ["italy",         [42.5, 12.5]],
       ["denmark",       [56.2639, 9.5019]],
-      ["united kingdom",[52.3555,-1.1743]],
       ["serbia",        [44.0165, 21.0059]],
-      ["united states", [39.8283,-98.5795]],
-      ["canada",        [56.1304,-106.3468]],
-      ["costa rica",    [9.7489, -83.7534]],
-      ["japan",         [36.2048, 138.2529]]
+      ["costa rica",    [9.7489, -83.7534]]
     ]);
 
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -286,15 +308,17 @@
     function normalizeCountry(s){
       const k = String(s||"")
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+        .replace(/\(.*?\)/g,'')              // drop bracketed hints like (ECCU)
         .replace(/[^a-z0-9 ]+/gi,' ')
         .replace(/\s+/g,' ')
         .toLowerCase().trim();
       return COUNTRY_ALIASES.get(k) || k;
     }
     function splitCountries(cell){
+      // DO NOT split on the word 'and' to keep composite names intact
       return String(cell)
         .replace(/・/g, ',')
-        .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
+        .split(/\s*(?:,|;|\/|&)\s*/i)
         .map(s=>s.trim())
         .filter(Boolean);
     }
@@ -527,7 +551,7 @@
       // expand unions like "Eastern Caribbean (ECCU)" into real countries
       function expandTokens(token){
         const t = token.trim();
-        const norm = normalizeCountry(t).replace(/\s*\(.*?\)\s*/g,''); // strip brackets like (ECCU)
+        const norm = normalizeCountry(t);
         if (UNION_EXPANSIONS.has(norm)) return UNION_EXPANSIONS.get(norm);
         return [t];
       }
@@ -556,7 +580,7 @@
 
           const reg = regionMap[key] || 'Other';
           const isImplemented = /implement/i.test(status);
-          const isDev = /develop|discussion|pilot|prepar|proof|concept/i.test(status);
+          const isDev = /develop|discussion|pilot|trial|poc|proof|concept|prepar/i.test(status);
 
           const obj = {
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
@@ -588,7 +612,7 @@
           responsive:true,
           plugins:{
             legend:{ position:'bottom', labels:{ color:'#d9efe4', boxWidth:12, boxHeight:12, font:{size:12} } },
-          datalabels:{
+            datalabels:{
               color:'#0b0f12', font:{weight:'700', size:11},
               formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
             }
