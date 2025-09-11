@@ -77,6 +77,27 @@
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
 
+    /* Mobile burger (hidden on desktop) */
+    #burger{
+      display:none;
+      margin-left:auto;
+      width:38px; height:34px; border-radius:10px;
+      border:1px solid #1b5a3e; background:#062015; color:#fff;
+      align-items:center; justify-content:center; font-size:20px; line-height:1;
+    }
+    #mobileMenu{
+      position:fixed; z-index:1200; left:12px; right:12px; top:calc(var(--barH) + 8px);
+      background:#081a13; border:1px solid #1b5a3e; border-radius:12px;
+      display:none; box-shadow:0 18px 30px rgba(0,0,0,.45);
+    }
+    #mobileMenu.open{display:block}
+    #mobileMenu a{
+      display:block; padding:12px 14px; color:#fff; text-decoration:none; border-bottom:1px solid #123b2a;
+      font-weight:700;
+    }
+    #mobileMenu a:last-child{border-bottom:none}
+    #mobileMenu a:hover{background:#0a2218}
+
     /* ===== Map beneath bar ===== */
     #map{
       position:absolute; left:0; right:0; top:var(--barH); bottom:0;
@@ -93,7 +114,7 @@
     }
     .recenter-btn:hover{box-shadow:0 0 14px rgba(33,255,157,.20)}
 
-    /* Drawer opener */
+    /* Drawer opener (FAB) */
     #fab{
       position:absolute; left:12px; bottom:12px; z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
@@ -101,6 +122,7 @@
       border-radius:999px; padding:10px 12px; cursor:pointer;
       font-weight:700;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
+      max-width:90vw;
     }
     #fab .dot{width:10px;height:10px;border-radius:50%}
     #fab .d-red{ background:var(--red) }
@@ -146,11 +168,34 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
+    /* --- Mobile layout tweaks --- */
     @media (max-width: 720px){
-      #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
-      #brandTitle h1{font-size:16px}
-      .actions{gap:6px}
-      .btn{padding:7px 9px;font-size:12px}
+      /* show burger, hide desktop actions */
+      #burger{ display:flex; }
+      .actions{ display:none; }
+
+      /* stack the title and center it cleanly */
+      #topbar{
+        flex-direction:column; align-items:center; gap:6px; padding:8px 10px;
+      }
+      #brandTitle{
+        width:100%; justify-content:center; text-align:center;
+      }
+      .updated{ margin-left:0; display:block; text-align:center; }
+
+      /* shrink FAB so it never crowds the recenter button */
+      #fab{
+        font-size:11px; padding:7px 10px; bottom:10px;
+      }
+
+      #drawer{
+        left:10px; right:10px; bottom:66px;
+        width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px;
+      }
+
+      /* nudge Leaflet controls down a touch more on small screens */
+      .leaflet-top{ top:18px; }
+      .leaflet-control-zoom{ margin-top:8px; }
     }
 
     .country-hover { cursor:pointer; }
@@ -170,6 +215,11 @@
       <span class="updated" id="updatedTop">Updated: …</span>
       <span class="inline-hint">• Click a dot or country for details</span>
     </div>
+
+    <!-- Mobile burger -->
+    <button id="burger" aria-label="Open menu" title="Menu">☰</button>
+
+    <!-- Desktop actions -->
     <div class="actions">
       <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
       <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
@@ -178,11 +228,20 @@
     </div>
   </div>
 
+  <!-- Mobile overlay menu -->
+  <nav id="mobileMenu" aria-label="Mobile menu">
+    <a href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
+    <a href="../">← Back to Agenda Tracker</a>
+    <a href="../cbdc/">Open CBDC Map</a>
+    <a href="../social-credit-system/">Open Social Credit Map</a>
+    <a href="javascript:void(0)" id="mobileMenuClose" style="text-align:center;opacity:.8;">Close ✕</a>
+  </nav>
+
   <div id="map" aria-label="Digital ID world map"></div>
 
   <!-- Bottom-left opener -->
   <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.95;">Digital ID <b>stats</b> — <u>click to open</u></span>
+    <span style="opacity:.95;">Digital ID <b>stats</b> — <u>click to view</u></span>
     <span class="dot d-red" title="Implemented"></span>
     <span class="dot d-org" title="In development"></span>
   </div>
@@ -306,7 +365,6 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    /* Targeted centroid fixes */
     const CENTROID_OVERRIDES = new Map([
       ["norway",[60.4720, 8.4689]],
       ["new zealand",[-41.0, 172.0]],
@@ -346,7 +404,7 @@
         .filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
-    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&gt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
     function haversine(a, b){
       const toRad = d => d * Math.PI/180, R=6371;
       const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
@@ -356,24 +414,23 @@
     const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
 
     /* ---------- Map ---------- */
-    // Clamp panning to the world bounds (no endless wrap)
     const maxBounds = L.latLngBounds(L.latLng(-85,-180), L.latLng(85,180));
 
     const map = L.map('map', {
       zoomControl:true,
       preferCanvas:true,
-      worldCopyJump:false,          // do not duplicate worlds
-      maxBounds: maxBounds,         // hard clamp
-      maxBoundsViscosity: 1.0,      // elastic bounce
-      minZoom: 2                     // avoid over-zoomed world at init
+      worldCopyJump:false,
+      maxBounds: maxBounds,
+      maxBoundsViscosity: 1.0,
+      minZoom: 2
     }).setView([20,0], 2);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8,
-      noWrap:true                     // stop tile repeating
+      noWrap:true
     }).addTo(map);
 
-    // Custom "Re-center" control (bottom-right)
+    // Re-center control
     const Recenter = L.Control.extend({
       options:{position:'bottomright'},
       onAdd: function(){
@@ -421,7 +478,29 @@
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
 
+    // Mobile burger logic
+    const burger = document.getElementById('burger');
+    const mobileMenu = document.getElementById('mobileMenu');
+    const mobileMenuClose = document.getElementById('mobileMenuClose');
+    if (burger){
+      burger.addEventListener('click', ()=>{
+        mobileMenu.classList.toggle('open');
+      });
+    }
+    if (mobileMenuClose){
+      mobileMenuClose.addEventListener('click', ()=>{
+        mobileMenu.classList.remove('open');
+      });
+    }
+    // close menu when clicking outside it
+    document.addEventListener('click', (e)=>{
+      if (!mobileMenu.classList.contains('open')) return;
+      const within = e.target.closest('#mobileMenu') || e.target.closest('#burger');
+      if (!within) mobileMenu.classList.remove('open');
+    });
+
     if (!isMobile()) drawer.classList.add('open');
+
     fab.addEventListener('click', ()=> drawer.classList.toggle('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
@@ -436,7 +515,7 @@
 
     let geoRef = null;
     let centroidByKey = {};
-    let lastDotsBounds = null; // updated whenever dots are drawn
+    let lastDotsBounds = null;
 
     function openCountryPopup(countryKey){
       const rows = entries.filter(e=>e.key===countryKey);
@@ -735,10 +814,7 @@
       }
 
       rebuildNetworksWithPoints(impPts, devPts);
-
-      // update cached bounds for recenter
-      const bb = collectDotsBounds();
-      lastDotsBounds = bb;
+      lastDotsBounds = collectDotsBounds();
     }
 
     function rebuildNetworksWithPoints(impPts, devPts){
@@ -765,7 +841,6 @@
       }
     }
 
-    /* ---- Re-center helpers ---- */
     function collectDotsBounds(){
       const groups = [dotsImpLayer, dotsDevLayer];
       let bounds = null;
@@ -781,12 +856,10 @@
     function fitAllDots(){
       const bb = lastDotsBounds || collectDotsBounds();
       if (bb && bb.isValid()){
-        // Fit within clamped world bounds
         const padded = bb.pad(0.25);
         map.fitBounds(padded, { animate:true, maxZoom:4 });
       } else {
-        // Fallback to whole world
-        map.fitBounds(maxBounds, { animate:true, maxZoom:2 });
+        map.fitBounds(L.latLngBounds(L.latLng(-60,-160), L.latLng(75,160)), { animate:true, maxZoom:2 });
       }
     }
 
