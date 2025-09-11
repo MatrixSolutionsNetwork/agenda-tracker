@@ -48,22 +48,24 @@
       border:1px solid rgba(0,0,0,.5);text-transform:uppercase;letter-spacing:.6px}
     .tile h2{margin:2px 36px 10px 6px;font-size:18px;color:var(--matrix)}
 
-    /* Inside tile: LEFT chart | RIGHT column */
-    .tile-body{display:grid;grid-template-columns:220px 1fr;gap:14px;align-items:start}
-    .chartbox{width:220px;height:220px;justify-self:center}
+    /* Inside tile: LEFT column (chart + button) | RIGHT column (stats) */
+    .tile-body{display:grid;grid-template-columns:260px 1fr;gap:16px;align-items:start}
+    .leftcol{display:flex;flex-direction:column;align-items:center;gap:14px}
+    .chartbox{width:240px;height:240px}
     .rightcol{display:flex;flex-direction:column;gap:12px;min-width:0}
 
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--matrix-dk);color:var(--matrix);
-      background:#0a1411;padding:10px 16px;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px;width:max-content}
+      background:#0a1411;padding:12px 18px;border-radius:12px;text-decoration:none;font-weight:700;font-size:14px;width:100%}
     .btn:hover{text-decoration:none;box-shadow:0 0 18px rgba(0,255,128,.22)}
 
     .stats{display:flex;flex-direction:column;gap:10px;position:relative}
-    .stat{background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:10px 12px;border-radius:10px;display:flex;align-items:center;justify-content:space-between;min-height:48px}
+    .stat{background:rgba(0,0,0,.25);border:1px solid var(--edge);padding:12px 14px;border-radius:10px;
+      display:flex;align-items:center;min-height:48px;gap:12px}
+    .stat .lbl{font-size:13px;color:var(--muted);margin-right:auto} /* pushes number to the right */
+    .stat .k{font-size:22px;color:var(--matrix);padding-left:14px}   /* breathing room from the text */
     .stat.clickable{cursor:pointer}
-    .k{font-size:20px;color:var(--matrix)}
-    .lbl{font-size:12px;color:var(--muted)}
 
-    /* Pop list lives INSIDE the same tile, anchored under the clicked box */
+    /* Pop list (country list) lives inside the same tile */
     .pop{position:absolute;left:0;right:0;margin-top:6px;background:#06120e;border:1px solid var(--edge);border-radius:12px;max-height:200px;overflow:auto;display:none;z-index:5;box-shadow:0 14px 30px rgba(0,0,0,.45)}
     .pop header{position:sticky;top:0;background:#071610;padding:8px 10px;border-bottom:1px solid #163a2d;display:flex;justify-content:space-between;color:var(--muted);font-size:12px}
     .pop ul{list-style:none;margin:0;padding:6px 10px 10px 14px}
@@ -76,8 +78,8 @@
     /* Stack vertically on narrow screens */
     @media (max-width:640px){
       .tile-body{grid-template-columns:1fr}
-      .chartbox{width:180px;height:180px}
-      .btn{width:100%;justify-content:center}
+      .chartbox{width:200px;height:200px}
+      .btn{width:100%}
     }
   </style>
 </head>
@@ -103,10 +105,11 @@
         <span class="live" id="pill-digid">Loading…</span>
         <h2>Digital ID Updates</h2>
         <div class="tile-body">
-          <div class="chartbox"><canvas id="pie-digid" width="220" height="220"></canvas></div>
-
-          <div class="rightcol">
+          <div class="leftcol">
+            <div class="chartbox"><canvas id="pie-digid" width="240" height="240"></canvas></div>
             <a class="btn" href="./digital-id/" aria-label="Open Digital ID map">View Live Map</a>
+          </div>
+          <div class="rightcol">
             <div class="stats" id="stats-digid">
               <div class="stat clickable" data-pop="digid-imp-pop"><span class="lbl">Implemented</span><span class="k" id="digid-imp">—</span></div>
               <div class="stat clickable" data-pop="digid-dev-pop"><span class="lbl">In development</span><span class="k" id="digid-dev">—</span></div>
@@ -124,10 +127,11 @@
         <span class="live" id="pill-cbdc">Loading…</span>
         <h2>Central Bank Digital Currency (CBDC) Updates</h2>
         <div class="tile-body">
-          <div class="chartbox"><canvas id="pie-cbdc" width="220" height="220"></canvas></div>
-
-          <div class="rightcol">
+          <div class="leftcol">
+            <div class="chartbox"><canvas id="pie-cbdc" width="240" height="240"></canvas></div>
             <a class="btn" href="./cbdc/" aria-label="Open CBDC map">View Live Map</a>
+          </div>
+          <div class="rightcol">
             <div class="stats" id="stats-cbdc">
               <div class="stat clickable" data-pop="cbdc-imp-pop"><span class="lbl">Implemented</span><span class="k" id="cbdc-imp">—</span></div>
               <div class="stat clickable" data-pop="cbdc-dev-pop"><span class="lbl">In development</span><span class="k" id="cbdc-dev">—</span></div>
@@ -145,10 +149,11 @@
         <span class="live" id="pill-scs">Loading…</span>
         <h2>Social Credit System Updates</h2>
         <div class="tile-body">
-          <div class="chartbox"><canvas id="pie-scs" width="220" height="220"></canvas></div>
-
-          <div class="rightcol">
+          <div class="leftcol">
+            <div class="chartbox"><canvas id="pie-scs" width="240" height="240"></canvas></div>
             <a class="btn" href="./social-credit-system/" aria-label="Open Social Credit map">View Live Map</a>
+          </div>
+          <div class="rightcol">
             <div class="stats" id="stats-scs">
               <div class="stat clickable" data-pop="scs-imp-pop"><span class="lbl">Implemented</span><span class="k" id="scs-imp">—</span></div>
               <div class="stat clickable" data-pop="scs-dev-pop"><span class="lbl">In development</span><span class="k" id="scs-dev">—</span></div>
@@ -212,7 +217,7 @@
           plugins:{
             legend:{display:false},
             datalabels:{
-              color:'#04130c', font:{weight:'700', size:11},
+              color:'#04130c', font:{weight:'700', size:12},
               formatter:(v,ctx)=>{ const ds=ctx.chart.data.datasets[0].data; const tot=Math.max(1,ds[0]+ds[1]); return `${v}\n${Math.round(v/tot*100)}%`; }
             },
             tooltip:{enabled:false}
@@ -242,7 +247,7 @@
         applyTile('scs',   bucketize(scs));
       });
 
-    // Toggle in-card pop lists (never overflow tile)
+    // Toggle in-card pop lists
     function closeAll(){ document.querySelectorAll('.pop').forEach(p=>p.style.display='none'); }
     document.addEventListener('click', (e)=>{
       if(e.target.matches('[data-close]')){ closeAll(); return; }
@@ -250,7 +255,6 @@
       if(stat && stat.dataset.pop){
         const pop = document.getElementById(stat.dataset.pop);
         if(!pop) return;
-        // Move the pop right under the clicked stat inside the same stats container
         stat.parentElement.appendChild(pop);
         pop.style.display = (pop.style.display==='block') ? 'none' : 'block';
       }else if(!e.target.closest('.pop')){ closeAll(); }
