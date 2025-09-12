@@ -398,8 +398,13 @@
       noWrap:true, bounds:[[-85,-180],[85,180]]
     }).addTo(map);
 
-    /* Dots must render above polygons/hit-layer */
-    const dotsRenderer = L.canvas({ pane: 'markerPane' });
+    /* NEW: a dedicated pane for dots above polygons/hit layer */
+    map.createPane('dotsPane');
+    // Put it above markerPane (600) but below tooltip (650) / popup (700)
+    map.getPane('dotsPane').style.zIndex = 610;
+
+    /* Dots renderer bound to that pane */
+    const dotsRenderer = L.canvas({ pane: 'dotsPane' });
 
     /* Layers */
     const dotsImpLayer = L.layerGroup().addTo(map);
@@ -521,7 +526,7 @@
         if (props.ADMIN) return props.ADMIN;
         if (props.NAME_EN) return props.NAME_EN;
         if (props.NAME) return props.NAME;
-        if (props.name && typeof props.name === 'object' && typeof props.name.common === 'string') return props.name.common;
+        if (props.name && typeof props.name.common === 'string') return props.name.common;
         if (props.SOVEREIGNT) return props.SOVEREIGNT;
         for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
         return null;
@@ -764,7 +769,7 @@
         const color = e.isImplemented ? red : orange;
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
-        /* CRITICAL: force draw above polygons */
+        /* Draw on our dedicated canvas pane (always above polygons) */
         L.circleMarker([e.lat, e.lng], {
           renderer: dotsRenderer,
           radius: 6.5,
