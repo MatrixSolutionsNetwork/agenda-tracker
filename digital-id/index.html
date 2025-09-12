@@ -41,19 +41,9 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
+      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-    /* Grid shell keeps the brand *truly centered* even with content on the right */
-    #topbarInner{
-      display:grid;
-      grid-template-columns: 1fr auto 1fr; /* left spacer | brand | right buttons */
-      align-items:center;
-      gap:16px;
-      max-width:1200px;
-      margin:0 auto;
-    }
-
-    /* Center brand block */
-    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; grid-column:2;}
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
     #pageTitle{color:#fff}
@@ -61,24 +51,19 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Stacked nav buttons to the immediate right of the centered brand */
-    .nav-stack{
-      grid-column:3;
-      justify-self:start;        /* sit next to the center block, not flush right */
+    /* NAV buttons (right side, stacked) */
+    #navStack{
+      position:absolute; right:16px; top:10px;
       display:flex; flex-direction:column; gap:8px;
-      margin-left:24px;          /* a little extra space from the brand block */
+      align-items:flex-end;
     }
     .nav-btn{
-      display:inline-block; text-decoration:none;
-      padding:6px 10px; font-weight:700; letter-spacing:.3px; font-size:13px;
-      color:#ffffff;                          /* white text as requested */
-      background:#062015; border:1px solid #1b5a3e; border-radius:10px;
-      white-space:nowrap;
+      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
+      padding:6px 10px; border-radius:10px; text-decoration:none;
+      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
     }
-    .nav-btn:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
-    .nav-btn.active{
-      background:var(--matrix); color:#082016; border-color:#28e39c; /* selected page (Digital ID) */
-    }
+    /* Active page indicator: underline text inside the button */
+    .nav-btn.active > span{ text-decoration: underline; text-underline-offset: 2px; }
 
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
@@ -87,8 +72,8 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Brighten labels-only tiles (country names) — target the correct pane */
-    .leaflet-pane.labelsPane img { filter: brightness(1.6) contrast(1.25); }
+    /* Brighten labels-only tiles (country names) */
+    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
     /* Popup / tooltip */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
@@ -97,35 +82,25 @@
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
-
-    /* Small screens: keep buttons tidy */
-    @media (max-width: 720px){
-      .nav-stack{ margin-left:12px; gap:6px; }
-      .nav-btn{ font-size:12px; padding:6px 9px; }
-    }
   </style>
 </head>
 <body>
   <div id="topbar">
-    <div id="topbarInner">
-      <div></div> <!-- left spacer to preserve true centering -->
-
-      <div id="brandWrap">
-        <div class="msn">Matrix Solutions Network</div>
-        <div id="rowStatus">
-          <span id="pageTitle">Digital ID Status</span>
-          <span class="live">LIVE</span>
-        </div>
-        <div class="updated" id="updatedTop">Updated: …</div>
-        <div class="inline-hint">• Click any dot or country for details</div>
+    <div id="brandWrap">
+      <div class="msn">Matrix Solutions Network</div>
+      <div id="rowStatus">
+        <span id="pageTitle">Digital ID Status</span>
+        <span class="live">LIVE</span>
       </div>
+      <div class="updated" id="updatedTop">Updated: …</div>
+      <div class="inline-hint">• Click any dot or country for details</div>
+    </div>
 
-      <!-- Stacked buttons just to the right of the centered title -->
-      <nav class="nav-stack" aria-label="Other trackers">
-        <a class="nav-btn active" href="#">Digital ID</a>
-        <a class="nav-btn" href="../cbdc/">CBDC Tracker</a>
-        <a class="nav-btn" href="../social-credit-system/">Social Credit Tracker</a>
-      </nav>
+    <!-- Stacked nav buttons on the right -->
+    <div id="navStack" aria-label="Other trackers">
+      <a class="nav-btn active" href="#" aria-current="page"><span>Digital ID</span></a>
+      <a class="nav-btn" href="../cbdc/"><span>CBDC Tracker</span></a>
+      <a class="nav-btn" href="../social-credit-system/"><span>Social Credit Tracker</span></a>
     </div>
   </div>
 
@@ -136,7 +111,7 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Local sample fallback (keeps map alive if fetch is blocked)
+    // Embedded fallback rows so the page still renders if CSV fetch is blocked
     const FALLBACK_CSV = `Title,Status,Description,Year,Countries
 National eID,Implemented,Live national digital identity,2023,United Kingdom
 Digital ID Pilot,In development,Phase 2 pilot,2025,United States
@@ -171,8 +146,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       ["chile",[-35.6751,-71.5430]],["mauritius",[-20.2,57.5]],["spain",[40.4168,-3.7038]],
       ["italy",[42.5,12.5]],["denmark",[56.2639,9.5019]],["united kingdom",[52.3555,-1.1743]],
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],
-      ["malaysia",[4.2105,101.9758]]
+      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],["malaysia",[4.2105,101.9758]]
     ]);
 
     function normalizeCountry(s){
@@ -196,15 +170,40 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
     map.getPane('labelsPane').style.pointerEvents = 'none';
 
-    // base tiles (no labels)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
+    // --- Robust basemap with fallbacks to avoid "green map" ---
+    let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // labels-only overlay
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
+    let labelsOnly = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
       subdomains:'abcd', maxZoom:8, pane:'labelsPane'
     }).addTo(map);
+
+    function installTileFallback(primary, overlay){
+      let switched = false;
+      function switchToFallback(){
+        if (switched) return; switched = true;
+        console.warn('Basemap error — switching to fallback tiles.');
+        if (map.hasLayer(primary)) map.removeLayer(primary);
+        if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
+        const fallback = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
+          subdomains:'abcd', maxZoom:8, attribution:'&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+        // second-level fallback (OSM) if Carto dark_all fails too
+        let switched2 = false;
+        fallback.on('tileerror', () => {
+          if (switched2) return; switched2 = true;
+          console.warn('Fallback dark_all failed — switching to plain OSM.');
+          if (map.hasLayer(fallback)) map.removeLayer(fallback);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+            maxZoom:8, attribution:'&copy; OpenStreetMap contributors'
+          }).addTo(map);
+        });
+      }
+      primary.on('tileerror', switchToFallback);
+      if (overlay) overlay.on('tileerror', switchToFallback);
+    }
+    installTileFallback(baseNoLabels, labelsOnly);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
 
@@ -245,6 +244,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
+    // fetch CSV with timeout + embedded fallback
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
         const ctrl = new AbortController();
@@ -326,7 +326,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
-          const alt=key.replace(/^(republic|kingdom)\sof\s/,'' ).trim();
+          const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
           const pt=centroidByKey[key]||centroidByKey[alt];
           if(!pt) continue;
           const isImplemented=/implement/i.test(status);
@@ -337,27 +337,31 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       drawAll(); // dots, lines, shading
 
-      // sanity tests
+      // sanity checks
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
 
     function drawAll(){
+      // Clear
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
 
       const red=getCSS('--red'), orange=getCSS('--orange');
 
+      // Deduplicate per country; prefer implemented if both exist
       const bestByKey=new Map();
       for(const e of entries){
         const prev=bestByKey.get(e.key);
         if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
 
+      // Separate lists for lines
       const impPts=[], devPts=[];
       const implementedShown = new Set();
 
+      // Draw dots
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
@@ -371,6 +375,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         else               { devPts.push([e.lat,e.lng]); }
       }
 
+      // Shade implemented countries that have dots
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -381,6 +386,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         });
       }
 
+      // Local networks: connect to K=3 nearest neighbors
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
