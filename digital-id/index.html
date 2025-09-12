@@ -77,7 +77,7 @@
     .updated{ color:#ffffff; opacity:.9 }
     .inline-hint{ opacity:.85 }
 
-    /* Burger button (unchanged behavior) */
+    /* Burger button */
     #burgerMenu{
       width:40px; height:40px; border-radius:10px; margin-left:10px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
@@ -118,7 +118,6 @@
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
     .leaflet-popup-content h3{ color:var(--countryText) !important; }
 
-    /* Make the whole-country hit layer obviously clickable on hover (desktop) */
     .country-hit { cursor:pointer; }
   </style>
 </head>
@@ -138,7 +137,7 @@
         <!-- Updated then hint, stacked -->
         <div id="metaCol">
           <div class="updated" id="updatedTop">Updated: …</div>
-          <div class="inline-hint">• Click any dot for details</div>
+          <div class="inline-hint">• Click any dot or country for details</div>
         </div>
       </div>
 
@@ -210,26 +209,34 @@
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){
+      const n = parseInt(hex.replace('#',''),16);
+      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
+    }
 
     /* ========= MAP ========= */
-    const map = L.map('map', {
-      zoomControl:true,
-      preferCanvas:true
-    }).setView([20,0], 2);
+    // Use preferCanvas so dots are fast; we will force SVG for the country hit layer explicitly.
+    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
 
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // Dots live on markerPane so they render above polygons and remain clickable
+    // Dots live on Canvas in markerPane (always above polygons)
     const dotsRenderer = L.canvas({ pane: 'markerPane', padding: 0.3 });
+
+    // Force SVG for polygon hit layer in overlayPane (so it never conflicts with dots)
+    const hitRenderer = L.svg({ pane: 'overlayPane' });
 
     // Layers
     let outlineLayer = null;
-    let hitLayer = null;       // NEW: whole-country click/tap layer
+    let hitLayer = null;
 
-    // Data/state
-    let mapReady=false, dataReady=false, worldGeo=null;
+    // State
+    let worldGeo = null;
     let centroidByKey = {};
     let entries = [];
 
@@ -273,65 +280,37 @@
                 ${list}
               </div>`;
     }
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){
-      const n = parseInt(hex.replace('#',''),16);
-      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
-      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
-    }
     function* groupByCountry(arr){
-      const map = new Map();
-      for (const e of arr){
-        if (!map.has(e.key)) map.set(e.key, []);
-        map.get(e.key).push(e);
-      }
-      for (const [k,v] of map) yield [k,v];
+      const m = new Map();
+      for (const e of arr){ if (!m.has(e.key)) m.set(e.key, []); m.get(e.key).push(e); }
+      for (const [k,v] of m) yield [k,v];
     }
     function forceDotsRedraw(){
-      map.invalidateSize(); map.fire('zoomend'); map.fire('moveend');
+      map.invalidateSize();
+      map.fire('zoomend'); map.fire('moveend');
       requestAnimationFrame(()=> map.invalidateSize());
     }
 
-    // Open popup by country key (used by hit layer and marker clicks)
-    function openCountryPopup(countryKey){
-      if (!countryKey) return;
-      const rows = entries.filter(e=>e.key===countryKey);
-      const pt = centroidByKey[countryKey];
-      const html = rows.length ? popupHTML(rows[0].country, rows)
-                               : `<div style="min-width:240px; color:#fff;">No record in dataset.</div>`;
-      if (!pt) return;
-      L.popup({autoClose:true, closeOnClick:true})
-        .setLatLng(pt)
-        .setContent(html)
-        .openOn(map);
-    }
-
-    /* ===== Ready gates ===== */
-    tiles.once('load', ()=>{ mapReady = true; maybeStart(); });
-    map.whenReady(()=>{ mapReady = true; maybeStart(); });
-    function maybeStart(){ if (mapReady && dataReady && worldGeo) firstDraw(); }
-
-    /* ===== Load polygons (world) ===== */
-    (async function loadWorld(){
+    /* ===== Data loaders ===== */
+    async function loadWorld(){
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
         'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
       ];
-      let lastErr=null;
+      let geo=null;
       for (const src of SOURCES){
         try{
           const r=await fetch(src,{cache:'default',mode:'cors'}); if(!r.ok) throw new Error(`HTTP ${r.status}`);
           const j=await r.json(); if(!j || !j.features || j.features.length<100) throw new Error('Bad geojson');
-          worldGeo=j; break;
-        }catch(e){ lastErr=e; }
+          geo=j; break;
+        }catch(e){}
       }
-      if(!worldGeo){ console.error('Failed to load world polygons', lastErr); return; }
+      if(!geo) throw new Error('World polygons failed to load');
 
-      // Build centroid lookup
+      // Build centroid lookup + annotate features with _key
       centroidByKey = {};
-      L.geoJSON(worldGeo).eachLayer(l=>{
+      L.geoJSON(geo).eachLayer(l=>{
         let nmRaw = (l.feature && l.feature.properties) ? (
           l.feature.properties.name || l.feature.properties.NAME || l.feature.properties.NAME_EN || l.feature.properties.ADMIN || l.feature.properties.SOVEREIGNT
         ) : null;
@@ -343,30 +322,24 @@
         } else {
           centroidByKey[nm] = centroidInside(l.feature);
         }
-        l.feature.properties._key = nm; // used by hit layer
+        if (l.feature && l.feature.properties) l.feature.properties._key = nm;
       });
 
-      maybeStart();
-    })();
+      return geo;
+    }
 
-    /* ===== Load sheet ===== */
-    (async function loadSheet(){
-      let rawRows;
-      try{
-        const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
-        if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
-        const dateHdr = res.headers.get('Date') || '';
-        document.getElementById('updatedTop').textContent = 'Updated: ' + (dateHdr || new Date().toUTCString());
+    async function loadSheet(){
+      const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
+      if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+      const dateHdr = res.headers.get('Date') || '';
+      document.getElementById('updatedTop').textContent = 'Updated: ' + (dateHdr || new Date().toUTCString());
 
-        const text = await res.text();
-        const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
-        rawRows = parsed.data;
-      }catch(e){
-        console.error('Failed to load/parse CSV.', e); return;
-      }
+      const text = await res.text();
+      const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
+      const rawRows = parsed.data;
 
-      entries = [];
-      let unmatched = new Set();
+      const out=[];
+      const unmatched = new Set();
 
       function pickYear(row){
         const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
@@ -387,37 +360,43 @@
 
         for (const raw of splitCountries(countriesCell)){
           const key = normalizeCountry(raw);
-          let pt = centroidByKey[key];
-          if (!pt){
-            const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
-            pt = centroidByKey[alt];
-          }
+          const pt = centroidByKey[key] || centroidByKey[key.replace(/^(republic|kingdom)\sof\s/,'').trim()];
           if (!pt){ unmatched.add(raw); continue; }
 
           const isImplemented = /implement/i.test(status);
           const isDev = /develop|discussion|pilot|trial|poc|concept/i.test(status);
 
-          entries.push({
+          out.push({
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
             status, isImplemented, isDev, title, notes, year: yr
           });
         }
       }
 
-      if (unmatched.size){
-        console.warn("Unmatched country tokens:", [...unmatched].sort());
+      if (unmatched.size) console.warn("Unmatched country tokens:", [...unmatched].sort());
+      return out;
+    }
+
+    /* ===== Init ===== */
+    map.whenReady(async ()=>{
+      try{
+        const [geo, rows] = await Promise.all([loadWorld(), loadSheet()]);
+        worldGeo = geo;
+        entries = rows;
+        drawAll();
+      }catch(e){
+        console.error(e);
       }
+    });
 
-      dataReady = true;
-      maybeStart();
-    })();
-
-    /* ===== First draw ===== */
-    function firstDraw(){
+    function drawAll(){
+      // Outline layer
       if (outlineLayer) outlineLayer.remove();
-      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
+      outlineLayer = L.geoJSON(worldGeo, {
+        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
+      }).addTo(map);
 
-      // Build dots (markers on markerPane)
+      // Dots
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey];
         if (!pt) continue;
@@ -426,7 +405,7 @@
         const color = isImplemented ? getCSS('--red') : getCSS('--orange');
 
         const m = L.circleMarker([pt.lat, pt.lng], {
-          renderer: dotsRenderer,
+          renderer: dotsRenderer,  /* Canvas on markerPane */
           radius: 6.5,
           color: darken(color,30),
           weight: 1.2,
@@ -440,29 +419,43 @@
         if (m.bringToFront) m.bringToFront();
       }
 
-      /* Transparent (but clickable) whole-country layer
-         - Lives on overlayPane (below markerPane) so dots stay clickable
-         - Tiny fillOpacity ensures reliable hit-testing across browsers
-      */
+      // Country hit layer (SVG on overlayPane)
       if (hitLayer) hitLayer.remove();
       hitLayer = L.geoJSON(worldGeo, {
+        renderer: hitRenderer,
         pane: 'overlayPane',
-        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.01 },
+        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.012, fillColor:'#000' }, // tiny fill for reliable hit-test
         interactive: true,
         onEachFeature: (f, layer) => {
           const key = (f.properties && f.properties._key) || '';
-          layer._countryKey = key;
           layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
           layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-          layer.on('click', () => openCountryPopup(key));
-          layer.setStyle({ className: 'country-hit' });
+          layer.on('click',     () => openCountryPopup(key));
+          if (layer.getElement) { // add hover cursor
+            const el = layer.getElement();
+            if (el) el.classList.add('country-hit');
+          }
         }
       }).addTo(map);
 
-      /* ensure canvases paint on first load across browsers */
-      forceDotsRedraw();
-      setTimeout(forceDotsRedraw, 0);
+      // Nudge first paint across browsers
+      map.once('idle', () => { forceDotsRedraw(); });
       requestAnimationFrame(forceDotsRedraw);
+      setTimeout(forceDotsRedraw, 0);
+    }
+
+    // Open popup by country key (used by both dots and hit layer)
+    function openCountryPopup(countryKey){
+      if (!countryKey) return;
+      const rows = entries.filter(e=>e.key===countryKey);
+      const pt = centroidByKey[countryKey];
+      if (!pt) return;
+      const html = rows.length ? popupHTML(rows[0].country, rows)
+                               : `<div style="min-width:240px; color:#fff;">No record in dataset.</div>`;
+      L.popup({autoClose:true, closeOnClick:true})
+        .setLatLng(pt)
+        .setContent(html)
+        .openOn(map);
     }
   </script>
 </body>
