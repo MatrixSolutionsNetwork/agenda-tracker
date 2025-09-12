@@ -28,6 +28,7 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
+      --countryText:#dfffe9;  /* slightly brighter than default, not pure white */
       --barPadY:16px;
       --barPadX:16px;
       --dynBarH: 92px; /* updated in JS */
@@ -43,10 +44,10 @@
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
-      background:linear-gradient(180deg,rgba(10,30,20,.70),rgba(8,22,16,.86)); /* more see-through */
+      background:linear-gradient(180deg,rgba(10,30,20,.70),rgba(8,22,16,.86));
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
-      backdrop-filter: blur(3px); /* subtle glass */
+      backdrop-filter: blur(3px);
       display:flex; flex-direction:column; align-items:center; gap:8px;
     }
 
@@ -58,14 +59,10 @@
       display:flex; flex-direction:column; align-items:center; gap:6px;
       text-align:center;
     }
-    #brandText .msn{
-      color:var(--matrix);
-    }
+    #brandText .msn{ color:var(--matrix); }
 
     /* "Digital ID Status" with LIVE to its right */
-    #statusRow{
-      display:flex; align-items:center; gap:8px; /* LIVE a few px to the right */
-    }
+    #statusRow{ display:flex; align-items:center; gap:8px; }
     #pageTitle{ color:#ffffff }
     .live{
       font-size:11px; color:#ffffff; background:var(--red);
@@ -86,9 +83,7 @@
       background:#062015; border:1px solid #1b5a3e; color:#fff;
       font-size:18px; font-weight:800; cursor:pointer;
     }
-
     @media (max-width: 720px){
-      /* Burger visible and fixed bottom-right on mobile (unchanged) */
       #burgerMenu{
         position:fixed; right:12px; bottom:12px; z-index:1150;
         width:48px; height:48px; border-radius:12px; margin-left:0;
@@ -98,7 +93,7 @@
     /* ===== BURGER DROPDOWN ===== */
     #mobileMenu{
       position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
-      background:rgba(11,30,22,.92); /* slight transparency to match header */
+      background:rgba(11,30,22,.92);
       border:1px solid #144832; border-radius:12px;
       padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
       backdrop-filter: blur(2px);
@@ -117,10 +112,14 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Popup & tooltip styles (country text white) */
+    /* Popup & tooltip styles (country text slightly brighter) */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
-    .leaflet-tooltip{background:#0a1c14;color:#ffffff;border:1px solid #174d35;} /* country text white */
+    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
+    .leaflet-popup-content h3{ color:var(--countryText) !important; }
+
+    /* Make the whole-country hit layer obviously clickable on hover (desktop) */
+    .country-hit { cursor:pointer; }
   </style>
 </head>
 <body>
@@ -213,19 +212,21 @@
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
 
     /* ========= MAP ========= */
-    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
+    const map = L.map('map', {
+      zoomControl:true,
+      preferCanvas:true
+    }).setView([20,0], 2);
+
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // IMPORTANT: dots rendered on the markerPane via Canvas so they sit above everything
+    // Dots live on markerPane so they render above polygons and remain clickable
     const dotsRenderer = L.canvas({ pane: 'markerPane', padding: 0.3 });
 
-    // Light country outlines (no fill)
+    // Layers
     let outlineLayer = null;
-
-    // NEW: transparent hit layer for whole-country tap/click
-    let hitLayer = null; /* HIT LAYER */
+    let hitLayer = null;       // NEW: whole-country click/tap layer
 
     // Data/state
     let mapReady=false, dataReady=false, worldGeo=null;
@@ -268,7 +269,7 @@
         return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
       }).join('');
       return `<div style="min-width:240px">
-                <h3 style="margin:0 0 6px 0; font-size:16px; color:#fff;">${escapeHtml(country)}</h3> <!-- country text white -->
+                <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>
                 ${list}
               </div>`;
     }
@@ -292,14 +293,14 @@
       requestAnimationFrame(()=> map.invalidateSize());
     }
 
-    // Open popup by country key (used by hit layer)
+    // Open popup by country key (used by hit layer and marker clicks)
     function openCountryPopup(countryKey){
       if (!countryKey) return;
       const rows = entries.filter(e=>e.key===countryKey);
       const pt = centroidByKey[countryKey];
-      if (!pt) return;
       const html = rows.length ? popupHTML(rows[0].country, rows)
                                : `<div style="min-width:240px; color:#fff;">No record in dataset.</div>`;
+      if (!pt) return;
       L.popup({autoClose:true, closeOnClick:true})
         .setLatLng(pt)
         .setContent(html)
@@ -309,10 +310,7 @@
     /* ===== Ready gates ===== */
     tiles.once('load', ()=>{ mapReady = true; maybeStart(); });
     map.whenReady(()=>{ mapReady = true; maybeStart(); });
-
-    function maybeStart(){
-      if (mapReady && dataReady && worldGeo) firstDraw();
-    }
+    function maybeStart(){ if (mapReady && dataReady && worldGeo) firstDraw(); }
 
     /* ===== Load polygons (world) ===== */
     (async function loadWorld(){
@@ -331,7 +329,7 @@
       }
       if(!worldGeo){ console.error('Failed to load world polygons', lastErr); return; }
 
-      // Build centroid lookup (centerOfMass + overrides)
+      // Build centroid lookup
       centroidByKey = {};
       L.geoJSON(worldGeo).eachLayer(l=>{
         let nmRaw = (l.feature && l.feature.properties) ? (
@@ -419,44 +417,45 @@
       if (outlineLayer) outlineLayer.remove();
       outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
-      // Build dots (markers stay on markerPane so they receive clicks even with hit layer)
+      // Build dots (markers on markerPane)
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey];
         if (!pt) continue;
 
-        // prefer implemented color if any implemented
         const isImplemented = rows.some(r=>r.isImplemented);
         const color = isImplemented ? getCSS('--red') : getCSS('--orange');
 
         const m = L.circleMarker([pt.lat, pt.lng], {
-          renderer: dotsRenderer,  /* CRITICAL for first-load visibility */
+          renderer: dotsRenderer,
           radius: 6.5,
           color: darken(color,30),
           weight: 1.2,
           fillColor: color,
           fillOpacity: 0.95
         })
-        .bindTooltip(`${rows[0].country}`, {direction:'top', offset:[0,-6]}) /* country text white via CSS */
-        .on('click', ()=> {
-          L.popup({autoClose:true, closeOnClick:true})
-            .setLatLng(pt)
-            .setContent(popupHTML(rows[0].country, rows))
-            .openOn(map);
-        })
+        .bindTooltip(`${rows[0].country}`, {direction:'top', offset:[0,-6]})
+        .on('click', ()=> openCountryPopup(countryKey))
         .addTo(map);
 
         if (m.bringToFront) m.bringToFront();
       }
 
-      /* Transparent hit layer for whole-country tap/click (mobile-friendly) */
+      /* Transparent (but clickable) whole-country layer
+         - Lives on overlayPane (below markerPane) so dots stay clickable
+         - Tiny fillOpacity ensures reliable hit-testing across browsers
+      */
       if (hitLayer) hitLayer.remove();
       hitLayer = L.geoJSON(worldGeo, {
-        style: { color:'#0000', weight:0, fillOpacity:0 },    // invisible by default
+        pane: 'overlayPane',
+        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.01 },
+        interactive: true,
         onEachFeature: (f, layer) => {
+          const key = (f.properties && f.properties._key) || '';
+          layer._countryKey = key;
           layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
           layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-          layer.on('click', () => openCountryPopup((f.properties && f.properties._key) || ''));
-          // touchstart also handled by Leaflet's click normalization; no extra needed
+          layer.on('click', () => openCountryPopup(key));
+          layer.setStyle({ className: 'country-hit' });
         }
       }).addTo(map);
 
