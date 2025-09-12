@@ -15,10 +15,6 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-
   <!-- Turf -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
@@ -43,40 +39,48 @@
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== TOP BAR ===== */
+    /* ===== TOP BAR (slightly transparent) ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
-      background:linear-gradient(180deg,rgba(10,30,20,.86),rgba(8,22,16,.98));
-      border-bottom:1px solid var(--panelEdge);
+      background:linear-gradient(180deg,rgba(10,30,20,.70),rgba(8,22,16,.86)); /* more see-through */
+      border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
-      backdrop-filter: blur(2px);
+      backdrop-filter: blur(3px); /* subtle glass */
       display:flex; flex-direction:column; align-items:center; gap:8px;
     }
 
-    /* Brand row: stack title lines; burger sits to the right on desktop */
+    /* Brand row with stacked lines; burger sits to the right on desktop */
     #brandRow{
       display:flex; align-items:center; gap:10px; white-space:nowrap;
     }
     #brandText{
-      display:flex; flex-direction:column; align-items:center; gap:4px;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
       text-align:center;
     }
-    #brandText .msn{ color:var(--matrix) }
+    #brandText .msn{
+      color:var(--matrix);
+    }
+
+    /* "Digital ID Status" with LIVE to its right */
+    #statusRow{
+      display:flex; align-items:center; gap:8px; /* LIVE a few px to the right */
+    }
     #pageTitle{ color:#ffffff }
     .live{
       font-size:11px; color:#ffffff; background:var(--red);
-      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; margin-top:4px;
+      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b;
     }
 
-    #subRow{
-      display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;
+    /* Updated + hint stacked beneath */
+    #metaCol{
+      display:flex; flex-direction:column; align-items:center; gap:4px;
       font-size:12px;
     }
     .updated{ color:#ffffff; opacity:.9 }
     .inline-hint{ opacity:.85 }
 
-    /* Burger button lives inside the row (to the right of the text on desktop) */
+    /* Burger button (unchanged behavior) */
     #burgerMenu{
       width:40px; height:40px; border-radius:10px; margin-left:10px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
@@ -84,7 +88,7 @@
     }
 
     @media (max-width: 720px){
-      /* Still stacked; burger visible on mobile (fixed bottom-right) */
+      /* Burger visible and fixed bottom-right on mobile (unchanged) */
       #burgerMenu{
         position:fixed; right:12px; bottom:12px; z-index:1150;
         width:48px; height:48px; border-radius:12px; margin-left:0;
@@ -94,8 +98,10 @@
     /* ===== BURGER DROPDOWN ===== */
     #mobileMenu{
       position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
-      background:#0b1e16; border:1px solid #144832; border-radius:12px;
+      background:rgba(11,30,22,.92); /* slight transparency to match header */
+      border:1px solid #144832; border-radius:12px;
       padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
+      backdrop-filter: blur(2px);
     }
     #mobileMenu a{ display:block; margin:6px 0; text-decoration:none; }
     .btn{
@@ -111,49 +117,6 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* ===== STATS CHIP ===== */
-    #statsChip{
-      position:absolute; left:50%; transform:translateX(-50%);
-      top:calc(var(--dynBarH) + 10px);
-      z-index:1002;
-      display:inline-flex; align-items:center; gap:10px;
-      background:var(--chip); border:1px solid var(--chipEdge); color:var(--text);
-      border-radius:999px; padding:9px 12px; cursor:pointer;
-      font-weight:700; font-size:13px;
-      box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
-    }
-    @media (max-width:420px){ #statsChip{ font-size:12px; padding:8px 10px; } }
-
-    /* ===== DRAWER (OVERVIEW) ===== */
-    #drawer{
-      position:absolute; left:12px; right:12px;
-      top:calc(var(--dynBarH) + 56px); bottom:16px;
-      z-index:1110;
-      width:auto; max-width:720px; margin:0 auto;
-      background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
-      border:1px solid var(--panelEdge); border-radius:12px;
-      padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
-      backdrop-filter: blur(1px);
-      color:#ffffff; overflow:auto;
-    }
-    #drawer.open{ display:block }
-    .drawer-head{ display:flex; align-items:center; gap:8px; margin-bottom:4px; }
-    .drawer-title{ flex:1; text-align:center; font-weight:800; letter-spacing:.4px; }
-    .icon-btn{
-      width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
-      background:#062015; color:#ffffff; font-size:14px; line-height:24px;
-      display:inline-flex; align-items:center; justify-content:center;
-      cursor:pointer; padding:0; font-weight:800;
-    }
-
-    /* Minimal contents */
-    .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
-    .sw{width:12px;height:12px;border-radius:50%}
-    .count{margin-left:auto;color:#ffffff;font-weight:700}
-    .hint{font-size:12px;color:#ffffff;opacity:.8}
-    .hr{border:none;border-top:1px solid #0f3524;margin:8px 0}
-    .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#ffffff;display:none}
-
     /* Popup style */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
@@ -166,15 +129,22 @@
     <div id="brandRow">
       <div id="brandText">
         <span class="msn">Matrix Solutions Network</span>
-        <span id="pageTitle">Digital ID Status</span>
-        <span class="live" id="livePill">LIVE</span>
+
+        <!-- Status line with LIVE just to the right -->
+        <div id="statusRow">
+          <span id="pageTitle">Digital ID Status</span>
+          <span class="live" id="livePill">LIVE</span>
+        </div>
+
+        <!-- Updated then hint, stacked -->
+        <div id="metaCol">
+          <div class="updated" id="updatedTop">Updated: …</div>
+          <div class="inline-hint">• Click any dot for details</div>
+        </div>
       </div>
-      <!-- Burger sits right of the text on desktop -->
+
+      <!-- Burger sits to the right of the text on desktop -->
       <button id="burgerMenu" aria-label="Open menu">≡</button>
-    </div>
-    <div id="subRow">
-      <div class="inline-hint">• Click any dot for details</div>
-      <div class="updated" id="updatedTop">Updated: …</div>
     </div>
   </div>
 
@@ -189,35 +159,6 @@
 
   <!-- MAP -->
   <div id="map" aria-label="Digital ID world map"></div>
-
-  <!-- STATS CHIP -->
-  <div id="statsChip" aria-label="Open stats panel">
-    <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
-  </div>
-
-  <!-- ===== DRAWER (with pie) ===== -->
-  <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID overview panel">
-    <div class="drawer-head">
-      <div style="width:26px;height:26px;"></div>
-      <div class="drawer-title">OVERVIEW</div>
-      <div style="display:flex;gap:6px;">
-        <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
-        <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
-      </div>
-    </div>
-
-    <!-- Pie chart -->
-    <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
-
-    <!-- Counts -->
-    <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
-    <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
-
-    <div class="hr"></div>
-    <div class="hint">Panel kept minimal per request. Dots are clickable for details.</div>
-
-    <div id="debug" class="debug"></div>
-  </div>
 
   <script>
     /* ========= CONFIG ========= */
@@ -280,27 +221,19 @@
     // IMPORTANT: dots rendered on the markerPane via Canvas so they sit above everything
     const dotsRenderer = L.canvas({ pane: 'markerPane', padding: 0.3 });
 
-    // Very light country outlines (no fill, so they never cover dots)
+    // Light country outlines (no fill)
     let outlineLayer = null;
 
     // Data/state
     let mapReady=false, dataReady=false, worldGeo=null;
     let centroidByKey = {};
     let entries = [];
-    let impCount = 0, devCount = 0;
-    let pieChart = null;
 
     /* ===== Burger ===== */
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
     burger.addEventListener('click', (e)=>{ e.stopPropagation(); mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block'; });
     document.addEventListener('click', (e)=>{ if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none'; });
-
-    /* ===== Stats chip / drawer ===== */
-    const drawer = document.getElementById('drawer');
-    document.getElementById('statsChip').addEventListener('click', ()=> drawer.classList.add('open'));
-    document.getElementById('drawerClose').addEventListener('click', ()=> drawer.classList.remove('open'));
-    document.getElementById('drawerRefresh').addEventListener('click', ()=> location.reload());
 
     /* ===== Layout: keep map under bar ===== */
     const topbar = document.getElementById('topbar');
@@ -352,38 +285,6 @@
       map.invalidateSize(); map.fire('zoomend'); map.fire('moveend');
       requestAnimationFrame(()=> map.invalidateSize());
     }
-    function drawPie(){
-      const ctx = document.getElementById('statusPie');
-      if (!ctx) return;
-      const total = Math.max(1, impCount + devCount);
-      if (!pieChart){
-        Chart.register(ChartDataLabels);
-        pieChart = new Chart(ctx, {
-          type:'pie',
-          data:{
-            labels:['Implemented','In development'],
-            datasets:[{
-              data:[impCount, devCount],
-              backgroundColor:[getCSS('--red'), getCSS('--orange')],
-              borderColor:'rgba(0,0,0,.45)', borderWidth:1
-            }]
-          },
-          options:{
-            responsive:true,
-            plugins:{
-              legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
-              datalabels:{
-                color:'#0b0f12', font:{weight:'700', size:11},
-                formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
-              }
-            }
-          }
-        });
-      } else {
-        pieChart.data.datasets[0].data = [impCount, devCount];
-        pieChart.update();
-      }
-    }
 
     /* ===== Ready gates ===== */
     tiles.once('load', ()=>{ mapReady = true; maybeStart(); });
@@ -408,7 +309,7 @@
           worldGeo=j; break;
         }catch(e){ lastErr=e; }
       }
-      if(!worldGeo){ showDbg('Failed to load world polygons.'); console.error(lastErr); return; }
+      if(!worldGeo){ console.error('Failed to load world polygons', lastErr); return; }
 
       // Build centroid lookup (centerOfMass + overrides)
       centroidByKey = {};
@@ -443,8 +344,7 @@
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
         rawRows = parsed.data;
       }catch(e){
-        showDbg('Failed to load/parse CSV.');
-        console.error(e); return;
+        console.error('Failed to load/parse CSV.', e); return;
       }
 
       entries = [];
@@ -487,7 +387,7 @@
       }
 
       if (unmatched.size){
-        showDbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
+        console.warn("Unmatched country tokens:", [...unmatched].sort());
       }
 
       dataReady = true;
@@ -499,21 +399,16 @@
       if (outlineLayer) outlineLayer.remove();
       outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
-      impCount = 0; devCount = 0;
-
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey];
         if (!pt) continue;
 
+        // prefer implemented color if any implemented
         const isImplemented = rows.some(r=>r.isImplemented);
-        const isDev = rows.some(r=>r.isDev);
-
-        // if both exist, prefer implemented color
         const color = isImplemented ? getCSS('--red') : getCSS('--orange');
-        if (isImplemented) impCount++; else if (isDev) devCount++;
 
         const m = L.circleMarker([pt.lat, pt.lng], {
-          renderer: dotsRenderer,  // CRITICAL
+          renderer: dotsRenderer,  /* CRITICAL for first-load visibility */
           radius: 6.5,
           color: darken(color,30),
           weight: 1.2,
@@ -532,25 +427,11 @@
         if (m.bringToFront) m.bringToFront();
       }
 
-      document.getElementById('c-imp').textContent = impCount;
-      document.getElementById('c-dev').textContent = devCount;
-
-      drawPie();           // build/update pie
-      forceDotsRedraw();   // paint on first load across browsers
+      /* ensure canvases paint on first load across browsers */
+      forceDotsRedraw();
       setTimeout(forceDotsRedraw, 0);
       requestAnimationFrame(forceDotsRedraw);
     }
-
-    function showDbg(html){
-      const dbg = document.getElementById('debug');
-      dbg.style.display='block';
-      dbg.innerHTML = html;
-    }
-
-    // ESC closes drawer
-    document.addEventListener('keydown', e=>{
-      if (e.key === 'Escape') document.getElementById('drawer').classList.remove('open');
-    });
   </script>
 </body>
 </html>
