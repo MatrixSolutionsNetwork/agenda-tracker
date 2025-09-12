@@ -15,13 +15,8 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-
-  <!-- Geometry helpers -->
+  <!-- Turf for basic centroids -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-  <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
 
   <style>
     :root{
@@ -35,7 +30,7 @@
       --matrix:#21ff9d;
       --barPadY:16px;
       --barPadX:16px;
-      --dynBarH: 92px;
+      --dynBarH: 92px; /* updated in JS */
     }
     html,body{
       height:100%;margin:0;
@@ -78,7 +73,7 @@
     #burgerMenu{
       width:40px; height:40px; border-radius:10px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
-      font-size:18px; font-weight:800;
+      font-size:18px; font-weight:800; cursor:pointer;
     }
 
     @media (max-width: 720px){
@@ -126,7 +121,7 @@
     }
     @media (max-width:420px){ #statsChip{ font-size:12px; padding:8px 10px; } }
 
-    /* ===== DRAWER ===== */
+    /* ===== DRAWER (OVERVIEW) ===== */
     #drawer{
       position:absolute; left:12px; right:12px;
       top:calc(var(--dynBarH) + 56px); bottom:16px;
@@ -147,24 +142,19 @@
       display:inline-flex; align-items:center; justify-content:center;
       cursor:pointer; padding:0; font-weight:800;
     }
+
+    /* Minimal contents */
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:#ffffff;font-weight:700}
-    .hr{border:none;border-top:1px solid #0f3524;margin:8px 0}
     .hint{font-size:12px;color:#ffffff;opacity:.8}
+    .hr{border:none;border-top:1px solid #0f3524;margin:8px 0}
     .debug{margin-top:8px;max-height:120px;overflow:auto;font-size:12px;color:#ffffff;display:none}
+
+    /* Popup style */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
     .leaflet-tooltip{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
-    .textfield, .select, .num {
-      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
-      padding:6px 8px;font:700 13px "Share Tech Mono",ui-monospace; outline:none; width:100%;
-    }
-    .btn-ghost {
-      background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
-      padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
-    }
-    .country-hover { cursor:pointer; }
   </style>
 </head>
 <body>
@@ -204,7 +194,7 @@
     <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
   </div>
 
-  <!-- ===== DRAWER ===== -->
+  <!-- ===== DRAWER (minimal) ===== -->
   <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID overview panel">
     <div class="drawer-head">
       <div style="width:26px;height:26px;"></div>
@@ -214,109 +204,30 @@
         <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
       </div>
     </div>
-
-    <!-- Search -->
-    <div class="row" style="gap:8px;align-items:center;">
-      <input id="searchCountry" class="textfield" list="countryList" placeholder="Search country… (Enter)" />
-      <datalist id="countryList"></datalist>
-      <button id="btnSearch" class="btn-ghost">Go</button>
-    </div>
-
-    <!-- Region (optional; blank = no filter) -->
-    <div class="row" style="gap:8px;align-items:center;">
-      <select id="regionSelect" class="select" title="Region (optional)"></select>
-    </div>
-
-    <!-- Min year (only if present) -->
-    <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
-      <label style="white-space:nowrap;">Min year:</label>
-      <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
-      <span id="yearMinVal" style="width:44px;text-align:right;">Any</span>
-    </div>
-
-    <!-- Pie -->
-    <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
-
-    <!-- Counts -->
+    <!-- Just the counts -->
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
 
     <div class="hr"></div>
-
-    <!-- Dot toggles -->
-    <div class="row" style="gap:12px;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="showImpDots" checked />
-        <span>Show dots — Implemented</span>
-      </label>
-    </div>
-    <div class="row" style="gap:12px;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="showDevDots" checked />
-        <span>Show dots — In development</span>
-      </label>
-    </div>
-
-    <div class="hr"></div>
-
-    <!-- Local networks -->
-    <div class="row" style="gap:12px; align-items:center;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="netImp" checked />
-        <span>Local network — Implemented</span>
-      </label>
-    </div>
-    <div class="row" style="gap:12px; align-items:center;">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
-        <input type="checkbox" id="netDev" />
-        <span>Local network — In development</span>
-      </label>
-    </div>
-    <div class="row" style="gap:8px; align-items:center; font-size:12px;">
-      <label>Neighbors:</label>
-      <input type="number" id="kNeighbors" min="1" max="6" value="4" class="num" style="width:56px;">
-      <span class="hint">(nearest per dot)</span>
-    </div>
-
-    <div class="hr"></div>
-
-    <!-- Export -->
-    <div class="row" style="gap:8px;">
-      <button id="btnExport" class="btn-ghost" title="Download current view as CSV">Export CSV</button>
-      <span class="hint" id="lastUpdated" style="margin-left:auto;">Updated: …</span>
-    </div>
+    <div class="hint">Panel kept minimal per request. Dots are clickable for details.</div>
 
     <div id="debug" class="debug"></div>
   </div>
 
   <script>
-    /* ===== CONFIG: SHEET ===== */
+    /* ========= CONFIG ========= */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
-      if (/\/pubhtml/i.test(u)){
-        const url = new URL(u);
-        url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub");
-        url.searchParams.set("output","csv");
-        if(!url.searchParams.has("single")) url.searchParams.set("single","true");
-        return url.toString();
-      }
-      if (/\/spreadsheets\/d\//i.test(u)){
-        const m = u.match(/\/spreadsheets\/d\/([^/]+)/i);
-        if(m){
-          const id=m[1];
-          const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
-          url.searchParams.set("format","csv");
-          return url.toString();
-        }
-      }
+      if (/\/pubhtml/i.test(u)){ const url = new URL(u); url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single")) url.searchParams.set("single","true"); return url.toString(); }
+      if (/\/spreadsheets\/d\//i.test(u)){ const m = u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
-    /* ===== Aliases & overrides ===== */
+    /* ========= NORMALIZATION ========= */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
@@ -332,30 +243,13 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
     const CENTROID_OVERRIDES = new Map([
-      ["norway",[60.4720, 8.4689]],
-      ["russia",[61.5240, 105.3188]],
-      ["new zealand",[-41.0, 172.0]],
-      ["chile",[-35.6751, -71.5430]],
-      ["mauritius",[-20.2000, 57.5000]],
-      ["spain",[40.4168, -3.7038]],
-      ["italy",[42.5, 12.5]],
-      ["denmark",[56.2639, 9.5019]],
-      ["united kingdom",[52.3555,-1.1743]],
-      ["serbia",[44.0165, 21.0059]],
-      ["united states",[39.8283,-98.5795]],
-      ["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489, -83.7534]],
-      ["japan",[36.2048, 138.2529]]
+      ["norway",[60.4720, 8.4689]], ["russia",[61.5240, 105.3188]], ["new zealand",[-41.0, 172.0]],
+      ["chile",[-35.6751, -71.5430]], ["mauritius",[-20.2000, 57.5000]],
+      ["spain",[40.4168, -3.7038]], ["italy",[42.5, 12.5]], ["denmark",[56.2639, 9.5019]],
+      ["united kingdom",[52.3555,-1.1743]], ["serbia",[44.0165, 21.0059]],
+      ["united states",[39.8283,-98.5795]], ["canada",[56.1304,-106.3468]],
+      ["costa rica",[9.7489, -83.7534]], ["japan",[36.2048, 138.2529]]
     ]);
-
-    /* ===== Helpers ===== */
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){
-      const n = parseInt(hex.replace('#',''),16);
-      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
-      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
-    }
     function normalizeCountry(s){
       const k = String(s||"")
         .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
@@ -371,292 +265,223 @@
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
-    function haversine(a, b){
-      const toRad = d => d * Math.PI/180, R=6371;
-      const dLat=toRad(b[0]-a[0]), dLng=toRad(b[1]-a[1]);
-      const s1=Math.sin(dLat/2)**2 + Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;
-      return 2*R*Math.asin(Math.sqrt(s1));
-    }
-    const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
 
-    /* ===== MAP ===== */
-    const map = L.map('map', {
-      zoomControl:true,
-      preferCanvas:true,
-      worldCopyJump:false,
-      noWrap:true,
-      maxBounds:[[-85,-180],[85,180]],
-      maxBoundsViscosity:1.0
-    }).setView([20,0], 2);
-
-    // Track readiness for the first draw
-    let tilesReady = false;
-    let dataReady  = false;
-
-    const baseTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8,
-      noWrap:true, bounds:[[-85,-180],[85,180]]
+    /* ========= MAP ========= */
+    const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
+    const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // Consider both tile 'load' and map 'whenReady' to be safe across browsers
-    baseTiles.once('load', () => { tilesReady = true; maybeFirstDraw(); });
-    map.whenReady(() => { tilesReady = true; maybeFirstDraw(); });
+    // IMPORTANT: dots rendered on the markerPane via Canvas so they sit above everything
+    const dotsRenderer = L.canvas({ pane: 'markerPane', padding: 0.3 });
 
-    /* ===== PANES ===== */
-    map.createPane('countriesPane'); map.getPane('countriesPane').style.zIndex = 350;
-    map.createPane('linesPane');     map.getPane('linesPane').style.zIndex     = 360;
-    map.createPane('dotsPane');      map.getPane('dotsPane').style.zIndex      = 650;
+    // Very light country outlines (no fill, so they never cover dots)
+    let outlineLayer = null;
 
-    // Canvas renderer bound to dotsPane
-    const dotsRenderer = L.canvas({ pane: 'dotsPane' });
+    // Data/state
+    let mapReady=false, dataReady=false;
+    let centroidByKey = {};
+    let entries = [];
+    let impCount = 0, devCount = 0;
 
-    /* ===== Layers ===== */
-    const dotsImpLayer  = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
-    const dotsDevLayer  = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
-    const linesImpLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
-    const linesDevLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
-
-    let outlineLayer = null;  // countriesPane
-    let shadeLayer   = null;  // countriesPane
-    let hitLayer     = null;  // countriesPane
-
-    /* ===== Burger ===== */
+    // Burger
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
-    burger.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block';
-    });
-    document.addEventListener('click', (e)=>{
-      if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none';
-    });
+    burger.addEventListener('click', (e)=>{ e.stopPropagation(); mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block'; });
+    document.addEventListener('click', (e)=>{ if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none'; });
 
-    /* ===== Stats chip / drawer ===== */
+    // Stats chip / drawer
     const drawer = document.getElementById('drawer');
-    const drawerClose = document.getElementById('drawerClose');
-    const drawerRefresh = document.getElementById('drawerRefresh');
-    const statsChip = document.getElementById('statsChip');
-    const statsChipText = document.getElementById('statsChipText');
-    statsChip.addEventListener('click', ()=> drawer.classList.add('open'));
-    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
-    drawerRefresh.addEventListener('click', ()=> location.reload());
-    function setChipLabel(){
-      statsChipText.textContent = `Digital ID Stats — ${isMobile() ? 'tap' : 'click'} to view`;
+    document.getElementById('statsChip').addEventListener('click', ()=> drawer.classList.add('open'));
+    document.getElementById('drawerClose').addEventListener('click', ()=> drawer.classList.remove('open'));
+    document.getElementById('drawerRefresh').addEventListener('click', ()=> location.reload());
+
+    // Layout: keep map under bar
+    const topbar = document.getElementById('topbar');
+    function placeMap(){
+      const h = topbar.offsetHeight;
+      document.documentElement.style.setProperty('--dynBarH', h+'px');
+      setTimeout(()=> map.invalidateSize(), 0);
     }
-    setChipLabel(); window.addEventListener('resize', setChipLabel); window.addEventListener('orientationchange', setChipLabel);
+    window.addEventListener('load', placeMap);
+    window.addEventListener('resize', placeMap);
+    if (document.fonts) { document.fonts.ready.then(placeMap); }
+    new ResizeObserver(placeMap).observe(topbar);
 
-    /* ===== Data state ===== */
-    let implementedCoords = [];
-    let devCoords = [];
-    let entries = [];
-    let regionMap = {};
-    let allRegions = new Set();
-    let centroidByKey = {};
+    // Helper: country centroid
+    function centroidInside(feature){
+      try {
+        const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
+        return L.latLng(c[1], c[0]);
+      }catch(e){}
+      return L.geoJSON(feature).getBounds().getCenter();
+    }
 
-    /* ===== Popup ===== */
-    function openCountryPopup(countryKey){
-      const rows = entries.filter(e=>e.key===countryKey);
-      if (!rows.length){
-        const pt = centroidByKey[countryKey];
-        if (pt) L.popup().setLatLng(pt).setContent("No record in dataset.").openOn(map);
-        return;
-      }
-      const pt = centroidByKey[countryKey] || L.latLng(rows[0].lat, rows[0].lng);
-      const primary = rows.find(r=>r.isImplemented) || rows[0];
-
-      let list = rows.map(r=>{
-        const bits = [];
-        if (r.title) bits.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
+    // Popup from entry
+    function popupHTML(country, rows){
+      const list = rows.map(r=>{
+        const bits=[];
+        if (r.title)  bits.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
         if (r.status) bits.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
         if (Number.isInteger(r.year)) bits.push(`<strong>Year:</strong> ${r.year}`);
-        if (r.notes) bits.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
+        if (r.notes)  bits.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
         return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
-      }).join("");
-
-      const html = `
-        <div style="min-width:240px">
-          <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(primary.country)}</h3>
-          ${list}
-        </div>`;
-      L.popup({autoClose:true, closeOnClick:true})
-        .setLatLng(pt)
-        .setContent(html)
-        .openOn(map);
+      }).join('');
+      return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>${list}</div>`;
     }
 
-    /* ===== First-draw helpers ===== */
+    // Draw markers once both map + data are ready
     function forceDotsRedraw(){
       map.invalidateSize();
-      if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
-      if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
-      requestAnimationFrame(() => {
-        if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
-        if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
-      });
+      // Touch the map to ensure canvas paints
+      map.fire('zoomend'); map.fire('moveend');
+      requestAnimationFrame(()=> map.invalidateSize());
     }
 
-    // *** Invisible boot-kick: reproduce your manual toggle that makes dots appear ***
-    function bootKickDotsOnce(){
-      const imp = document.getElementById('showImpDots');
-      const dev = document.getElementById('showDevDots');
-      const impWas = imp.checked, devWas = dev.checked;
+    function firstDraw(){
+      // Clear any existing vector layers (we only use outlines + markers)
+      if (outlineLayer) outlineLayer.remove();
 
-      // Flip quickly without visible flicker
-      imp.checked = false; dev.checked = false;
-      applyFilters();                      // hide
-      imp.checked = impWas; dev.checked = devWas;
+      // Draw outlines
+      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
-      // Re-show and force paint in next ticks
-      requestAnimationFrame(() => {
-        applyFilters();
-        forceDotsRedraw();
-        setTimeout(forceDotsRedraw, 0);
-      });
-    }
+      // Draw dots
+      impCount = 0; devCount = 0;
+      for (const [countryKey, rows] of groupByCountry(entries)){
+        const pt = centroidByKey[countryKey];
+        if (!pt) continue;
 
-    function maybeFirstDraw(){
-      if (tilesReady && dataReady) {
-        applyFilters();          // add markers
-        forceDotsRedraw();       // nudge canvas
-        bootKickDotsOnce();      // guarantee visibility (mirrors your manual fix)
+        const isImplemented = rows.some(r=>r.isImplemented);
+        const isDev = rows.some(r=>r.isDev);
+
+        const color = isImplemented ? getCSS('--red') : getCSS('--orange');
+        if (isImplemented) impCount++; else if (isDev) devCount++;
+
+        const m = L.circleMarker([pt.lat, pt.lng], {
+          renderer: dotsRenderer,  // CRITICAL
+          radius: 6.5,
+          color: darken(color,30),
+          weight: 1.2,
+          fillColor: color,
+          fillOpacity: 0.95
+        })
+        .bindTooltip(`${rows[0].country}: ${rows[0].status||''}`, {direction:'top', offset:[0,-6]})
+        .on('click', ()=> {
+          L.popup({autoClose:true, closeOnClick:true})
+            .setLatLng(pt)
+            .setContent(popupHTML(rows[0].country, rows))
+            .openOn(map);
+        })
+        .addTo(map);
+
+        if (m.bringToFront) m.bringToFront();
       }
+
+      document.getElementById('c-imp').textContent = impCount;
+      document.getElementById('c-dev').textContent = devCount;
+
+      // Nudge canvases to paint on first load across browsers
+      forceDotsRedraw();
+      setTimeout(forceDotsRedraw, 0);
+      requestAnimationFrame(forceDotsRedraw);
     }
 
-    /* ===== INIT ===== */
-    (async function init(){
-      // 1) Polygons
-      let geo=null, lastErr=null;
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){
+      const n = parseInt(hex.replace('#',''),16);
+      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
+      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
+    }
+
+    function* groupByCountry(arr){
+      const map = new Map();
+      for (const e of arr){
+        if (!map.has(e.key)) map.set(e.key, []);
+        map.get(e.key).push(e);
+      }
+      for (const [k,v] of map) yield [k,v];
+    }
+
+    // Ready gates
+    let worldGeo = null;
+    tiles.once('load', ()=>{ mapReady = true; maybeStart(); });
+    map.whenReady(()=>{ mapReady = true; maybeStart(); });
+
+    function maybeStart(){
+      if (mapReady && dataReady && worldGeo) firstDraw();
+    }
+
+    // ===== Load polygons (world) =====
+    (async function loadWorld(){
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
         'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
       ];
+      let lastErr=null;
       for (const src of SOURCES){
         try{
           const r=await fetch(src,{cache:'default',mode:'cors'}); if(!r.ok) throw new Error(`HTTP ${r.status}`);
           const j=await r.json(); if(!j || !j.features || j.features.length<100) throw new Error('Bad geojson');
-          geo=j; break;
+          worldGeo=j; break;
         }catch(e){ lastErr=e; }
       }
-      if(!geo){ const d=document.getElementById('debug'); d.style.display='block'; d.innerHTML='Failed to load world polygons.'; console.error(lastErr); return; }
+      if(!worldGeo){ showDbg('Failed to load world polygons.'); console.error(lastErr); return; }
 
-      function getName(props){
-        if (!props) return null;
-        if (typeof props.name === 'string') return props.name;
-        if (props.ADMIN) return props.ADMIN;
-        if (props.NAME_EN) return props.NAME_EN;
-        if (props.NAME) return props.NAME;
-        if (props.name && typeof props.name.common === 'string') return props.name.common;
-        if (props.SOVEREIGNT) return props.SOVEREIGNT;
-        for (const [k,v] of Object.entries(props)) if (/name/i.test(k) && typeof v === 'string') return v;
-        return null;
-      }
-      function getRegion(props){
-        return props.region || props.REGION_UN || props.Subregion || props.subregion || props.SUBREGION || 'Other';
-      }
-      function centroidInside(feature){
-        try {
-          if (feature.geometry && (feature.geometry.type==='Polygon' || feature.geometry.type==='MultiPolygon')){
-            let coords=null;
-            if (feature.geometry.type==='Polygon'){
-              coords=feature.geometry.coordinates;
-            } else {
-              let best=null,bestA=-1;
-              for (const poly of feature.geometry.coordinates){
-                const a=turf.area(turf.polygon(poly));
-                if(a>bestA){ bestA=a; best=poly; }
-              }
-              coords=best;
-            }
-            const p=polylabel(coords, 1.0); // [lng,lat]
-            return L.latLng(p[1], p[0]);
-          }
-        }catch(e){}
-        try {
-          const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
-          return L.latLng(c[1], c[0]);
-        }catch(e){}
-        return L.geoJSON(feature).getBounds().getCenter();
-      }
-
-      // Build centroid + region lookup
-      allRegions = new Set();
+      // Build centroid lookup (simple centerOfMass + overrides)
       centroidByKey = {};
-      regionMap = {};
-
-      L.geoJSON(geo).eachLayer(l=>{
-        const nm = normalizeCountry(getName(l.feature.properties));
-        if (!nm) return;
+      L.geoJSON(worldGeo).eachLayer(l=>{
+        let nmRaw = (l.feature && l.feature.properties) ? (
+          l.feature.properties.name || l.feature.properties.NAME || l.feature.properties.NAME_EN || l.feature.properties.ADMIN || l.feature.properties.SOVEREIGNT
+        ) : null;
+        if (!nmRaw) return;
+        const nm = normalizeCountry(nmRaw);
         if (CENTROID_OVERRIDES.has(nm)){
           const [lat,lng] = CENTROID_OVERRIDES.get(nm);
           centroidByKey[nm] = L.latLng(lat,lng);
         } else {
           centroidByKey[nm] = centroidInside(l.feature);
         }
-        const reg = getRegion(l.feature.properties) || 'Other';
-        regionMap[nm] = reg;
         l.feature.properties._key = nm;
-        allRegions.add(reg);
       });
 
-      // Country outline (thin mint) in countriesPane
-      outlineLayer = L.geoJSON(geo, {
-        pane: 'countriesPane',
-        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
-      }).addTo(map);
+      maybeStart();
+    })();
 
-      // Implemented shading (style adjusted by filters)
-      shadeLayer = L.geoJSON(geo, {
-        pane: 'countriesPane',
-        style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
-      }).addTo(map);
-
-      // Clickable invisible layer (also in countriesPane)
-      hitLayer = L.geoJSON(geo, {
-        pane: 'countriesPane',
-        style: { color:'#0000', weight:0, fillOpacity:0 },
-        onEachFeature: (f, layer) => {
-          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
-          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-          layer.on('click', () => openCountryPopup((f.properties&&f.properties._key)||""));
-        }
-      }).addTo(map);
-
-      // 2) Sheet
+    // ===== Load sheet =====
+    (async function loadSheet(){
       let rawRows;
       try{
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
         const dateHdr = res.headers.get('Date') || '';
-        (document.getElementById('updatedTop') || {}).textContent = 'Updated: ' + (dateHdr || 'now');
-        (document.getElementById('lastUpdated') || {}).textContent = 'Updated: ' + (dateHdr || 'now');
+        document.getElementById('updatedTop').textContent = 'Updated: ' + (dateHdr || new Date().toUTCString());
 
         const text = await res.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
         rawRows = parsed.data;
       }catch(e){
-        const d=document.getElementById('debug'); d.style.display='block'; d.textContent='Failed to load/parse CSV.'; console.error(e); return;
+        showDbg('Failed to load/parse CSV.');
+        console.error(e); return;
       }
 
-      // 3) Normalize rows
       entries = [];
-      const counts={imp:0, dev:0};
-      const unmatched = new Set();
-      implementedCoords=[]; devCoords=[];
-      let yMin=Infinity, yMax=-Infinity;
+      let unmatched = new Set();
 
       function pickYear(row){
         const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
-        for (const k of keys){ if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]); }
+        for (const k of keys){
+          if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
+        }
         return null;
       }
 
       for (const row of rawRows){
         const title = String(row["Title"]||"").trim();
         const status = String(row["Status"]||"").trim();
-        const notes = String(row["Description"]||"").trim();
-        const yr = pickYear(row);
-        if (yr){ yMin=Math.min(yMin, yr); yMax=Math.max(yMax, yr); }
+        const notes  = String(row["Description"]||"").trim();
+        const yr     = pickYear(row);
 
         const countriesCell = String(row["Countries"]||"").trim();
         if (!countriesCell) continue;
@@ -670,239 +495,29 @@
           }
           if (!pt){ unmatched.add(raw); continue; }
 
-          const reg = regionMap[key] || 'Other';
           const isImplemented = /implement/i.test(status);
           const isDev = /develop|discussion|pilot|trial|poc|concept/i.test(status);
-          const obj = {
+
+          entries.push({
             key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
-            status, isImplemented, isDev, title, notes, year: yr, region: reg
-          };
-          entries.push(obj);
-
-          if (isImplemented){ implementedCoords.push([pt.lat, pt.lng]); counts.imp++; }
-          else if (isDev){ devCoords.push([pt.lat, pt.lng]); counts.dev++; }
+            status, isImplemented, isDev, title, notes, year: yr
+          });
         }
       }
 
-      // Region selector (blank = no filter)
-      const regionSelect = document.getElementById('regionSelect');
-      const optionBlank = document.createElement('option');
-      optionBlank.value = ""; optionBlank.textContent = "Region (optional)";
-      regionSelect.appendChild(optionBlank);
-      [...[...allRegions].sort()].forEach(r=>{
-        const opt=document.createElement('option');
-        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
-      });
-
-      // Counters + pie
-      document.getElementById('c-imp').textContent = counts.imp;
-      document.getElementById('c-dev').textContent = counts.dev;
-      const total = Math.max(1, counts.imp + counts.dev);
-      Chart.register(ChartDataLabels);
-      new Chart(document.getElementById('statusPie'), {
-        type:'pie',
-        data:{
-          labels:['Implemented','In development'],
-          datasets:[{
-            data:[counts.imp, counts.dev],
-            backgroundColor:[getCSS('--red'), getCSS('--orange')],
-            borderColor:'rgba(0,0,0,.45)', borderWidth:1
-          }]
-        },
-        options:{
-          responsive:true,
-          plugins:{
-            legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
-            datalabels:{
-              color:'#0b0f12', font:{weight:'700', size:11},
-              formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
-            }
-          }
-        }
-      });
-
-      // Autocomplete
-      const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
-      document.getElementById('countryList').innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
-
-      // Year slider (if any)
-      const yearRow = document.getElementById('yearRow');
-      const yearMin = document.getElementById('yearMin');
-      const yearMinVal = document.getElementById('yearMinVal');
-      if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
-        yearRow.style.display='flex';
-        yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
-        yearMinVal.textContent = 'Any';
-        yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
-      }
-
-      // Listeners
-      document.getElementById('showImpDots').addEventListener('change', applyFilters);
-      document.getElementById('showDevDots').addEventListener('change', applyFilters);
-      regionSelect.addEventListener('change', applyFilters);
-      document.getElementById('netImp').addEventListener('change', applyNetworks);
-      document.getElementById('netDev').addEventListener('change', applyNetworks);
-      document.getElementById('kNeighbors').addEventListener('change', applyNetworks);
-      document.getElementById('btnExport').addEventListener('click', exportCurrent);
-
-      const searchInput = document.getElementById('searchCountry');
-      const searchBtn = document.getElementById('btnSearch');
-      function runSearch(){
-        const q = (searchInput.value||'').trim().toLowerCase();
-        if (!q) return;
-        const hit = entries.find(e=>e.country.toLowerCase()===q) || entries.find(e=>e.country.toLowerCase().includes(q));
-        if (!hit) return;
-        map.flyTo([hit.lat, hit.lng], 4, {duration:.6});
-        openCountryPopup(hit.key);
-      }
-      searchBtn.addEventListener('click', runSearch);
-      searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-
-      // Defer FIRST draw until both map/tiles & data are ready
-      dataReady = true;
-      maybeFirstDraw();
-
-      // Debug unmatched
       if (unmatched.size){
-        const dbgEl = document.getElementById('debug');
-        dbgEl.style.display='block';
-        dbgEl.innerHTML = `<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`;
+        showDbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
       }
+
+      dataReady = true;
+      maybeStart();
     })();
 
-    /* ===== FILTER + RENDER ===== */
-    function currentFilters(){
-      const showImp = document.getElementById('showImpDots').checked;
-      const showDev = document.getElementById('showDevDots').checked;
-      const region = (document.getElementById('regionSelect').value || "");
-      const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
-      const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
-      return {showImp, showDev, region, minYear, hasYearUI};
+    function showDbg(html){
+      const dbg = document.getElementById('debug');
+      dbg.style.display='block';
+      dbg.innerHTML = html;
     }
-
-    function applyFilters(){
-      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
-
-      dotsImpLayer.clearLayers();
-      dotsDevLayer.clearLayers();
-
-      const red = getCSS('--red'), orange=getCSS('--orange');
-
-      const filt = e => {
-        if (region && (e.region||'Other') !== region) return false;
-        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
-        if (e.isImplemented && !showImp) return false;
-        if (e.isDev && !showDev) return false;
-        return e.isImplemented || e.isDev;
-      };
-
-      const impPts=[], devPts=[];
-      const implementedShown = new Set();
-
-      for (const e of entries){
-        if (!filt(e)) continue;
-        const color = e.isImplemented ? red : orange;
-        const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
-
-        L.circleMarker([e.lat, e.lng], {
-          renderer: dotsRenderer,
-          pane: 'dotsPane',
-          radius: 6.5,
-          color: darken(color,30),
-          weight: 1.2,
-          fillColor: color,
-          fillOpacity: 0.95
-        })
-        .on('click', ()=> openCountryPopup(e.key))
-        .bindTooltip(`${e.country}: ${e.status}`, {direction:'top', offset:[0,-6]})
-        .addTo(layer);
-
-        if (e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(e.key); }
-        else if (e.isDev) { devPts.push([e.lat,e.lng]); }
-      }
-
-      // Shade implemented countries that are visible (in countriesPane)
-      if (shadeLayer){
-        const fill = getCSS('--red');
-        shadeLayer.setStyle(f=>{
-          const key = (f.properties && f.properties._key) || '';
-          return implementedShown.has(key)
-            ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
-            : {fillOpacity:0, color:'#0000', weight:0};
-        });
-      }
-
-      // Rebuild optional networks
-      rebuildNetworksWithPoints(impPts, devPts);
-    }
-
-    function rebuildNetworksWithPoints(impPts, devPts){
-      const k = Math.max(1, Math.min(6, parseInt(document.getElementById('kNeighbors').value||'4',10)));
-      linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
-
-      if (document.getElementById('netImp').checked && impPts.length>1)
-        buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
-      if (document.getElementById('netDev').checked && devPts.length>1)
-        buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
-    }
-    function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
-      const n=coords.length; if(n<2) return;
-      const seen=new Set();
-      for(let i=0;i<n;i++){
-        const dists=[];
-        for(let j=0;j<n;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
-        dists.sort((a,b)=>a.d-b.d);
-        const limit=Math.min(k, dists.length);
-        for(let t=0;t<limit;t++){
-          const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
-          L.polyline([coords[i], coords[j]], { pane:'linesPane', color, weight, opacity, smoothFactor:1 }).addTo(layer);
-        }
-      }
-    }
-
-    /* ===== EXPORT ===== */
-    function exportCurrent(){
-      const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
-      const rows = entries.filter(e=>{
-        if (region && (e.region||'Other') !== region) return false;
-        if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
-        if (e.isImplemented && !showImp) return false;
-        if (e.isDev && !showDev) return false;
-        return e.isImplemented || e.isDev;
-      }).map(e=>({
-        Country:e.country, Title:e.title, Status:e.status, Year:e.year||"",
-        Region:e.region||"", Lat:e.lat, Lng:e.lng, Notes:e.notes||""
-      }));
-
-      const header = Object.keys(rows[0]||{
-        Country:"",Title:"",Status:"",Year:"",Region:"",Lat:"",Lng:"",Notes:""
-      });
-      const csv = [header.join(",")]
-        .concat(rows.map(r=>header.map(k=>{
-          const v = String(r[k]??"").replace(/"/g,'""');
-          return `"${v}"`;
-        }).join(",")))
-        .join("\n");
-
-      const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href=url; a.download='digital-id-export.csv';
-      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-    }
-
-    /* ===== LAYOUT ===== */
-    const topbar = document.getElementById('topbar');
-    function placeMap(){
-      const h = topbar.offsetHeight;
-      document.documentElement.style.setProperty('--dynBarH', h+'px');
-      setTimeout(()=> map.invalidateSize(), 0);
-    }
-    window.addEventListener('load', placeMap);
-    window.addEventListener('resize', placeMap);
-    window.addEventListener('orientationchange', placeMap);
-    if (document.fonts) { document.fonts.ready.then(placeMap); }
-    new ResizeObserver(placeMap).observe(topbar);
 
     // ESC closes drawer
     document.addEventListener('keydown', e=>{
