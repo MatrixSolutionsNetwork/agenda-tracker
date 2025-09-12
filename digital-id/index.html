@@ -33,74 +33,66 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
+      --barPadY:12px; /* desktop bar padding will be larger */
     }
     html,body{
-      height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
+      height:100%;margin:0;
+      background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
       color:var(--text);
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== Top brand bar ===== */
+    /* ===== Top brand bar (centered) ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
-      display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+      display:flex; flex-direction:column; align-items:center; gap:6px;
       background:linear-gradient(180deg,rgba(10,30,20,.86),rgba(8,22,16,.98));
       border-bottom:1px solid var(--panelEdge);
-      padding:10px 16px;
+      padding:var(--barPadY) 16px;
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(2px);
     }
-
-    /* Brand cluster */
-    #brandCol{
-      display:flex; flex-direction:column; gap:4px; min-width:0;
+    /* desktop: make bar a bit bigger */
+    @media (min-width: 721px){
+      :root{ --barPadY:16px; }
     }
+
     #brandRow{
-      display:flex; align-items:center; gap:10px; min-width:0; white-space:nowrap;
+      display:flex; align-items:center; gap:10px; white-space:nowrap;
     }
     #brandRow .dot{
       width:14px;height:14px;border-radius:50%;
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
       box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
     }
-    #brandRow h1{margin:0; font-size:18px; letter-spacing:.4px;}
+    #brandRow h1{margin:0; font-size:20px; letter-spacing:.4px; text-align:center}
     #brandRow .msn{color:var(--matrix)}
     #brandRow .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
     #brandRow .page{color:#ffffff}
     .live{font-size:11px;color:#ffffff;background:var(--red);
-      padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
-    .updated{font-size:12px; color:#ffffff; opacity:.9}
-    .inline-hint{font-size:12px; opacity:.85}
-    .spacer{flex:1;}
+      padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b; margin-left:8px}
 
-    /* Make the old action buttons optional/hidden by default */
-    .actions{ display:none; }
+    #subRow{
+      display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;
+      font-size:12px;
+    }
+    .updated{color:#ffffff; opacity:.9}
+    .inline-hint{opacity:.85}
 
-    /* Burger (now shown on desktop AND mobile) */
+    /* Burger (right aligned but not part of centered flow) */
+    #barRight{
+      position:absolute; right:12px; top:50%; transform:translateY(-50%);
+      display:flex; align-items:center; gap:8px;
+    }
     #burgerMenu{
-      display:flex; align-items:center; justify-content:center;
       width:36px; height:36px; border-radius:8px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
       font-size:18px; font-weight:800;
-      margin-left:auto;
     }
 
-    /* Mobile stacked order */
-    .mobile-only{ display:none; }
-    @media (max-width:720px){
-      #brandCol{ width:100%; align-items:center; text-align:center; }
-      #brandRow{ display:none; } /* hide desktop title row */
-      .mobile-only{ display:block; }
-      .stack-line{ display:flex; align-items:center; justify-content:center; gap:8px; }
-      .line-msn{ font-weight:700; color:var(--matrix); }
-      .line-title{ font-weight:700; color:#fff; }
-      .line-updated{ margin-top:2px; }
-      .line-hint{ margin-top:2px; }
-    }
-
-    /* Mobile dropdown menu (also used on desktop) */
+    /* Dropdown menu (mobile & desktop) */
     #mobileMenu{
-      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH,72px) + 8px);
+      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH,80px) + 8px);
       background:#0b1e16; border:1px solid #144832; border-radius:12px;
       padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
     }
@@ -115,33 +107,34 @@
 
     /* ===== Map ===== */
     #map{
-      position:absolute; left:0; right:0; top:72px; bottom:0; /* JS updates top */
+      position:absolute; left:0; right:0; top:80px; bottom:0; /* JS will update this */
     }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:8px; }
 
-    /* ===== Centered “Digital ID stats — click to view” ===== */
-    #fab{
-      position:absolute; left:50%; transform:translateX(-50%); bottom:22px; z-index:1002;
+    /* ===== Centered stats chip below bar ===== */
+    #statsChip{
+      position:absolute; left:50%; transform:translateX(-50%);
+      top:calc(var(--dynBarH,80px) + 8px);
+      z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
       background:var(--chip); border:1px solid var(--chipEdge); color:var(--text);
       border-radius:999px; padding:9px 12px; cursor:pointer;
       font-weight:700; font-size:13px;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
     }
-    #fab .dot{width:9px;height:9px;border-radius:50%}
-    #fab .d-red{ background:var(--red) }
-    #fab .d-org{ background:var(--orange) }
 
     /* ===== Drawer ===== */
     #drawer{
-      position:absolute; left:12px; bottom:56px; z-index:1110;
-      width:360px; max-width:92vw; max-height:66vh; overflow:auto;
+      position:absolute; left:12px; right:12px;
+      top:calc(var(--dynBarH,80px) + 56px); bottom:16px;
+      z-index:1110;
+      width:auto; max-width:720px; margin:0 auto;
       background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
       padding:12px; display:none; box-shadow:0 10px 28px rgba(0,0,0,.55);
       backdrop-filter: blur(1px);
-      color:#ffffff;
+      color:#ffffff; overflow:auto;
     }
     #drawer.open{ display:block }
     .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; position:sticky; top:0; background:transparent; }
@@ -173,56 +166,34 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
-    /* Mobile drawer sizing: smaller & clear of the header */
-    @media (max-width: 720px){
-      #drawer{
-        left:10px; right:10px; bottom:82px;
-        width:auto; max-width:calc(100vw - 20px);
-        max-height: calc(100vh - var(--dynBarH,72px) - 110px);
-        border-radius:12px;
-      }
+    /* Prevent chip overlap with Leaflet controls on tiny screens */
+    @media (max-width: 420px){
+      #statsChip{ top:calc(var(--dynBarH,80px) + 10px); font-size:12px; padding:8px 10px; }
     }
-
-    .country-hover { cursor:pointer; }
   </style>
 </head>
 <body>
-  <!-- ===== Top navigation / context bar ===== -->
+  <!-- ===== Top bar (centered content) ===== -->
   <div id="topbar" role="navigation" aria-label="Map header">
-    <div id="brandCol">
-      <!-- Desktop title row -->
-      <div id="brandRow">
-        <span class="dot" aria-hidden="true"></span>
-        <h1>
-          <span class="msn">Matrix Solutions Network</span>
-          <span class="sep">—</span>
-          <span class="page">Digital ID Status</span>
-          <span class="live" id="livePill" style="margin-left:8px;">LIVE</span>
-        </h1>
-      </div>
-
-      <!-- Mobile stacked order -->
-      <div class="stack-line mobile-only line-msn">Matrix Solutions Network</div>
-      <div class="stack-line mobile-only line-title">
-        <span>Digital ID Status</span><span class="live" id="mLivePill">LIVE</span>
-      </div>
-      <div class="stack-line mobile-only line-updated"><span class="updated" id="updatedTopMobile">Updated: …</span></div>
-      <div class="stack-line mobile-only line-hint"><span class="inline-hint">• Click any dot for details</span></div>
-
-      <!-- Desktop sublines -->
-      <div class="brand-sub" id="desktopSub">
-        <div class="inline-hint">• Click any dot for details</div>
-        <div class="updated" id="updatedTop">Updated: …</div>
-      </div>
+    <div id="brandRow">
+      <span class="dot" aria-hidden="true"></span>
+      <h1>
+        <span class="msn">Matrix Solutions Network</span>
+        <span class="sep">—</span>
+        <span class="page">Digital ID Status</span>
+        <span class="live" id="livePill">LIVE</span>
+      </h1>
     </div>
-
-    <div class="spacer"></div>
-
-    <!-- Burger visible on all viewports -->
-    <button id="burgerMenu" aria-label="Open menu">≡</button>
+    <div id="subRow">
+      <div class="inline-hint">• Click any dot for details</div>
+      <div class="updated" id="updatedTop">Updated: …</div>
+    </div>
+    <div id="barRight">
+      <button id="burgerMenu" aria-label="Open menu">≡</button>
+    </div>
   </div>
 
-  <!-- Dropdown menu (mobile & desktop) -->
+  <!-- Dropdown menu -->
   <div id="mobileMenu" role="menu" aria-label="Navigation">
     <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
     <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
@@ -231,13 +202,12 @@
     <a class="btn" href="https://pickled-prose-789.notion.site/21cf848a73ef805c9f53ee8d066d67ef?pvs=105" target="_blank" rel="noopener">Submit feedback ✍️</a>
   </div>
 
+  <!-- Map -->
   <div id="map" aria-label="Digital ID world map"></div>
 
-  <!-- Centered opener -->
-  <div id="fab" aria-label="Open stats panel">
-    <span style="opacity:.95;">Digital ID <b>stats</b> — <u>click to view</u></span>
-    <span class="dot d-red" title="Implemented"></span>
-    <span class="dot d-org" title="In development"></span>
+  <!-- Centered stats chip below the bar -->
+  <div id="statsChip" aria-label="Open stats panel">
+    <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
   </div>
 
   <!-- Drawer -->
@@ -277,8 +247,6 @@
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
 
     <div class="hr"></div>
-
-    <!-- Removed Country shading toggle -->
 
     <!-- Show/Hide dots -->
     <div class="row" style="gap:12px;">
@@ -421,7 +389,6 @@
     let hitLayer = null;
 
     // UI refs
-    const fab = document.getElementById('fab');
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
     const drawerRefresh = document.getElementById('drawerRefresh');
@@ -443,26 +410,32 @@
     const btnExport = document.getElementById('btnExport');
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
-    const updatedTopMobile = document.getElementById('updatedTopMobile');
 
     // Burger toggle
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
-    burger.addEventListener('click', ()=>{
-      const show = mobileMenu.style.display !== 'block';
-      mobileMenu.style.display = show ? 'block' : 'none';
+    burger.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block';
     });
     document.addEventListener('click', (e)=>{
-      if (e.target === burger) return;
-      if (!mobileMenu.contains(e.target)) mobileMenu.style.display = 'none';
+      if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none';
     });
 
-    // Drawer
-    function openDrawer(){ drawer.classList.add('open'); }
-    function closeDrawer(){ drawer.classList.remove('open'); }
-    fab.addEventListener('click', openDrawer);
-    drawerClose.addEventListener('click', closeDrawer);
+    // Stats chip opens drawer
+    const statsChip = document.getElementById('statsChip');
+    const statsChipText = document.getElementById('statsChipText');
+    statsChip.addEventListener('click', ()=> drawer.classList.add('open'));
+    drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
+
+    // Set chip text per device
+    function setChipLabel(){
+      statsChipText.textContent = `Digital ID Stats — ${isMobile() ? 'tap' : 'click'} to view`;
+    }
+    setChipLabel();
+    window.addEventListener('resize', setChipLabel);
+    window.addEventListener('orientationchange', setChipLabel);
 
     // state
     let implementedCoords = [];
@@ -589,7 +562,7 @@
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // implemented shading (always on)
+      // implemented shading (always on, controlled by filters later)
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
@@ -611,7 +584,6 @@
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
         const dateHdr = res.headers.get('Date') || '';
         (updatedTop || {}).textContent = 'Updated: ' + (dateHdr || 'now');
-        (updatedTopMobile || {}).textContent = 'Updated: ' + (dateHdr || 'now');
         (document.getElementById('lastUpdated') || {}).textContent = 'Updated: ' + (dateHdr || 'now');
 
         const text = await res.text();
@@ -775,7 +747,6 @@
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
-      /* Shading always on */
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -843,13 +814,14 @@
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    /* ===== Map below bar (dynamic) ===== */
+    /* ===== Map & chip placement below dynamic bar ===== */
     const mapEl = document.getElementById('map');
     const topbar = document.getElementById('topbar');
     function placeMap(){
       const h = topbar.offsetHeight;
-      mapEl.style.top = h + 'px';
+      mapEl.style.top = (h) + 'px';
       document.documentElement.style.setProperty('--dynBarH', h+'px');
+      // also reposition stats chip (CSS uses var)
     }
     window.addEventListener('load', placeMap);
     window.addEventListener('resize', placeMap);
