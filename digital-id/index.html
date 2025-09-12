@@ -117,10 +117,10 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Popup style */
+    /* Popup & tooltip styles (country text white) */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
-    .leaflet-tooltip{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
+    .leaflet-tooltip{background:#0a1c14;color:#ffffff;border:1px solid #174d35;} /* country text white */
   </style>
 </head>
 <body>
@@ -224,6 +224,9 @@
     // Light country outlines (no fill)
     let outlineLayer = null;
 
+    // NEW: transparent hit layer for whole-country tap/click
+    let hitLayer = null; /* HIT LAYER */
+
     // Data/state
     let mapReady=false, dataReady=false, worldGeo=null;
     let centroidByKey = {};
@@ -264,7 +267,10 @@
         if (r.notes)  bits.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
         return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
       }).join('');
-      return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>${list}</div>`;
+      return `<div style="min-width:240px">
+                <h3 style="margin:0 0 6px 0; font-size:16px; color:#fff;">${escapeHtml(country)}</h3> <!-- country text white -->
+                ${list}
+              </div>`;
     }
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
@@ -284,6 +290,20 @@
     function forceDotsRedraw(){
       map.invalidateSize(); map.fire('zoomend'); map.fire('moveend');
       requestAnimationFrame(()=> map.invalidateSize());
+    }
+
+    // Open popup by country key (used by hit layer)
+    function openCountryPopup(countryKey){
+      if (!countryKey) return;
+      const rows = entries.filter(e=>e.key===countryKey);
+      const pt = centroidByKey[countryKey];
+      if (!pt) return;
+      const html = rows.length ? popupHTML(rows[0].country, rows)
+                               : `<div style="min-width:240px; color:#fff;">No record in dataset.</div>`;
+      L.popup({autoClose:true, closeOnClick:true})
+        .setLatLng(pt)
+        .setContent(html)
+        .openOn(map);
     }
 
     /* ===== Ready gates ===== */
@@ -325,7 +345,7 @@
         } else {
           centroidByKey[nm] = centroidInside(l.feature);
         }
-        l.feature.properties._key = nm;
+        l.feature.properties._key = nm; // used by hit layer
       });
 
       maybeStart();
@@ -399,6 +419,7 @@
       if (outlineLayer) outlineLayer.remove();
       outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
+      // Build dots (markers stay on markerPane so they receive clicks even with hit layer)
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey];
         if (!pt) continue;
@@ -415,7 +436,7 @@
           fillColor: color,
           fillOpacity: 0.95
         })
-        .bindTooltip(`${rows[0].country}: ${rows[0].status||''}`, {direction:'top', offset:[0,-6]})
+        .bindTooltip(`${rows[0].country}`, {direction:'top', offset:[0,-6]}) /* country text white via CSS */
         .on('click', ()=> {
           L.popup({autoClose:true, closeOnClick:true})
             .setLatLng(pt)
@@ -426,6 +447,18 @@
 
         if (m.bringToFront) m.bringToFront();
       }
+
+      /* Transparent hit layer for whole-country tap/click (mobile-friendly) */
+      if (hitLayer) hitLayer.remove();
+      hitLayer = L.geoJSON(worldGeo, {
+        style: { color:'#0000', weight:0, fillOpacity:0 },    // invisible by default
+        onEachFeature: (f, layer) => {
+          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
+          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
+          layer.on('click', () => openCountryPopup((f.properties && f.properties._key) || ''));
+          // touchstart also handled by Leaflet's click normalization; no extra needed
+        }
+      }).addTo(map);
 
       /* ensure canvases paint on first load across browsers */
       forceDotsRedraw();
