@@ -58,9 +58,6 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* >>> NEW: brighten labels-only tiles (country names) <<< */
-    #labelsPane img { filter: brightness(1.6) contrast(1.25); }
-
     /* Popup / tooltip */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
@@ -136,19 +133,11 @@
     /* ===== Map & panes ===== */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
-    // custom panes
-    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex = 650;
-    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
-    map.getPane('labelsPane').style.pointerEvents = 'none';
+    // custom panes: dots above, hit polygons below; lines in default overlay
+    map.createPane('dotsPane');  map.getPane('dotsPane').style.zIndex = 650;
 
-    /* >>> CHANGED: base tiles now "no labels" <<< */
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
-    }).addTo(map);
-
-    /* >>> NEW: labels-only overlay (brightened via CSS) <<< */
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
-      subdomains:'abcd', maxZoom:8, pane:'labelsPane'
     }).addTo(map);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
@@ -272,7 +261,6 @@
 
     function drawAll(){
       // Clear
-      const dotsLayer = getDotsLayer(); // keep instance stable if re-called
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
@@ -308,7 +296,7 @@
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
-          const k=(f.properties&&f.properties._key)||';
+          const k=(f.properties&&f.properties._key)||'';
           return implementedShown.has(k)
             ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
             : {fillOpacity:0, color:'#0000', weight:0};
@@ -319,13 +307,6 @@
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
-    }
-
-    // keep dotsLayer as a singleton (avoid accidental re-declarations)
-    let _dotsLayerRef = null;
-    function getDotsLayer(){
-      if(!_dotsLayerRef){ _dotsLayerRef = L.layerGroup().addTo(map); }
-      return _dotsLayerRef;
     }
 
     function buildLocalNetwork(coords, color, layer, k=3, opacity=.35, weight=1.2){
