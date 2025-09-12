@@ -50,9 +50,6 @@
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(2px);
     }
-    @media (min-width: 721px){
-      #topbar{ max-height: 96px; overflow:hidden; }
-    }
 
     /* Brand cluster */
     #brandCol{
@@ -74,51 +71,47 @@
       padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
     .updated{font-size:12px; color:#ffffff; opacity:.9}
     .inline-hint{font-size:12px; opacity:.85}
-
     .spacer{flex:1;}
 
-    /* Desktop actions (far right) */
-    .actions{
-      margin-left:auto; display:flex; gap:8px; overflow:auto hidden;
-      scrollbar-width:none;
-    }
-    .actions::-webkit-scrollbar{display:none}
-    .btn{
-      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
-      padding:8px 10px; border-radius:10px; text-decoration:none;
-      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
-    }
-    .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
+    /* Make the old action buttons optional/hidden by default */
+    .actions{ display:none; }
 
-    /* Mobile: stack in the exact order requested */
-    #burgerMenu{ display:none; }
-    #mobileMenu{
-      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH,72px) + 8px);
-      background:#0b1e16; border:1px solid #144832; border-radius:12px;
-      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
+    /* Burger (now shown on desktop AND mobile) */
+    #burgerMenu{
+      display:flex; align-items:center; justify-content:center;
+      width:36px; height:36px; border-radius:8px;
+      background:#062015; border:1px solid #1b5a3e; color:#fff;
+      font-size:18px; font-weight:800;
+      margin-left:auto;
     }
-    #mobileMenu a{ display:block; margin:6px 0; }
 
+    /* Mobile stacked order */
+    .mobile-only{ display:none; }
     @media (max-width:720px){
       #brandCol{ width:100%; align-items:center; text-align:center; }
-      #brandRow{ justify-content:center; }
-      #brandRow h1{ font-size:16px; }
-
-      /* Force order: MSN (line1), Digital ID + LIVE (line2), Updated (line3), hint (line4) */
+      #brandRow{ display:none; } /* hide desktop title row */
+      .mobile-only{ display:block; }
       .stack-line{ display:flex; align-items:center; justify-content:center; gap:8px; }
       .line-msn{ font-weight:700; color:var(--matrix); }
       .line-title{ font-weight:700; color:#fff; }
       .line-updated{ margin-top:2px; }
       .line-hint{ margin-top:2px; }
-
-      .actions{ display:none; } /* hide full menu */
-      #burgerMenu{
-        display:flex; align-items:center; justify-content:center;
-        width:36px; height:36px; border-radius:8px;
-        background:#062015; border:1px solid #1b5a3e; color:#fff;
-        font-size:18px; font-weight:800;
-      }
     }
+
+    /* Mobile dropdown menu (also used on desktop) */
+    #mobileMenu{
+      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH,72px) + 8px);
+      background:#0b1e16; border:1px solid #144832; border-radius:12px;
+      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
+    }
+    #mobileMenu a{ display:block; margin:6px 0; text-decoration:none; }
+    .btn{
+      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
+      padding:8px 10px; border-radius:10px; text-decoration:none;
+      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
+      display:inline-block;
+    }
+    .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
 
     /* ===== Map ===== */
     #map{
@@ -142,7 +135,7 @@
 
     /* ===== Drawer ===== */
     #drawer{
-      position:absolute; left:12px; bottom:56px; z-index:1001;
+      position:absolute; left:12px; bottom:56px; z-index:1110;
       width:360px; max-width:92vw; max-height:66vh; overflow:auto;
       background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
       border:1px solid var(--panelEdge); border-radius:12px;
@@ -151,7 +144,7 @@
       color:#ffffff;
     }
     #drawer.open{ display:block }
-    .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; position:sticky; top:0; background:transparent; }
     .drawer-title{ font-weight:800; letter-spacing:.4px; }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
@@ -180,8 +173,14 @@
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
 
+    /* Mobile drawer sizing: smaller & clear of the header */
     @media (max-width: 720px){
-      #drawer{ left:10px; right:10px; bottom:66px; width:auto; max-width:calc(100vw - 20px); max-height:58vh; border-radius:12px; }
+      #drawer{
+        left:10px; right:10px; bottom:82px;
+        width:auto; max-width:calc(100vw - 20px);
+        max-height: calc(100vh - var(--dynBarH,72px) - 110px);
+        border-radius:12px;
+      }
     }
 
     .country-hover { cursor:pointer; }
@@ -192,7 +191,7 @@
   <div id="topbar" role="navigation" aria-label="Map header">
     <div id="brandCol">
       <!-- Desktop title row -->
-      <div id="brandRow" class="stack-line desktop-only">
+      <div id="brandRow">
         <span class="dot" aria-hidden="true"></span>
         <h1>
           <span class="msn">Matrix Solutions Network</span>
@@ -203,15 +202,15 @@
       </div>
 
       <!-- Mobile stacked order -->
-      <div class="stack-line line-msn mobile-only" style="display:none;">Matrix Solutions Network</div>
-      <div class="stack-line line-title mobile-only" style="display:none;">
+      <div class="stack-line mobile-only line-msn">Matrix Solutions Network</div>
+      <div class="stack-line mobile-only line-title">
         <span>Digital ID Status</span><span class="live" id="mLivePill">LIVE</span>
       </div>
-      <div class="stack-line line-updated mobile-only" style="display:none;"><span class="updated" id="updatedTopMobile">Updated: …</span></div>
-      <div class="stack-line line-hint mobile-only" style="display:none;"><span class="inline-hint">• Click any dot for details</span></div>
+      <div class="stack-line mobile-only line-updated"><span class="updated" id="updatedTopMobile">Updated: …</span></div>
+      <div class="stack-line mobile-only line-hint"><span class="inline-hint">• Click any dot for details</span></div>
 
       <!-- Desktop sublines -->
-      <div class="brand-sub desktop-only">
+      <div class="brand-sub" id="desktopSub">
         <div class="inline-hint">• Click any dot for details</div>
         <div class="updated" id="updatedTop">Updated: …</div>
       </div>
@@ -219,24 +218,17 @@
 
     <div class="spacer"></div>
 
-    <!-- Desktop actions -->
-    <div class="actions desktop-only">
-      <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
-      <a class="btn" href="../cbdc/" title="Open the CBDC map">Open CBDC Map</a>
-      <a class="btn" href="../social-credit-system/" title="Open Social Credit Map">Open Social Credit Map</a>
-      <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
-    </div>
-
-    <!-- Mobile burger -->
-    <button id="burgerMenu" aria-label="Open menu" class="mobile-only" style="display:none;">≡</button>
+    <!-- Burger visible on all viewports -->
+    <button id="burgerMenu" aria-label="Open menu">≡</button>
   </div>
 
-  <!-- Mobile dropdown menu -->
-  <div id="mobileMenu" role="menu" aria-label="Mobile navigation">
+  <!-- Dropdown menu (mobile & desktop) -->
+  <div id="mobileMenu" role="menu" aria-label="Navigation">
     <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
     <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
     <a class="btn" href="../cbdc/">Open CBDC Map</a>
     <a class="btn" href="../social-credit-system/">Open Social Credit Map</a>
+    <a class="btn" href="https://pickled-prose-789.notion.site/21cf848a73ef805c9f53ee8d066d67ef?pvs=105" target="_blank" rel="noopener">Submit feedback ✍️</a>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
@@ -286,7 +278,7 @@
 
     <div class="hr"></div>
 
-    <!-- Removed Country shading toggle per request -->
+    <!-- Removed Country shading toggle -->
 
     <!-- Show/Hide dots -->
     <div class="row" style="gap:12px;">
@@ -453,22 +445,14 @@
     const updatedTop = document.getElementById('updatedTop');
     const updatedTopMobile = document.getElementById('updatedTopMobile');
 
-    // Mobile/desktop section toggles
-    function setModeBlocks(){
-      const isM = isMobile();
-      for (const el of document.querySelectorAll('.desktop-only')) el.style.display = isM ? 'none' : '';
-      for (const el of document.querySelectorAll('.mobile-only'))  el.style.display = isM ? '' : 'none';
-    }
-
-    // Mobile burger toggle
+    // Burger toggle
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
-    burger?.addEventListener('click', ()=>{
+    burger.addEventListener('click', ()=>{
       const show = mobileMenu.style.display !== 'block';
       mobileMenu.style.display = show ? 'block' : 'none';
     });
     document.addEventListener('click', (e)=>{
-      if (!mobileMenu) return;
       if (e.target === burger) return;
       if (!mobileMenu.contains(e.target)) mobileMenu.style.display = 'none';
     });
@@ -522,8 +506,6 @@
     }
 
     (async function init(){
-      setModeBlocks();
-
       // 1) polygons
       let geo=null, lastErr=null;
       const SOURCES=[
@@ -607,7 +589,7 @@
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // implemented shading
+      // implemented shading (always on)
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
@@ -793,7 +775,7 @@
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
-      /* Shading is ALWAYS ON now */
+      /* Shading always on */
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -868,7 +850,6 @@
       const h = topbar.offsetHeight;
       mapEl.style.top = h + 'px';
       document.documentElement.style.setProperty('--dynBarH', h+'px');
-      setModeBlocks();
     }
     window.addEventListener('load', placeMap);
     window.addEventListener('resize', placeMap);
