@@ -41,9 +41,14 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:flex; flex-direction:column; align-items:center; gap:8px;
+      display:flex; justify-content:center;
     }
-    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
+    /* Centered cluster (title + stacked nav) */
+    #barContent{
+      display:flex; align-items:center; gap:16px; /* space between title block and buttons */
+      text-align:center;
+    }
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px;}
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
     #pageTitle{color:#fff}
@@ -51,11 +56,10 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* NAV buttons (right side, stacked) */
+    /* Stacked nav buttons placed to the RIGHT of the centered title */
     #navStack{
-      position:absolute; right:16px; top:10px;
       display:flex; flex-direction:column; gap:8px;
-      align-items:flex-end;
+      align-items:flex-start; /* left-align the stacked buttons */
     }
     .nav-btn{
       background:#062015; border:1px solid #1b5a3e; color:#ffffff;
@@ -82,25 +86,32 @@
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+
+    @media (max-width: 640px){
+      #barContent{flex-direction:column; gap:10px;}
+      #navStack{align-items:center;}
+    }
   </style>
 </head>
 <body>
   <div id="topbar">
-    <div id="brandWrap">
-      <div class="msn">Matrix Solutions Network</div>
-      <div id="rowStatus">
-        <span id="pageTitle">Digital ID Status</span>
-        <span class="live">LIVE</span>
+    <div id="barContent">
+      <div id="brandWrap">
+        <div class="msn">Matrix Solutions Network</div>
+        <div id="rowStatus">
+          <span id="pageTitle">Digital ID Status</span>
+          <span class="live">LIVE</span>
+        </div>
+        <div class="updated" id="updatedTop">Updated: …</div>
+        <div class="inline-hint">• Click any dot or country for details</div>
       </div>
-      <div class="updated" id="updatedTop">Updated: …</div>
-      <div class="inline-hint">• Click any dot or country for details</div>
-    </div>
 
-    <!-- Stacked nav buttons on the right -->
-    <div id="navStack" aria-label="Other trackers">
-      <a class="nav-btn active" href="#" aria-current="page"><span>Digital ID</span></a>
-      <a class="nav-btn" href="../cbdc/"><span>CBDC Tracker</span></a>
-      <a class="nav-btn" href="../social-credit-system/"><span>Social Credit Tracker</span></a>
+      <!-- Stacked nav buttons, placed next to the centered title cluster -->
+      <div id="navStack" aria-label="Other trackers">
+        <a class="nav-btn active" href="#" aria-current="page"><span>Digital ID</span></a>
+        <a class="nav-btn" href="../cbdc/"><span>CBDC Tracker</span></a>
+        <a class="nav-btn" href="../social-credit-system/"><span>Social Credit Tracker</span></a>
+      </div>
     </div>
   </div>
 
@@ -183,7 +194,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       let switched = false;
       function switchToFallback(){
         if (switched) return; switched = true;
-        console.warn('Basemap error — switching to fallback tiles.');
         if (map.hasLayer(primary)) map.removeLayer(primary);
         if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
         const fallback = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
@@ -193,7 +203,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         let switched2 = false;
         fallback.on('tileerror', () => {
           if (switched2) return; switched2 = true;
-          console.warn('Fallback dark_all failed — switching to plain OSM.');
           if (map.hasLayer(fallback)) map.removeLayer(fallback);
           L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
             maxZoom:8, attribution:'&copy; OpenStreetMap contributors'
@@ -337,7 +346,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       drawAll(); // dots, lines, shading
 
-      // sanity checks
+      // smoke tests
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
