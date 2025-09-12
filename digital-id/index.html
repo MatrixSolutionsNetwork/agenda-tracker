@@ -28,7 +28,7 @@
 
     html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
 
-    /* ===== Top bar (your minimal layout) ===== */
+    /* ===== Top bar ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
@@ -46,15 +46,28 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Burger (unchanged) */
-    #burgerMenu{position:fixed; right:12px; bottom:12px; z-index:1150; width:48px; height:48px; border-radius:12px; background:#062015; border:1px solid #1b5a3e; color:#fff; font-size:18px; font-weight:800; cursor:pointer;}
-    #mobileMenu{position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px); background:rgba(11,30,22,.92); border:1px solid #144832; border-radius:12px; padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55); backdrop-filter: blur(2px);}
+    /* Burger on the TOP BAR (right side) */
+    #burgerMenu{
+      position:absolute; right:12px; top:50%; transform:translateY(-50%);
+      width:40px; height:40px; border-radius:10px;
+      background:#062015; border:1px solid #1b5a3e; color:#fff;
+      font-size:18px; font-weight:800; cursor:pointer;
+    }
+    @media (max-width: 720px){
+      #burgerMenu{ width:44px; height:44px; border-radius:12px; }
+    }
+
+    /* ===== Dropdown ===== */
+    #mobileMenu{
+      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
+      background:rgba(11,30,22,.92); border:1px solid #144832; border-radius:12px;
+      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55); backdrop-filter: blur(2px);
+    }
     #mobileMenu a{display:block; margin:6px 0; text-decoration:none;}
     .btn{background:#062015; border:1px solid #1b5a3e; color:#ffffff; padding:8px 10px; border-radius:10px; text-decoration:none; white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px; display:inline-block;}
 
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    /* Hide tile seams */
     .leaflet-container{ background:#081911; }
     .leaflet-tile{ background:#081911; transform:translateZ(0); }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
@@ -80,9 +93,10 @@
       <div class="updated" id="updatedTop">Updated: …</div>
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
+    <!-- Burger moved back to the top bar -->
+    <button id="burgerMenu" aria-label="Open menu">≡</button>
   </div>
 
-  <button id="burgerMenu" aria-label="Open menu">≡</button>
   <div id="mobileMenu" role="menu" aria-label="Navigation">
     <a class="btn" href="../">← Back to Agenda Tracker</a>
     <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
@@ -153,7 +167,7 @@
     const dotsLayer = L.layerGroup().addTo(map);
     let outlineLayer=null, hitLayer=null;
 
-    /* ===== Burger menu ===== */
+    /* ===== Dropdown (burger) ===== */
     const burger=document.getElementById('burgerMenu');
     const mobileMenu=document.getElementById('mobileMenu');
     burger.addEventListener('click',e=>{e.stopPropagation();mobileMenu.style.display=mobileMenu.style.display==='block'?'none':'block';});
@@ -218,7 +232,7 @@
         style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
       }).addTo(map);
 
-      // hit polygons (SVG in hitPane). IMPORTANT: tiny fillOpacity so browsers register hits.
+      // hit polygons (SVG in hitPane). Tiny fillOpacity so browsers register hits.
       hitLayer = L.geoJSON(worldGeo, {
         renderer: hitRenderer,
         style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
@@ -228,7 +242,6 @@
           const open=()=>openCountryPopup(key);
           layer.on('click',open);
           layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open();});
-          // subtle hover outline on desktop
           layer.on('mouseover',()=>layer.setStyle({stroke:true,color:getCSS('--mint'),weight:1,opacity:.6}));
           layer.on('mouseout', ()=>layer.setStyle({stroke:false}));
         }
@@ -269,7 +282,6 @@
     function drawDots(){
       dotsLayer.clearLayers();
       const red=getCSS('--red'), orange=getCSS('--orange');
-      // group by country so one dot per country (status priority: implemented beats dev)
       const byKey=new Map();
       for(const e of entries){
         const prev=byKey.get(e.key);
