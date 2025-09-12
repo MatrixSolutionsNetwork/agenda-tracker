@@ -15,7 +15,7 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Turf (centroids fallback) -->
+  <!-- Turf (centroid fallback) -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
   <style>
@@ -26,7 +26,12 @@
       --countryText:#dfffe9;
     }
 
-    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
+    html,body{
+      height:100%;margin:0;
+      background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
+      color:var(--text);
+      font-family:"Share Tech Mono",ui-monospace,monospace;
+    }
 
     /* ===== Top bar ===== */
     #topbar{
@@ -46,26 +51,6 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Burger on the TOP BAR (right side) */
-    #burgerMenu{
-      position:absolute; right:12px; top:50%; transform:translateY(-50%);
-      width:40px; height:40px; border-radius:10px;
-      background:#062015; border:1px solid #1b5a3e; color:#fff;
-      font-size:18px; font-weight:800; cursor:pointer;
-    }
-    @media (max-width: 720px){
-      #burgerMenu{ width:44px; height:44px; border-radius:12px; }
-    }
-
-    /* ===== Dropdown ===== */
-    #mobileMenu{
-      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
-      background:rgba(11,30,22,.92); border:1px solid #144832; border-radius:12px;
-      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55); backdrop-filter: blur(2px);
-    }
-    #mobileMenu a{display:block; margin:6px 0; text-decoration:none;}
-    .btn{background:#062015; border:1px solid #1b5a3e; color:#ffffff; padding:8px 10px; border-radius:10px; text-decoration:none; white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px; display:inline-block;}
-
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
     .leaflet-container{ background:#081911; }
@@ -78,7 +63,7 @@
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
 
-    /* Ensure hit polygons accept events even when nearly transparent */
+    /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
   </style>
 </head>
@@ -93,15 +78,6 @@
       <div class="updated" id="updatedTop">Updated: …</div>
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
-    <!-- Burger moved back to the top bar -->
-    <button id="burgerMenu" aria-label="Open menu">≡</button>
-  </div>
-
-  <div id="mobileMenu" role="menu" aria-label="Navigation">
-    <a class="btn" href="../">← Back to Agenda Tracker</a>
-    <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
-    <a class="btn" href="../cbdc/">Open CBDC Map</a>
-    <a class="btn" href="../social-credit-system/">Open Social Credit Map</a>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
@@ -140,46 +116,46 @@
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
       ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]]
     ]);
+
     function normalizeCountry(s){
       const k=String(s||"").normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/gi,' ').replace(/\s+/g,' ').toLowerCase().trim();
       return COUNTRY_ALIASES.get(k)||k;
     }
-    function splitCountries(cell){return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);}
+    function splitCountries(cell){
+      return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
+    }
     function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
     function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
     function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
     function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
+    function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
 
-    /* ===== Map ===== */
+    /* ===== Map & panes ===== */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
-    // Custom panes: dots above, hit polygons below
+    // custom panes: dots above, hit polygons below; lines in default overlay
     map.createPane('dotsPane');  map.getPane('dotsPane').style.zIndex = 650;
-    map.createPane('hitPane');   map.getPane('hitPane').style.zIndex  = 450;
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
-    const hitRenderer  = L.svg({   pane:'hitPane' });
 
-    const dotsLayer = L.layerGroup().addTo(map);
-    let outlineLayer=null, hitLayer=null;
+    // Layers
+    const linesImpLayer = L.layerGroup().addTo(map);
+    const linesDevLayer = L.layerGroup().addTo(map);
+    const dotsLayer     = L.layerGroup().addTo(map);
+    let outlineLayer=null, shadeLayer=null, hitLayer=null;
 
-    /* ===== Dropdown (burger) ===== */
-    const burger=document.getElementById('burgerMenu');
-    const mobileMenu=document.getElementById('mobileMenu');
-    burger.addEventListener('click',e=>{e.stopPropagation();mobileMenu.style.display=mobileMenu.style.display==='block'?'none':'block';});
-    document.addEventListener('click',e=>{if(!mobileMenu.contains(e.target)&&e.target!==burger)mobileMenu.style.display='none';});
-
-    /* ===== Layout ===== */
+    /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
     window.addEventListener('load',placeMap); window.addEventListener('resize',placeMap); if(document.fonts){document.fonts.ready.then(placeMap);} new ResizeObserver(placeMap).observe(topbar);
 
-    /* ===== Centroids & popups ===== */
+    /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
+
     function centroidInside(feature){
       try{ const c=turf.centerOfMass(feature).geometry.coordinates; return L.latLng(c[1],c[0]); }
       catch(e){ return L.geoJSON(feature).getBounds().getCenter(); }
@@ -203,9 +179,8 @@
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    /* ===== Data ===== */
     (async function init(){
-      // world polygons
+      // 1) world polygons
       const sources=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
@@ -216,7 +191,7 @@
       }
       if(!worldGeo){ console.error('World polygons failed to load'); return; }
 
-      // build centroid map and store normalized keys on features
+      // build centroid map + normalized key on features
       centroidByKey={};
       L.geoJSON(worldGeo).eachLayer(l=>{
         const p=l.feature&&l.feature.properties||{};
@@ -227,14 +202,18 @@
         if(l.feature.properties) l.feature.properties._key=nm;
       });
 
-      // outline under hit layer
+      // outline
       outlineLayer = L.geoJSON(worldGeo, {
         style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
       }).addTo(map);
 
-      // hit polygons (SVG in hitPane). Tiny fillOpacity so browsers register hits.
+      // shading (implemented only; style set after we know which)
+      shadeLayer = L.geoJSON(worldGeo, {
+        style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
+      }).addTo(map);
+
+      // hit polygons (transparent but clickable)
       hitLayer = L.geoJSON(worldGeo, {
-        renderer: hitRenderer,
         style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
         interactive:true,
         onEachFeature:(f,layer)=>{
@@ -247,7 +226,7 @@
         }
       }).addTo(map);
 
-      // sheet
+      // 2) sheet rows
       const res = await fetch(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'});
       if(!res.ok){ console.error('CSV fetch failed'); return; }
       const dateHdr=res.headers.get('Date')||new Date().toUTCString();
@@ -256,7 +235,7 @@
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
-      // normalize rows
+      // 3) normalize
       entries=[];
       for(const row of rows){
         const title=String(row["Title"]||"").trim();
@@ -265,6 +244,7 @@
         const year  =/^\d{4}$/.test(String(row["Year"]||"").trim())?parseInt(row["Year"]):null;
         const countriesCell=String(row["Countries"]||"").trim();
         if(!countriesCell) continue;
+
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
           const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
@@ -276,18 +256,30 @@
         }
       }
 
-      drawDots();
+      drawAll(); // dots, lines, shading
     })();
 
-    function drawDots(){
+    function drawAll(){
+      // Clear
       dotsLayer.clearLayers();
+      linesImpLayer.clearLayers();
+      linesDevLayer.clearLayers();
+
       const red=getCSS('--red'), orange=getCSS('--orange');
-      const byKey=new Map();
+
+      // Deduplicate per country; prefer implemented if both exist
+      const bestByKey=new Map();
       for(const e of entries){
-        const prev=byKey.get(e.key);
-        if(!prev || (e.isImplemented && !prev.isImplemented)) byKey.set(e.key,e);
+        const prev=bestByKey.get(e.key);
+        if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
-      for(const [key,e] of byKey){
+
+      // Separate lists for lines
+      const impPts=[], devPts=[];
+      const implementedShown = new Set();
+
+      // Draw dots
+      for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
           renderer:dotsRenderer, radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
@@ -295,6 +287,43 @@
         .bindTooltip(`${e.country}`,{direction:'top',offset:[0,-6]})
         .on('click',()=>openCountryPopup(key))
         .addTo(dotsLayer);
+
+        if(e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(key); }
+        else               { devPts.push([e.lat,e.lng]); }
+      }
+
+      // Shade implemented countries that have dots
+      if (shadeLayer){
+        const fill = getCSS('--red');
+        shadeLayer.setStyle(f=>{
+          const k=(f.properties&&f.properties._key)||'';
+          return implementedShown.has(k)
+            ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
+            : {fillOpacity:0, color:'#0000', weight:0};
+        });
+      }
+
+      // Local networks: connect to K=3 nearest neighbors
+      const K=3;
+      buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
+      buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
+    }
+
+    function buildLocalNetwork(coords, color, layer, k=3, opacity=.35, weight=1.2){
+      const n=coords.length; if(n<2) return;
+      const seen=new Set();
+      for(let i=0;i<n;i++){
+        const dists=[];
+        for(let j=0;j<n;j++){
+          if(i===j) continue;
+          dists.push({j, d:haversine(coords[i],coords[j])});
+        }
+        dists.sort((a,b)=>a.d-b.d);
+        const limit=Math.min(k, dists.length);
+        for(let t=0;t<limit;t++){
+          const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
+          L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
+        }
       }
     }
   </script>
