@@ -41,14 +41,9 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:flex; justify-content:center;
+      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-    /* Centered cluster (title + stacked nav) */
-    #barContent{
-      display:flex; align-items:center; gap:16px; /* space between title block and buttons */
-      text-align:center;
-    }
-    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px;}
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
     #pageTitle{color:#fff}
@@ -56,23 +51,11 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Stacked nav buttons placed to the RIGHT of the centered title */
-    #navStack{
-      display:flex; flex-direction:column; gap:8px;
-      align-items:flex-start; /* left-align the stacked buttons */
-    }
-    .nav-btn{
-      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
-      padding:6px 10px; border-radius:10px; text-decoration:none;
-      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
-    }
-    /* Active page indicator: underline text inside the button */
-    .nav-btn.active > span{ text-decoration: underline; text-underline-offset: 2px; }
-
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    .leaflet-container{ background:#081911; }
-    .leaflet-tile{ background:#081911; transform:translateZ(0); }
+    /* If tiles fail, show neutral black instead of green */
+    .leaflet-container{ background:#000; }
+    .leaflet-tile{ background:transparent; transform:translateZ(0); }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
@@ -86,32 +69,18 @@
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
-
-    @media (max-width: 640px){
-      #barContent{flex-direction:column; gap:10px;}
-      #navStack{align-items:center;}
-    }
   </style>
 </head>
 <body>
   <div id="topbar">
-    <div id="barContent">
-      <div id="brandWrap">
-        <div class="msn">Matrix Solutions Network</div>
-        <div id="rowStatus">
-          <span id="pageTitle">Digital ID Status</span>
-          <span class="live">LIVE</span>
-        </div>
-        <div class="updated" id="updatedTop">Updated: …</div>
-        <div class="inline-hint">• Click any dot or country for details</div>
+    <div id="brandWrap">
+      <div class="msn">Matrix Solutions Network</div>
+      <div id="rowStatus">
+        <span id="pageTitle">Digital ID Status</span>
+        <span class="live">LIVE</span>
       </div>
-
-      <!-- Stacked nav buttons, placed next to the centered title cluster -->
-      <div id="navStack" aria-label="Other trackers">
-        <a class="nav-btn active" href="#" aria-current="page"><span>Digital ID</span></a>
-        <a class="nav-btn" href="../cbdc/"><span>CBDC Tracker</span></a>
-        <a class="nav-btn" href="../social-credit-system/"><span>Social Credit Tracker</span></a>
-      </div>
+      <div class="updated" id="updatedTop">Updated: …</div>
+      <div class="inline-hint">• Click any dot or country for details</div>
     </div>
   </div>
 
@@ -122,7 +91,7 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Embedded fallback rows so the page still renders if CSV fetch is blocked
+    // Local CSV fallback so the app still runs if fetch is blocked
     const FALLBACK_CSV = `Title,Status,Description,Year,Countries
 National eID,Implemented,Live national digital identity,2023,United Kingdom
 Digital ID Pilot,In development,Phase 2 pilot,2025,United States
@@ -181,38 +150,75 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
     map.getPane('labelsPane').style.pointerEvents = 'none';
 
-    // --- Robust basemap with fallbacks to avoid "green map" ---
-    let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
-      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
-    }).addTo(map);
+    // --- Robust basemap with fallbacks to avoid the “green map” ---
+    const TILE_OPTS = {
+      subdomains: 'abcd',
+      maxZoom: 8,
+      // Transparent 1x1 so missing tiles don’t show a color
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+    };
 
-    let labelsOnly = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
-      subdomains:'abcd', maxZoom:8, pane:'labelsPane'
-    }).addTo(map);
+    // Primary: no-labels + labels overlay (best look)
+    let baseNoLabels = L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
+      { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+    ).addTo(map);
 
-    function installTileFallback(primary, overlay){
+    let labelsOnly = L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
+      { ...TILE_OPTS, pane: 'labelsPane' }
+    ).addTo(map);
+
+    installTileFallback(baseNoLabels, labelsOnly);
+
+    function installTileFallback(primary, overlay) {
       let switched = false;
-      function switchToFallback(){
-        if (switched) return; switched = true;
+
+      function switchToFallback() {
+        if (switched) return;
+        switched = true;
+        console.warn('Basemap tiles failing → switching to fallback.');
+
         if (map.hasLayer(primary)) map.removeLayer(primary);
         if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
-        const fallback = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
-          subdomains:'abcd', maxZoom:8, attribution:'&copy; OpenStreetMap &copy; CARTO'
-        }).addTo(map);
-        // second-level fallback (OSM) if Carto dark_all fails too
+
+        // Fallback #1: single dark_all tiles
+        const fallback1 = L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+          { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+        ).addTo(map);
+
+        // Fallback #2: plain OSM if even Carto dark_all is blocked
         let switched2 = false;
-        fallback.on('tileerror', () => {
-          if (switched2) return; switched2 = true;
-          if (map.hasLayer(fallback)) map.removeLayer(fallback);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-            maxZoom:8, attribution:'&copy; OpenStreetMap contributors'
+        fallback1.on('tileerror', () => {
+          if (switched2) return;
+          switched2 = true;
+          if (map.hasLayer(fallback1)) map.removeLayer(fallback1);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            ...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'
           }).addTo(map);
         });
+
+        // If fallback1 never starts (ad-block), force-switch after 3s
+        setTimeout(() => {
+          if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
+            fallback1.fire('tileerror');
+          }
+        }, 3000);
       }
+
+      // Switch on any tile error
       primary.on('tileerror', switchToFallback);
       if (overlay) overlay.on('tileerror', switchToFallback);
+
+      // Guard against silent failures: if nothing loads in 3.5s, fallback.
+      setTimeout(() => {
+        const loaded =
+          Object.keys(primary._tiles || {}).length +
+          (overlay ? Object.keys(overlay._tiles || {}).length : 0);
+        if (!switched && loaded === 0) switchToFallback();
+      }, 3500);
     }
-    installTileFallback(baseNoLabels, labelsOnly);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
 
@@ -225,7 +231,13 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
-    window.addEventListener('load',placeMap); window.addEventListener('resize',placeMap); if(document.fonts){document.fonts.ready.then(placeMap);} new ResizeObserver(placeMap).observe(topbar);
+    window.addEventListener('load',placeMap);
+    window.addEventListener('resize',placeMap);
+    if(document.fonts){document.fonts.ready.then(placeMap);}
+    new ResizeObserver(placeMap).observe(topbar);
+    // Mobile resilience
+    window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150); });
 
     /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
@@ -346,7 +358,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       drawAll(); // dots, lines, shading
 
-      // smoke tests
+      // sanity checks
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
