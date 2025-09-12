@@ -15,7 +15,7 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Turf (for robust centroids; you can remove if you prefer bounds center) -->
+  <!-- Turf -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
   <style>
@@ -27,6 +27,7 @@
       --dynBarH: 92px;
     }
     html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
+
     /* ===== TOP BAR ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
@@ -71,7 +72,8 @@
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
     .leaflet-popup-content h3{ color:var(--countryText) !important; }
 
-    .country-hit{ cursor:pointer; }
+    /* Ensure SVG paths accept taps/clicks reliably */
+    .country-hit{ cursor:pointer; pointer-events:auto; }
   </style>
 </head>
 <body>
@@ -159,24 +161,22 @@
     /* ========= MAP ========= */
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
 
-    // Create explicit panes so order & events are stable across refreshes
+    // Explicit panes to stabilize z-order
     map.createPane('hitPane');  map.getPane('hitPane').style.zIndex = 590;   // below markers
-    map.createPane('dotsPane'); map.getPane('dotsPane').style.zIndex = 610;  // above markers
-    // (Leaflet default: overlayPane 400, markerPane 600, tooltip 650, popup 700)
+    map.createPane('dotsPane'); map.getPane('dotsPane').style.zIndex = 610;  // above polygons
+    map.getPane('hitPane').style.pointerEvents = 'auto'; // ★ allow clicks on the pane
 
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    const dotsRenderer = L.canvas({ pane: 'dotsPane', padding: 0.3 }); // dots on canvas (top)
-    const hitRenderer  = L.svg({ pane: 'hitPane' });                    // country clicks on svg (under)
+    const dotsRenderer = L.canvas({ pane: 'dotsPane', padding: 0.3 });
+    const hitRenderer  = L.svg({ pane: 'hitPane' }); // ★ SVG so pointer events work perfectly
 
-    // Layers
     const dotsLayer = L.layerGroup().addTo(map);
     let outlineLayer = null;
     let hitLayer = null;
 
-    // State
     let worldGeo = null;
     let centroidByKey = {};
     let entries = [];
@@ -187,7 +187,7 @@
     burger.addEventListener('click', (e)=>{ e.stopPropagation(); mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block'; });
     document.addEventListener('click', (e)=>{ if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none'; });
 
-    /* ===== Layout: keep map under bar ===== */
+    /* ===== Layout ===== */
     const topbar = document.getElementById('topbar');
     function placeMap(){ const h = topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=> map.invalidateSize(), 0); }
     window.addEventListener('load', placeMap);
@@ -225,7 +225,7 @@
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    /* ===== Data loaders — IMPORTANT: world FIRST, then sheet ===== */
+    /* ===== Data loaders ===== */
     async function loadWorld(){
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -294,28 +294,23 @@
       return out;
     }
 
-    /* ===== Init sequence: deterministic ===== */
+    /* ===== Init sequence ===== */
     (async function init(){
       try{
-        // 1) world first
-        worldGeo = await loadWorld();
-
-        // 2) sheet after centroids exist
-        entries = await loadSheet();
-
-        // 3) draw
+        const geo = await loadWorld();
+        const rows = await loadSheet();
+        worldGeo = geo;
+        entries = rows;
         drawAll();
-      }catch(e){
-        console.error(e);
-      }
+      }catch(e){ console.error(e); }
     })();
 
     function drawAll(){
-      // outline
+      // Outline
       if (outlineLayer) outlineLayer.remove();
       outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
-      // dots
+      // Dots
       dotsLayer.clearLayers();
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey]; if (!pt) continue;
@@ -335,22 +330,30 @@
         if (m.bringToFront) m.bringToFront();
       }
 
-      // country hit layer (SVG, lower pane)
+      // Country hit layer — SVG below markers, with reliable hit area
       if (hitLayer) hitLayer.remove();
       hitLayer = L.geoJSON(worldGeo, {
-        renderer: hitRenderer, pane: 'hitPane',
-        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.012, fillColor:'#000' },
+        renderer: hitRenderer,
+        pane: 'hitPane',
+        style: () => ({
+          className: 'country-hit',      // ★ ensure cursor + events
+          color:'#0000',
+          weight:0,
+          fill:true,
+          fillColor:'#000',
+          fillOpacity:0.08               // ★ slightly higher for touch hit-testing (still invisible)
+        }),
         interactive: true,
         onEachFeature: (f, layer) => {
           const key = (f.properties && f.properties._key) || '';
+          layer.on('click', () => openCountryPopup(key));
+          // Optional hover outline on desktop
           layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
           layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-          layer.on('click',     () => openCountryPopup(key));
-          if (layer.getElement){ const el=layer.getElement(); if (el) el.classList.add('country-hit'); }
         }
       }).addTo(map);
 
-      // nudge first paint
+      // Nudge first paint
       map.once('idle', forceDotsRedraw);
       requestAnimationFrame(forceDotsRedraw);
       setTimeout(forceDotsRedraw, 0);
