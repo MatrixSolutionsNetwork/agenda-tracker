@@ -293,7 +293,6 @@
     /* ===== CONFIG: SHEET ===== */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
-
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
@@ -332,7 +331,6 @@
       ["bolivia (plurinational state of)","bolivia"], ["brunei darussalam","brunei"],
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
-
     const CENTROID_OVERRIDES = new Map([
       ["norway",[60.4720, 8.4689]],
       ["russia",[61.5240, 105.3188]],
@@ -367,11 +365,9 @@
       return COUNTRY_ALIASES.get(k) || k;
     }
     function splitCountries(cell){
-      return String(cell)
-        .replace(/・/g, ',')
+      return String(cell).replace(/・/g, ',')
         .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
-        .map(s=>s.trim())
-        .filter(Boolean);
+        .map(s=>s.trim()).filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
@@ -406,7 +402,7 @@
     baseTiles.once('load', () => { tilesReady = true; maybeFirstDraw(); });
     map.whenReady(() => { tilesReady = true; maybeFirstDraw(); });
 
-    /* ===== PANES (critical for dot visibility) ===== */
+    /* ===== PANES ===== */
     map.createPane('countriesPane'); map.getPane('countriesPane').style.zIndex = 350;
     map.createPane('linesPane');     map.getPane('linesPane').style.zIndex     = 360;
     map.createPane('dotsPane');      map.getPane('dotsPane').style.zIndex      = 650;
@@ -488,24 +484,41 @@
         .openOn(map);
     }
 
-    /* ===== First-draw helpers to fix "dots invisible until toggle" ===== */
+    /* ===== First-draw helpers ===== */
     function forceDotsRedraw(){
-      map.invalidateSize();                         // ensure layout is current
+      map.invalidateSize();
       if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
       if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
       requestAnimationFrame(() => {
         if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
         if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
       });
-      setTimeout(() => {
-        if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
-        if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
-      }, 0);
     }
+
+    // *** Invisible boot-kick: reproduce your manual toggle that makes dots appear ***
+    function bootKickDotsOnce(){
+      const imp = document.getElementById('showImpDots');
+      const dev = document.getElementById('showDevDots');
+      const impWas = imp.checked, devWas = dev.checked;
+
+      // Flip quickly without visible flicker
+      imp.checked = false; dev.checked = false;
+      applyFilters();                      // hide
+      imp.checked = impWas; dev.checked = devWas;
+
+      // Re-show and force paint in next ticks
+      requestAnimationFrame(() => {
+        applyFilters();
+        forceDotsRedraw();
+        setTimeout(forceDotsRedraw, 0);
+      });
+    }
+
     function maybeFirstDraw(){
       if (tilesReady && dataReady) {
-        applyFilters();          // add markers now that map/tiles are ready
-        forceDotsRedraw();       // force the initial paint
+        applyFilters();          // add markers
+        forceDotsRedraw();       // nudge canvas
+        bootKickDotsOnce();      // guarantee visibility (mirrors your manual fix)
       }
     }
 
@@ -525,7 +538,7 @@
           geo=j; break;
         }catch(e){ lastErr=e; }
       }
-      if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
+      if(!geo){ const d=document.getElementById('debug'); d.style.display='block'; d.innerHTML='Failed to load world polygons.'; console.error(lastErr); return; }
 
       function getName(props){
         if (!props) return null;
@@ -567,7 +580,7 @@
       }
 
       // Build centroid + region lookup
-      let allRegions = new Set();
+      allRegions = new Set();
       centroidByKey = {};
       regionMap = {};
 
@@ -621,7 +634,9 @@
         const text = await res.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
         rawRows = parsed.data;
-      }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
+      }catch(e){
+        const d=document.getElementById('debug'); d.style.display='block'; d.textContent='Failed to load/parse CSV.'; console.error(e); return;
+      }
 
       // 3) Normalize rows
       entries = [];
@@ -632,9 +647,7 @@
 
       function pickYear(row){
         const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
-        for (const k of keys){
-          if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
-        }
+        for (const k of keys){ if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]); }
         return null;
       }
 
@@ -723,7 +736,7 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
-      // Listeners that can run anytime after
+      // Listeners
       document.getElementById('showImpDots').addEventListener('change', applyFilters);
       document.getElementById('showDevDots').addEventListener('change', applyFilters);
       regionSelect.addEventListener('change', applyFilters);
@@ -745,10 +758,11 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
-      // >>> Do NOT draw yet; mark data ready and wait for tiles/map
+      // Defer FIRST draw until both map/tiles & data are ready
       dataReady = true;
       maybeFirstDraw();
 
+      // Debug unmatched
       if (unmatched.size){
         const dbgEl = document.getElementById('debug');
         dbgEl.style.display='block';
@@ -760,7 +774,7 @@
     function currentFilters(){
       const showImp = document.getElementById('showImpDots').checked;
       const showDev = document.getElementById('showDevDots').checked;
-      const region = (document.getElementById('regionSelect').value || ""); // empty = no region filter
+      const region = (document.getElementById('regionSelect').value || "");
       const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
       const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
       return {showImp, showDev, region, minYear, hasYearUI};
@@ -775,7 +789,7 @@
       const red = getCSS('--red'), orange=getCSS('--orange');
 
       const filt = e => {
-        if (region && (e.region||'Other') !== region) return false;   // blank = no region filter
+        if (region && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
         if (e.isDev && !showDev) return false;
@@ -790,7 +804,6 @@
         const color = e.isImplemented ? red : orange;
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
-        // Draw on dotsPane via canvas renderer (always above polygons)
         L.circleMarker([e.lat, e.lng], {
           renderer: dotsRenderer,
           pane: 'dotsPane',
