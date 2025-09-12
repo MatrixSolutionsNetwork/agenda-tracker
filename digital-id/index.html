@@ -26,9 +26,15 @@
       --barPadY:16px; --barPadX:16px;
       --dynBarH: 92px;
     }
-    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
 
-    /* ===== TOP BAR ===== */
+    html,body{
+      height:100%;margin:0;
+      background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
+      color:var(--text);
+      font-family:"Share Tech Mono",ui-monospace,monospace;
+    }
+
+    /* ===== TOP BAR (unchanged layout) ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
@@ -63,6 +69,11 @@
 
     /* ===== MAP ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
+
+    /* Remove visible tile seams */
+    .leaflet-container{ background:#081911; }                /* ← matches basemap */
+    .leaflet-tile{ background:#081911; transform:translateZ(0); } /* ← hide gaps on some GPUs */
+
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
@@ -72,7 +83,6 @@
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
     .leaflet-popup-content h3{ color:var(--countryText) !important; }
 
-    /* Ensure SVG paths accept taps/clicks reliably */
     .country-hit{ cursor:pointer; pointer-events:auto; }
   </style>
 </head>
@@ -143,35 +153,35 @@
       ["costa rica",[9.7489, -83.7534]], ["japan",[36.2048, 138.2529]]
     ]);
     function normalizeCountry(s){
-      const k = String(s||"")
-        .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
-        .replace(/[^a-z0-9 ]+/gi,' ')
-        .replace(/\s+/g,' ')
-        .toLowerCase().trim();
+      const k = String(s||"").normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/gi,' ').replace(/\s+/g,' ').toLowerCase().trim();
       return COUNTRY_ALIASES.get(k) || k;
     }
     function splitCountries(cell){
-      return String(cell).replace(/・/g, ',')
-        .split(/\s*(?:,|;|\/|&|\band\b)\s*/i)
-        .map(s=>s.trim()).filter(Boolean);
+      return String(cell).replace(/・/g, ',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){ const n=parseInt(hex.replace('#',''),16); let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt; r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b)); return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0'); }
 
     /* ========= MAP ========= */
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
 
-    // Explicit panes to stabilize z-order
-    map.createPane('hitPane');  map.getPane('hitPane').style.zIndex = 590;   // below markers
-    map.createPane('dotsPane'); map.getPane('dotsPane').style.zIndex = 610;  // above polygons
-    map.getPane('hitPane').style.pointerEvents = 'auto'; // ★ allow clicks on the pane
+    // Only a custom pane for dots (to keep them above polygons)
+    map.createPane('dotsPane'); map.getPane('dotsPane').style.zIndex = 610;
 
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+      attribution:'&copy; OpenStreetMap &copy; CARTO',
+      subdomains:'abcd',
+      maxZoom:8,
+      crossOrigin:true,
+      updateWhenZooming:false,
+      updateWhenIdle:true,
+      keepBuffer:4
     }).addTo(map);
 
     const dotsRenderer = L.canvas({ pane: 'dotsPane', padding: 0.3 });
-    const hitRenderer  = L.svg({ pane: 'hitPane' }); // ★ SVG so pointer events work perfectly
+    const hitRenderer  = L.svg();                 // ← default overlayPane with pointer events
 
     const dotsLayer = L.layerGroup().addTo(map);
     let outlineLayer = null;
@@ -211,11 +221,7 @@
       }).join('');
       return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>${list}</div>`;
     }
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){ const n=parseInt(hex.replace('#',''),16); let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt; r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b)); return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0'); }
     function* groupByCountry(arr){ const m=new Map(); for(const e of arr){ if(!m.has(e.key)) m.set(e.key,[]); m.get(e.key).push(e);} for(const kv of m) yield kv; }
-    function forceDotsRedraw(){ map.invalidateSize(); requestAnimationFrame(()=>{ map.fire('zoomend'); map.fire('moveend'); }); }
-
     function openCountryPopup(countryKey){
       if (!countryKey) return;
       const rows = entries.filter(e=>e.key===countryKey);
@@ -248,8 +254,9 @@
         const nmRaw=p.name||p.NAME||p.NAME_EN||p.ADMIN||p.SOVEREIGNT;
         if(!nmRaw) return;
         const nm = normalizeCountry(nmRaw);
-        if (CENTROID_OVERRIDES.has(nm)){ const [lat,lng]=CENTROID_OVERRIDES.get(nm); centroidByKey[nm]=L.latLng(lat,lng); }
-        else { centroidByKey[nm]=centroidInside(l.feature); }
+        centroidByKey[nm] = CENTROID_OVERRIDES.has(nm)
+          ? L.latLng(...CENTROID_OVERRIDES.get(nm))
+          : centroidInside(l.feature);
         if (l.feature && l.feature.properties) l.feature.properties._key = nm;
       });
       return geo;
@@ -295,28 +302,44 @@
     }
 
     /* ===== Init sequence ===== */
+    let worldGeo = null, entries = [];
     (async function init(){
       try{
-        const geo = await loadWorld();
-        const rows = await loadSheet();
-        worldGeo = geo;
-        entries = rows;
+        worldGeo = await loadWorld();
+        entries  = await loadSheet();
         drawAll();
       }catch(e){ console.error(e); }
     })();
 
     function drawAll(){
-      // Outline
+      // Outline under the interactive hit layer (both are in overlayPane)
       if (outlineLayer) outlineLayer.remove();
-      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
+      outlineLayer = L.geoJSON(worldGeo, {
+        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
+      }).addTo(map);
 
-      // Dots
+      // Countries hit layer (SVG in overlayPane → reliable clicks)
+      if (hitLayer) hitLayer.remove();
+      hitLayer = L.geoJSON(worldGeo, {
+        renderer: hitRenderer,                            // ← overlayPane, pointer-events ON
+        style: { className:'country-hit', color:'#0000', weight:0, fill:true, fillColor:'#000', fillOpacity:0.08 },
+        interactive: true,
+        onEachFeature: (f, layer) => {
+          const key = (f.properties && f.properties._key) || '';
+          layer.on('click', () => openCountryPopup(key));
+          // gentle hover outline on desktop
+          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
+          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
+        }
+      }).addTo(map);
+
+      // Dots (Canvas on separate pane above polygons)
       dotsLayer.clearLayers();
       for (const [countryKey, rows] of groupByCountry(entries)){
         const pt = centroidByKey[countryKey]; if (!pt) continue;
         const isImplemented = rows.some(r=>r.isImplemented);
         const color = isImplemented ? getCSS('--red') : getCSS('--orange');
-        const m = L.circleMarker([pt.lat, pt.lng], {
+        L.circleMarker([pt.lat, pt.lng], {
           renderer: dotsRenderer,
           radius: 6.5,
           color: darken(color,30),
@@ -327,36 +350,7 @@
         .bindTooltip(`${rows[0].country}`, {direction:'top', offset:[0,-6]})
         .on('click', ()=> openCountryPopup(countryKey))
         .addTo(dotsLayer);
-        if (m.bringToFront) m.bringToFront();
       }
-
-      // Country hit layer — SVG below markers, with reliable hit area
-      if (hitLayer) hitLayer.remove();
-      hitLayer = L.geoJSON(worldGeo, {
-        renderer: hitRenderer,
-        pane: 'hitPane',
-        style: () => ({
-          className: 'country-hit',      // ★ ensure cursor + events
-          color:'#0000',
-          weight:0,
-          fill:true,
-          fillColor:'#000',
-          fillOpacity:0.08               // ★ slightly higher for touch hit-testing (still invisible)
-        }),
-        interactive: true,
-        onEachFeature: (f, layer) => {
-          const key = (f.properties && f.properties._key) || '';
-          layer.on('click', () => openCountryPopup(key));
-          // Optional hover outline on desktop
-          layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
-          layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
-        }
-      }).addTo(map);
-
-      // Nudge first paint
-      map.once('idle', forceDotsRedraw);
-      requestAnimationFrame(forceDotsRedraw);
-      setTimeout(forceDotsRedraw, 0);
     }
   </script>
 </body>
