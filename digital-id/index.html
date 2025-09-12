@@ -393,59 +393,36 @@
       maxBoundsViscosity:1.0
     }).setView([20,0], 2);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
+    // Track readiness for the first draw
+    let tilesReady = false;
+    let dataReady  = false;
+
+    const baseTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8,
       noWrap:true, bounds:[[-85,-180],[85,180]]
     }).addTo(map);
 
+    // Consider both tile 'load' and map 'whenReady' to be safe across browsers
+    baseTiles.once('load', () => { tilesReady = true; maybeFirstDraw(); });
+    map.whenReady(() => { tilesReady = true; maybeFirstDraw(); });
+
     /* ===== PANES (critical for dot visibility) ===== */
-    // Countries (polygons, shading, hit layer) below dots
-    map.createPane('countriesPane');
-    map.getPane('countriesPane').style.zIndex = 350;
-
-    // Lines just above countries
-    map.createPane('linesPane');
-    map.getPane('linesPane').style.zIndex = 360;
-
-    // Dots above everything else (except tooltips/popups)
-    map.createPane('dotsPane');
-    map.getPane('dotsPane').style.zIndex = 650;
+    map.createPane('countriesPane'); map.getPane('countriesPane').style.zIndex = 350;
+    map.createPane('linesPane');     map.getPane('linesPane').style.zIndex     = 360;
+    map.createPane('dotsPane');      map.getPane('dotsPane').style.zIndex      = 650;
 
     // Canvas renderer bound to dotsPane
     const dotsRenderer = L.canvas({ pane: 'dotsPane' });
 
     /* ===== Layers ===== */
-    const dotsImpLayer = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
-    const dotsDevLayer = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
+    const dotsImpLayer  = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
+    const dotsDevLayer  = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
     const linesImpLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
     const linesDevLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
 
     let outlineLayer = null;  // countriesPane
-    let shadeLayer = null;    // countriesPane
-    let hitLayer = null;      // countriesPane
-
-    /* ===== UI refs ===== */
-    const drawer = document.getElementById('drawer');
-    const drawerClose = document.getElementById('drawerClose');
-    const drawerRefresh = document.getElementById('drawerRefresh');
-    const netImp = document.getElementById('netImp');
-    const netDev = document.getElementById('netDev');
-    const kNeighborsInput = document.getElementById('kNeighbors');
-    const showImpDots = document.getElementById('showImpDots');
-    const showDevDots = document.getElementById('showDevDots');
-    const dbgEl = document.getElementById('debug');
-    const dbg = (m)=>{ dbgEl.style.display='block'; dbgEl.innerHTML += (dbgEl.innerHTML?'<br>':'') + m; };
-
-    const searchInput = document.getElementById('searchCountry');
-    const searchBtn = document.getElementById('btnSearch');
-    const dataList = document.getElementById('countryList');
-    const regionSelect = document.getElementById('regionSelect');
-    const yearRow = document.getElementById('yearRow');
-    const yearMin = document.getElementById('yearMin');
-    const yearMinVal = document.getElementById('yearMinVal');
-    const btnExport = document.getElementById('btnExport');
-    const lastUpdated = document.getElementById('lastUpdated');
-    const updatedTop = document.getElementById('updatedTop');
+    let shadeLayer   = null;  // countriesPane
+    let hitLayer     = null;  // countriesPane
 
     /* ===== Burger ===== */
     const burger = document.getElementById('burgerMenu');
@@ -459,6 +436,9 @@
     });
 
     /* ===== Stats chip / drawer ===== */
+    const drawer = document.getElementById('drawer');
+    const drawerClose = document.getElementById('drawerClose');
+    const drawerRefresh = document.getElementById('drawerRefresh');
     const statsChip = document.getElementById('statsChip');
     const statsChipText = document.getElementById('statsChipText');
     statsChip.addEventListener('click', ()=> drawer.classList.add('open'));
@@ -506,6 +486,27 @@
         .setLatLng(pt)
         .setContent(html)
         .openOn(map);
+    }
+
+    /* ===== First-draw helpers to fix "dots invisible until toggle" ===== */
+    function forceDotsRedraw(){
+      map.invalidateSize();                         // ensure layout is current
+      if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
+      if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
+      requestAnimationFrame(() => {
+        if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
+        if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
+      });
+      setTimeout(() => {
+        if (dotsImpLayer.invoke) dotsImpLayer.invoke('redraw');
+        if (dotsDevLayer.invoke) dotsDevLayer.invoke('redraw');
+      }, 0);
+    }
+    function maybeFirstDraw(){
+      if (tilesReady && dataReady) {
+        applyFilters();          // add markers now that map/tiles are ready
+        forceDotsRedraw();       // force the initial paint
+      }
     }
 
     /* ===== INIT ===== */
@@ -566,9 +567,9 @@
       }
 
       // Build centroid + region lookup
+      let allRegions = new Set();
       centroidByKey = {};
       regionMap = {};
-      allRegions = new Set();
 
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
@@ -614,8 +615,8 @@
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
         if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
         const dateHdr = res.headers.get('Date') || '';
-        (updatedTop || {}).textContent = 'Updated: ' + (dateHdr || 'now');
-        (lastUpdated || {}).textContent = 'Updated: ' + (dateHdr || 'now');
+        (document.getElementById('updatedTop') || {}).textContent = 'Updated: ' + (dateHdr || 'now');
+        (document.getElementById('lastUpdated') || {}).textContent = 'Updated: ' + (dateHdr || 'now');
 
         const text = await res.text();
         const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
@@ -671,6 +672,7 @@
       }
 
       // Region selector (blank = no filter)
+      const regionSelect = document.getElementById('regionSelect');
       const optionBlank = document.createElement('option');
       optionBlank.value = ""; optionBlank.textContent = "Region (optional)";
       regionSelect.appendChild(optionBlank);
@@ -708,9 +710,12 @@
 
       // Autocomplete
       const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
-      dataList.innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
+      document.getElementById('countryList').innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
 
       // Year slider (if any)
+      const yearRow = document.getElementById('yearRow');
+      const yearMin = document.getElementById('yearMin');
+      const yearMinVal = document.getElementById('yearMinVal');
       if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
         yearRow.style.display='flex';
         yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
@@ -718,15 +723,17 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
-      // Listeners
-      showImpDots.addEventListener('change', applyFilters);
-      showDevDots.addEventListener('change', applyFilters);
+      // Listeners that can run anytime after
+      document.getElementById('showImpDots').addEventListener('change', applyFilters);
+      document.getElementById('showDevDots').addEventListener('change', applyFilters);
       regionSelect.addEventListener('change', applyFilters);
-      netImp.addEventListener('change', applyNetworks);
-      netDev.addEventListener('change', applyNetworks);
-      kNeighborsInput.addEventListener('change', applyNetworks);
-      btnExport.addEventListener('click', exportCurrent);
+      document.getElementById('netImp').addEventListener('change', applyNetworks);
+      document.getElementById('netDev').addEventListener('change', applyNetworks);
+      document.getElementById('kNeighbors').addEventListener('change', applyNetworks);
+      document.getElementById('btnExport').addEventListener('click', exportCurrent);
 
+      const searchInput = document.getElementById('searchCountry');
+      const searchBtn = document.getElementById('btnSearch');
       function runSearch(){
         const q = (searchInput.value||'').trim().toLowerCase();
         if (!q) return;
@@ -738,12 +745,14 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
-      // First draw
-      applyFilters();
+      // >>> Do NOT draw yet; mark data ready and wait for tiles/map
+      dataReady = true;
+      maybeFirstDraw();
 
       if (unmatched.size){
-        dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
-        console.warn("Unmatched:", [...unmatched].sort());
+        const dbgEl = document.getElementById('debug');
+        dbgEl.style.display='block';
+        dbgEl.innerHTML = `<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`;
       }
     })();
 
@@ -751,7 +760,7 @@
     function currentFilters(){
       const showImp = document.getElementById('showImpDots').checked;
       const showDev = document.getElementById('showDevDots').checked;
-      const region = document.getElementById('regionSelect').value || ""; // empty = no region filter
+      const region = (document.getElementById('regionSelect').value || ""); // empty = no region filter
       const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
       const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
       return {showImp, showDev, region, minYear, hasYearUI};
@@ -815,11 +824,13 @@
     }
 
     function rebuildNetworksWithPoints(impPts, devPts){
-      const k = Math.max(1, Math.min(6, parseInt(kNeighborsInput.value||'4',10)));
+      const k = Math.max(1, Math.min(6, parseInt(document.getElementById('kNeighbors').value||'4',10)));
       linesImpLayer.clearLayers(); linesDevLayer.clearLayers();
 
-      if (netImp.checked && impPts.length>1) buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
-      if (netDev.checked && devPts.length>1) buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
+      if (document.getElementById('netImp').checked && impPts.length>1)
+        buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
+      if (document.getElementById('netDev').checked && devPts.length>1)
+        buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
     }
     function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
       const n=coords.length; if(n<2) return;
@@ -882,7 +893,7 @@
 
     // ESC closes drawer
     document.addEventListener('keydown', e=>{
-      if (e.key === 'Escape') drawer.classList.remove('open');
+      if (e.key === 'Escape') document.getElementById('drawer').classList.remove('open');
     });
   </script>
 </body>
