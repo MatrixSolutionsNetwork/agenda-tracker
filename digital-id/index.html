@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <!-- FONT -->
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- CSV parser -->
+  <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
   <!-- Charts -->
@@ -222,7 +222,7 @@
       <button id="btnSearch" class="btn-ghost">Go</button>
     </div>
 
-    <!-- Region (no “All regions”; blank means no filter) -->
+    <!-- Region (optional; blank = no filter) -->
     <div class="row" style="gap:8px;align-items:center;">
       <select id="regionSelect" class="select" title="Region (optional)"></select>
     </div>
@@ -398,26 +398,33 @@
       noWrap:true, bounds:[[-85,-180],[85,180]]
     }).addTo(map);
 
-    /* NEW: a dedicated pane for dots above polygons/hit layer */
-    map.createPane('dotsPane');
-    // Put it above markerPane (600) but below tooltip (650) / popup (700)
-    map.getPane('dotsPane').style.zIndex = 610;
+    /* ===== PANES (critical for dot visibility) ===== */
+    // Countries (polygons, shading, hit layer) below dots
+    map.createPane('countriesPane');
+    map.getPane('countriesPane').style.zIndex = 350;
 
-    /* Dots renderer bound to that pane */
+    // Lines just above countries
+    map.createPane('linesPane');
+    map.getPane('linesPane').style.zIndex = 360;
+
+    // Dots above everything else (except tooltips/popups)
+    map.createPane('dotsPane');
+    map.getPane('dotsPane').style.zIndex = 650;
+
+    // Canvas renderer bound to dotsPane
     const dotsRenderer = L.canvas({ pane: 'dotsPane' });
 
-    /* Layers */
-    const dotsImpLayer = L.layerGroup().addTo(map);
-    const dotsDevLayer = L.layerGroup().addTo(map);
-    const linesImpLayer = L.layerGroup().addTo(map);
-    const linesDevLayer = L.layerGroup().addTo(map);
+    /* ===== Layers ===== */
+    const dotsImpLayer = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
+    const dotsDevLayer = L.layerGroup({ pane: 'dotsPane' }).addTo(map);
+    const linesImpLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
+    const linesDevLayer = L.layerGroup({ pane: 'linesPane' }).addTo(map);
 
-    /* Country layers */
-    let outlineLayer = null;
-    let shadeLayer = null;
-    let hitLayer = null;
+    let outlineLayer = null;  // countriesPane
+    let shadeLayer = null;    // countriesPane
+    let hitLayer = null;      // countriesPane
 
-    /* UI refs */
+    /* ===== UI refs ===== */
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
     const drawerRefresh = document.getElementById('drawerRefresh');
@@ -440,7 +447,7 @@
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
 
-    /* Burger menu */
+    /* ===== Burger ===== */
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
     burger.addEventListener('click', (e)=>{
@@ -451,7 +458,7 @@
       if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none';
     });
 
-    /* Stats chip toggles drawer (hidden by default) */
+    /* ===== Stats chip / drawer ===== */
     const statsChip = document.getElementById('statsChip');
     const statsChipText = document.getElementById('statsChipText');
     statsChip.addEventListener('click', ()=> drawer.classList.add('open'));
@@ -462,15 +469,15 @@
     }
     setChipLabel(); window.addEventListener('resize', setChipLabel); window.addEventListener('orientationchange', setChipLabel);
 
-    /* Data state */
+    /* ===== Data state ===== */
     let implementedCoords = [];
     let devCoords = [];
     let entries = [];
     let regionMap = {};
     let allRegions = new Set();
-    let geoRef = null;
     let centroidByKey = {};
 
+    /* ===== Popup ===== */
     function openCountryPopup(countryKey){
       const rows = entries.filter(e=>e.key===countryKey);
       if (!rows.length){
@@ -503,7 +510,7 @@
 
     /* ===== INIT ===== */
     (async function init(){
-      /* 1) Polygons */
+      // 1) Polygons
       let geo=null, lastErr=null;
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -518,7 +525,6 @@
         }catch(e){ lastErr=e; }
       }
       if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
-      geoRef = geo;
 
       function getName(props){
         if (!props) return null;
@@ -559,8 +565,11 @@
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
+      // Build centroid + region lookup
       centroidByKey = {};
       regionMap = {};
+      allRegions = new Set();
+
       L.geoJSON(geo).eachLayer(l=>{
         const nm = normalizeCountry(getName(l.feature.properties));
         if (!nm) return;
@@ -576,18 +585,21 @@
         allRegions.add(reg);
       });
 
-      /* Outline */
+      // Country outline (thin mint) in countriesPane
       outlineLayer = L.geoJSON(geo, {
+        pane: 'countriesPane',
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      /* Implemented shading (always on; opacity set per filter) */
+      // Implemented shading (style adjusted by filters)
       shadeLayer = L.geoJSON(geo, {
+        pane: 'countriesPane',
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      /* Clickable invisible layer */
+      // Clickable invisible layer (also in countriesPane)
       hitLayer = L.geoJSON(geo, {
+        pane: 'countriesPane',
         style: { color:'#0000', weight:0, fillOpacity:0 },
         onEachFeature: (f, layer) => {
           layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
@@ -596,7 +608,7 @@
         }
       }).addTo(map);
 
-      /* 2) Sheet data */
+      // 2) Sheet
       let rawRows;
       try{
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
@@ -610,7 +622,7 @@
         rawRows = parsed.data;
       }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      /* 3) Normalize */
+      // 3) Normalize rows
       entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
@@ -658,7 +670,7 @@
         }
       }
 
-      /* Region selector (blank = no filter) */
+      // Region selector (blank = no filter)
       const optionBlank = document.createElement('option');
       optionBlank.value = ""; optionBlank.textContent = "Region (optional)";
       regionSelect.appendChild(optionBlank);
@@ -667,7 +679,7 @@
         opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
       });
 
-      /* Counters + pie */
+      // Counters + pie
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
       const total = Math.max(1, counts.imp + counts.dev);
@@ -694,11 +706,11 @@
         }
       });
 
-      /* Autocomplete */
+      // Autocomplete
       const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
       dataList.innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
 
-      /* Year slider (if any) */
+      // Year slider (if any)
       if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
         yearRow.style.display='flex';
         yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
@@ -706,7 +718,7 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
-      /* Listeners */
+      // Listeners
       showImpDots.addEventListener('change', applyFilters);
       showDevDots.addEventListener('change', applyFilters);
       regionSelect.addEventListener('change', applyFilters);
@@ -726,7 +738,7 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
-      /* First draw */
+      // First draw
       applyFilters();
 
       if (unmatched.size){
@@ -739,7 +751,7 @@
     function currentFilters(){
       const showImp = document.getElementById('showImpDots').checked;
       const showDev = document.getElementById('showDevDots').checked;
-      const region = document.getElementById('regionSelect').value || ""; // empty = no filter
+      const region = document.getElementById('regionSelect').value || ""; // empty = no region filter
       const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
       const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
       return {showImp, showDev, region, minYear, hasYearUI};
@@ -769,9 +781,10 @@
         const color = e.isImplemented ? red : orange;
         const layer = e.isImplemented ? dotsImpLayer : dotsDevLayer;
 
-        /* Draw on our dedicated canvas pane (always above polygons) */
+        // Draw on dotsPane via canvas renderer (always above polygons)
         L.circleMarker([e.lat, e.lng], {
           renderer: dotsRenderer,
+          pane: 'dotsPane',
           radius: 6.5,
           color: darken(color,30),
           weight: 1.2,
@@ -786,7 +799,7 @@
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
-      /* Shade implemented countries that are visible */
+      // Shade implemented countries that are visible (in countriesPane)
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -797,7 +810,7 @@
         });
       }
 
-      /* Networks */
+      // Rebuild optional networks
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
@@ -818,7 +831,7 @@
         const limit=Math.min(k, dists.length);
         for(let t=0;t<limit;t++){
           const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
-          L.polyline([coords[i], coords[j]], { color, weight, opacity, smoothFactor:1 }).addTo(layer);
+          L.polyline([coords[i], coords[j]], { pane:'linesPane', color, weight, opacity, smoothFactor:1 }).addTo(layer);
         }
       }
     }
@@ -867,7 +880,7 @@
     if (document.fonts) { document.fonts.ready.then(placeMap); }
     new ResizeObserver(placeMap).observe(topbar);
 
-    /* ESC closes drawer */
+    // ESC closes drawer
     document.addEventListener('keydown', e=>{
       if (e.key === 'Escape') drawer.classList.remove('open');
     });
