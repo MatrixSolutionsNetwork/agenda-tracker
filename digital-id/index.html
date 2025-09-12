@@ -41,8 +41,14 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
+
+    /* A centered row that keeps the title block and the stacked buttons together */
+    #headerRow{
+      display:flex; justify-content:center; align-items:flex-start; gap:16px;
+      max-width:1200px; margin:0 auto;
+    }
+
     #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
@@ -51,40 +57,44 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Right-side vertical button stack */
+    /* Stacked nav buttons placed immediately to the right of the centered title */
     #navStack{
-      position:absolute; right:16px; top:50%; transform:translateY(-50%);
-      display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+      display:flex; flex-direction:column; gap:8px; align-items:flex-start;
+      margin-top:2px; /* lines up visually with the title row */
     }
-    .btnLink{
-      display:inline-block;
+    .pill{
+      background:rgba(10,30,20,.75);
+      border:1px solid #1b5a3e;
+      color:#eafaf3;
       padding:6px 10px;
       border-radius:10px;
-      border:1px solid #1b5a3e;
-      background:#062015;
-      color:#ffffff;
       text-decoration:none;
-      font-weight:700; letter-spacing:.2px; font-size:12px;
-      box-shadow:0 4px 12px rgba(0,0,0,.25);
+      font-weight:700;
+      letter-spacing:.3px;
+      font-size:13px;
       white-space:nowrap;
     }
-    .btnLink:hover{ box-shadow:0 0 18px rgba(33,255,157,.20); }
-    .btnActive{
-      color:#0a1; /* deeper green text for contrast */
-      color:var(--matrix);
-      border-color:#2ae89f;
-      background:rgba(33,255,157,.10);
+    .pill:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
+    .pill.active{
+      background:rgba(33,255,157,.15);
+      border-color:#21ff9d;
+      color:#d6ffe9;
+    }
+
+    /* Mobile: stack everything centered; buttons go below title block */
+    @media (max-width: 720px){
+      #headerRow{ flex-direction:column; align-items:center; gap:10px; }
+      #navStack{ align-items:center; }
     }
 
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
     .leaflet-container{ background:#081911; }
-    .leaflet-tile{ background:#081911; transform:translateZ(0); }
-    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Brighten labels-only tiles (country names) */
-    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
+    /* Scope filters so tiles don't go "solid green" */
+    .leaflet-tile-pane .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+    .leaflet-labelsPane-pane .leaflet-tile { filter: brightness(1.35) contrast(1.15); }
 
     /* Popup / tooltip */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
@@ -93,33 +103,28 @@
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
-
-    /* Small screens: tuck buttons under the title to avoid overlap */
-    @media (max-width: 720px){
-      #navStack{
-        position:static; transform:none; margin-top:6px;
-        flex-direction:row; gap:8px; justify-content:center;
-      }
-    }
   </style>
 </head>
 <body>
   <div id="topbar">
-    <div id="brandWrap">
-      <div class="msn">Matrix Solutions Network</div>
-      <div id="rowStatus">
-        <span id="pageTitle">Digital ID Status</span>
-        <span class="live">LIVE</span>
+    <div id="headerRow">
+      <!-- Centered brand + status -->
+      <div id="brandWrap">
+        <div class="msn">Matrix Solutions Network</div>
+        <div id="rowStatus">
+          <span id="pageTitle">Digital ID Status</span>
+          <span class="live">LIVE</span>
+        </div>
+        <div class="updated" id="updatedTop">Updated: …</div>
+        <div class="inline-hint">• Click any dot or country for details</div>
       </div>
-      <div class="updated" id="updatedTop">Updated: …</div>
-      <div class="inline-hint">• Click any dot or country for details</div>
-    </div>
 
-    <!-- Right-side stacked buttons -->
-    <div id="navStack" aria-label="Other trackers">
-      <a class="btnLink btnActive" href="./" title="You are here">Digital ID</a>
-      <a class="btnLink" href="../cbdc/" title="Open the CBDC map">CBDC Tracker</a>
-      <a class="btnLink" href="../social-credit-system/" title="Open the Social Credit System map">Social Credit Tracker</a>
+      <!-- Stacked buttons immediately to the right of the centered block -->
+      <div id="navStack" aria-label="Dashboards">
+        <a class="pill active" href="#">Digital ID</a>
+        <a class="pill" href="../cbdc/">CBDC Tracker</a>
+        <a class="pill" href="../social-credit-system/">Social Credit Tracker</a>
+      </div>
     </div>
   </div>
 
@@ -129,14 +134,6 @@
     /* ===== CONFIG ===== */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
-
-    // Small local CSV fallback so the app still runs if fetch is blocked
-    const FALLBACK_CSV = `Title,Status,Description,Year,Countries
-National eID,Implemented,Live national digital identity,2023,United Kingdom
-Digital ID Pilot,In development,Phase 2 pilot,2025,United States
-MyKad,Implemented,Malaysia ID,2012,Malaysia
-DNIe,Implemented,Spain smart ID,2016,Spain`;
-
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
@@ -165,8 +162,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       ["chile",[-35.6751,-71.5430]],["mauritius",[-20.2,57.5]],["spain",[40.4168,-3.7038]],
       ["italy",[42.5,12.5]],["denmark",[56.2639,9.5019]],["united kingdom",[52.3555,-1.1743]],
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],
-      ["malaysia",[4.2105,101.9758]]
+      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]]
     ]);
 
     function normalizeCountry(s){
@@ -177,7 +173,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
     }
     function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
-    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));}
+    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
     function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
     function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
     function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
@@ -185,7 +181,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     /* ===== Map & panes ===== */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
-    // custom panes
+    // custom panes: dots above, labels below them
     map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex = 650;
     map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
     map.getPane('labelsPane').style.pointerEvents = 'none';
@@ -211,7 +207,8 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
-    window.addEventListener('load',placeMap); window.addEventListener('resize',placeMap); if(document.fonts){document.fonts.ready.then(placeMap);} new ResizeObserver(placeMap).observe(topbar);
+    window.addEventListener('load',placeMap); window.addEventListener('resize',placeMap);
+    if(document.fonts){document.fonts.ready.then(placeMap);} new ResizeObserver(placeMap).observe(topbar);
 
     /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
@@ -237,24 +234,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       if(!pt) return;
       const html=rows.length?popupHTML(rows[0].country,rows):`<div style="min-width:240px;">No record in dataset.</div>`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
-    }
-
-    // fetch helper with timeout + local fallback
-    async function fetchCsvOrFallback(url, timeoutMs=7000){
-      try{
-        const ctrl = new AbortController();
-        const t = setTimeout(()=>ctrl.abort(), timeoutMs);
-        const res = await fetch(url, { cache:'no-store', mode:'cors', signal: ctrl.signal });
-        clearTimeout(t);
-        if(!res.ok) throw new Error('Bad status '+res.status);
-        const dateHdr = res.headers.get('Date') || new Date().toUTCString();
-        document.getElementById('updatedTop').textContent = 'Updated: ' + dateHdr;
-        return await res.text();
-      }catch(err){
-        console.warn('[CSV] Falling back to embedded sample data because fetch failed:', err);
-        document.getElementById('updatedTop').textContent = 'Updated: Local sample data';
-        return FALLBACK_CSV;
-      }
     }
 
     (async function init(){
@@ -304,8 +283,11 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         }
       }).addTo(map);
 
-      // 2) sheet rows (with fallback)
-      const text = await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
+      // 2) sheet rows
+      const res = await fetch(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'});
+      const dateHdr = res.ok ? (res.headers.get('Date') || new Date().toUTCString()) : new Date().toUTCString();
+      document.getElementById('updatedTop').textContent = 'Updated: ' + dateHdr;
+      const text = res.ok ? await res.text() : "Title,Status,Description,Year,Countries\n";
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
@@ -321,7 +303,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
-          const alt=key.replace(/^(republic|kingdom)\sof\s/,'' ).trim();
+          const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
           const pt=centroidByKey[key]||centroidByKey[alt];
           if(!pt) continue;
           const isImplemented=/implement/i.test(status);
@@ -331,10 +313,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       }
 
       drawAll(); // dots, lines, shading
-
-      // simple runtime checks
-      console.assert(entries.length > 0, '[TEST] entries should not be empty');
-      console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
 
     function drawAll(){
