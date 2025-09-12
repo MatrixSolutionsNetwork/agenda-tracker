@@ -5,38 +5,44 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <!-- Share Tech Mono (dashboard font) -->
+  <!-- FONT (change here if you want a different typeface) -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-  <!-- Leaflet -->
+  <!-- Leaflet map core -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- CSV -->
+  <!-- CSV parser -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Chart.js (+labels) -->
+  <!-- Charts (pie) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 
-  <!-- Turf + polylabel for robust centroids -->
+  <!-- Geometry helpers for country centroids -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <script src="https://unpkg.com/polylabel@1.1.0/polylabel.js"></script>
 
   <style>
+    /* =======================
+       THEME VARIABLES
+       Tweak colors and spacing here
+       ======================= */
     :root{
       --bg:#07100b;
       --text:#ffffff;
       --chip:#061c13; --chipEdge:#10402b;
       --panel:#06130d; --panelEdge:#0b2a1c;
-      --orange:#ff9900;
-      --red:#ff3333;
-      --mint:#7be2b1;
-      --matrix:#21ff9d;
-      --barPadY:16px;
-      --barPadX:16px;
-      --dynBarH: 92px; /* JS updates this */
+      --orange:#ff9900;      /* In development dots/fill */
+      --red:#ff3333;         /* Implemented dots/fill + LIVE pill bg */
+      --mint:#7be2b1;        /* Country thin outlines */
+      --matrix:#21ff9d;      /* Brand green for “Matrix Solutions Network” text */
+      --barPadY:16px;        /* Topbar vertical padding */
+      --barPadX:16px;        /* Topbar horizontal padding */
+      --dynBarH: 92px;       /* JS updates this to real bar height */
     }
+
+    /* Base page + background gradient */
     html,body{
       height:100%;margin:0;
       background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
@@ -44,7 +50,11 @@
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== Top brand bar ===== */
+    /* =======================
+       TOP BAR (HEADER)
+       - Desktop: centered rows
+       - Mobile: “Digital ID Status” is under “Matrix Solutions Network”
+       ======================= */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
@@ -55,79 +65,91 @@
       display:flex; flex-direction:column; align-items:center; gap:8px;
     }
 
-    /* Header rows */
-    #brandRow{
-      display:flex; align-items:center; gap:10px; white-space:nowrap;
-    }
-    #brandRow .dot{
-      width:14px;height:14px;border-radius:50%;
-      background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
-      box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
-    }
-    #brandText{
-      display:flex; align-items:center; gap:8px;
-    }
-    #brandText .msn{color:var(--matrix)}
-    #brandText .sep{opacity:.6; color:#c3ffe6}
+    /* Row with brand and live pill */
+    #brandRow{ display:flex; align-items:center; gap:10px; white-space:nowrap; }
 
-    #pageTitle{ color:#ffffff }
+    /* Brand text group (MSN — Digital ID Status) */
+    #brandText{ display:flex; align-items:center; gap:8px; }
+    #brandText .msn{ color:var(--matrix) }   /* Only MSN stays matrix-green */
+    #brandText .sep{ opacity:.6; color:#c3ffe6 }
+    #pageTitle{ color:#ffffff }              /* Make “Digital ID Status” white */
 
-    .live{font-size:11px;color:#ffffff;background:var(--red);
-      padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b; margin-left:8px}
+    /* LIVE pill (change to white by editing color/background/border here) */
+    .live{
+      font-size:11px; color:#ffffff; background:var(--red);
+      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; margin-left:8px
+    }
 
+    /* Second row under the title */
     #subRow{
       display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;
       font-size:12px;
     }
-    .updated{color:#ffffff; opacity:.9}
-    .inline-hint{opacity:.85}
+    .updated{ color:#ffffff; opacity:.9 }
+    .inline-hint{ opacity:.85 }
 
-    /* Burger area (floats right) */
+    /* Desktop burger position (top-right of bar) */
     #barRight{
       position:absolute; right:12px; top:50%; transform:translateY(-50%);
       display:flex; align-items:center; gap:8px;
     }
+
+    /* Burger button base style (also used for the floating mobile version) */
     #burgerMenu{
-      width:36px; height:36px; border-radius:8px;
+      width:40px; height:40px; border-radius:10px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
       font-size:18px; font-weight:800;
     }
 
-    /* Mobile stack: center, each on own line */
+    /* ========== Mobile layout changes ========== */
     @media (max-width: 720px){
+      /* Put “Digital ID Status” under “Matrix Solutions Network” */
       #brandRow{ flex-direction:column; gap:6px; }
       #brandText{ gap:6px; }
-      /* Make "MSN" and "Digital ID Status" separate lines */
-      #brandText .sep{ display:none; }
+      #brandText .sep{ display:none; }     /* Remove the dash on mobile */
       #pageTitle{ display:block; text-align:center; }
-      .live{ margin-left:0; }
-      #barRight{ right:10px; }
+
+      /* Move burger to bottom-right of the screen so it never blocks LIVE pill */
+      #barRight{ display:none; }           /* Hide desktop position on mobile */
+      #burgerMenu{
+        position:fixed; right:12px; bottom:12px; z-index:1150;
+        width:48px; height:48px; border-radius:12px;
+      }
     }
 
-    /* Dropdown menu */
+    /* =======================
+       BURGER DROPDOWN MENU
+       - Appears below the bar on desktop
+       - On mobile it still drops from under the bar (keeps layout simple)
+       ======================= */
     #mobileMenu{
       position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
       background:#0b1e16; border:1px solid #144832; border-radius:12px;
       padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
     }
     #mobileMenu a{ display:block; margin:6px 0; text-decoration:none; }
+
+    /* Generic “button look” for links and small buttons */
     .btn{
       background:#062015; border:1px solid #1b5a3e; color:#ffffff;
       padding:8px 10px; border-radius:10px; text-decoration:none;
       white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
       display:inline-block;
     }
-    .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
+    .btn:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
 
-    /* ===== Map (sits below dynamic bar) ===== */
-    #map{
-      position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0;
-    }
+    /* =======================
+       MAP CONTAINER
+       The top offset matches the live header height (updated via JS)
+       ======================= */
+    #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
-    /* Keep zoom controls clear of the bar */
-    .leaflet-top{ top:12px; }
+    .leaflet-top{ top:12px; } /* push zoom controls a bit below the bar */
 
-    /* ===== Centered stats chip right under the bar ===== */
+    /* =======================
+       STATS CHIP (click/tap to open the panel)
+       Centered under the bar, floating above the map
+       ======================= */
     #statsChip{
       position:absolute; left:50%; transform:translateX(-50%);
       top:calc(var(--dynBarH) + 10px);
@@ -138,11 +160,13 @@
       font-weight:700; font-size:13px;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
     }
-    @media (max-width:420px){
-      #statsChip{ font-size:12px; padding:8px 10px; }
-    }
+    @media (max-width:420px){ #statsChip{ font-size:12px; padding:8px 10px; } }
 
-    /* ===== Drawer (stats panel) ===== */
+    /* =======================
+       DRAWER (the stats/overview panel)
+       - NOTE: header is NOT sticky anymore per request
+       - Title centered and renamed to OVERVIEW
+       ======================= */
     #drawer{
       position:absolute; left:12px; right:12px;
       top:calc(var(--dynBarH) + 56px); bottom:16px;
@@ -155,8 +179,15 @@
       color:#ffffff; overflow:auto;
     }
     #drawer.open{ display:block }
-    .drawer-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; position:sticky; top:0; background:transparent; }
-    .drawer-title{ font-weight:800; letter-spacing:.4px; }
+
+    .drawer-head{
+      /* NOT sticky anymore, so it scrolls away (exact request) */
+      display:flex; align-items:center; gap:8px; margin-bottom:4px;
+    }
+    .drawer-title{
+      flex:1; text-align:center;           /* Center the word OVERVIEW */
+      font-weight:800; letter-spacing:.4px;
+    }
     .icon-btn{
       width:26px;height:26px;border-radius:8px;border:1px solid #1b5a3e;
       background:#062015; color:#ffffff; font-size:14px; line-height:24px;
@@ -164,6 +195,7 @@
       cursor:pointer; padding:0; font-weight:800;
     }
 
+    /* Simple form/grid bits in the drawer */
     .row{display:flex;align-items:center;gap:8px;margin:6px 0;}
     .sw{width:12px;height:12px;border-radius:50%}
     .count{margin-left:auto;color:#ffffff;font-weight:700}
@@ -183,13 +215,19 @@
       background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
+
+    /* Hover cursor for whole-country hit layer */
+    .country-hover { cursor:pointer; }
   </style>
 </head>
 <body>
-  <!-- ===== Top bar ===== -->
+  <!-- =======================
+       TOP BAR
+       ======================= -->
   <div id="topbar" role="navigation" aria-label="Map header">
+    <!-- Brand row (MSN — Digital ID Status + LIVE) -->
     <div id="brandRow">
-      <span class="dot" aria-hidden="true"></span>
+      <!-- NOTE: green dot REMOVED per request -->
       <div id="brandText">
         <span class="msn">Matrix Solutions Network</span>
         <span class="sep">—</span>
@@ -197,16 +235,20 @@
         <span class="live" id="livePill">LIVE</span>
       </div>
     </div>
+
+    <!-- Sub info row (hint + updated time) -->
     <div id="subRow">
       <div class="inline-hint">• Click any dot for details</div>
       <div class="updated" id="updatedTop">Updated: …</div>
     </div>
+
+    <!-- Desktop burger position (hidden on mobile via CSS) -->
     <div id="barRight">
       <button id="burgerMenu" aria-label="Open menu">≡</button>
     </div>
   </div>
 
-  <!-- Dropdown menu -->
+  <!-- BURGER DROPDOWN MENU -->
   <div id="mobileMenu" role="menu" aria-label="Navigation">
     <a class="btn" href="../" title="Back to Agenda Tracker">← Back to Agenda Tracker</a>
     <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
@@ -215,18 +257,23 @@
     <a class="btn" href="https://pickled-prose-789.notion.site/21cf848a73ef805c9f53ee8d066d67ef?pvs=105" target="_blank" rel="noopener">Submit feedback ✍️</a>
   </div>
 
-  <!-- Map -->
+  <!-- MAP -->
   <div id="map" aria-label="Digital ID world map"></div>
 
-  <!-- Centered stats chip -->
+  <!-- CENTERED STATS CHIP (click/tap to open panel) -->
   <div id="statsChip" aria-label="Open stats panel">
     <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
   </div>
 
-  <!-- Drawer -->
-  <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID statistics panel">
+  <!-- =======================
+       DRAWER (OVERVIEW PANEL)
+       ======================= -->
+  <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID overview panel">
     <div class="drawer-head">
-      <div class="drawer-title">Stats</div>
+      <!-- Left spacer just to balance layout -->
+      <div style="width:26px;height:26px;"></div>
+      <div class="drawer-title">OVERVIEW</div>
+      <!-- Controls (these now scroll with content; not sticky) -->
       <div style="display:flex;gap:6px;">
         <button id="drawerRefresh" class="icon-btn" title="Refresh">↻</button>
         <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
@@ -240,28 +287,31 @@
       <button id="btnSearch" class="btn-ghost">Go</button>
     </div>
 
-    <!-- Region -->
+    <!-- Region selector
+         NOTE: “All regions” REMOVED. Leaving it blank means: no region filter. -->
     <div class="row" style="gap:8px;align-items:center;">
-      <select id="regionSelect" class="select" title="Region">
-        <option value="__all">All regions</option>
+      <select id="regionSelect" class="select" title="Region (optional)">
+        <!-- Options are injected by JS; no “All regions” option anymore -->
       </select>
     </div>
 
-    <!-- Min year (auto-shown only if Year exists) -->
+    <!-- Min year (auto-shown only if Year exists in data) -->
     <div id="yearRow" class="row" style="gap:8px;align-items:center;display:none;">
       <label style="white-space:nowrap;">Min year:</label>
       <input id="yearMin" type="range" min="1900" max="2100" value="1900" style="flex:1;">
       <span id="yearMinVal" style="width:44px;text-align:right;">Any</span>
     </div>
 
+    <!-- Pie chart -->
     <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
 
+    <!-- Simple counters -->
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
 
     <div class="hr"></div>
 
-    <!-- Show/Hide dots -->
+    <!-- Dot toggles -->
     <div class="row" style="gap:12px;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="showImpDots" checked />
@@ -277,7 +327,7 @@
 
     <div class="hr"></div>
 
-    <!-- Local networks -->
+    <!-- Local network overlays (optional visual) -->
     <div class="row" style="gap:12px; align-items:center;">
       <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
         <input type="checkbox" id="netImp" checked />
@@ -304,23 +354,47 @@
       <span class="hint" id="lastUpdated" style="margin-left:auto;">Updated: …</span>
     </div>
 
+    <!-- Debug box for unmatched country names etc. -->
     <div id="debug" class="debug"></div>
   </div>
 
   <script>
-    /* === YOUR PUBLISHED CSV LINK === */
+    /* =========================================
+       CONFIG: WHERE YOUR DATA COMES FROM
+       - Replace the link below with your own published Google Sheet CSV
+       - If you change to a non-CSV link, toCsvUrl() tries to “csv-ify” it
+       ========================================= */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
+    /* Converts different Google Sheets share URLs to a CSV endpoint when possible */
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
-      if (/\/pubhtml/i.test(u)){ const url = new URL(u); url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single"))url.searchParams.set("single","true"); return url.toString(); }
-      if (/\/spreadsheets\/d\//i.test(u)){ const m = u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
+      if (/\/pubhtml/i.test(u)){
+        const url = new URL(u);
+        url.pathname = url.pathname.replace(/\/pubhtml/i,"/pub");
+        url.searchParams.set("output","csv");
+        if(!url.searchParams.has("single")) url.searchParams.set("single","true");
+        return url.toString();
+      }
+      if (/\/spreadsheets\/d\//i.test(u)){
+        const m = u.match(/\/spreadsheets\/d\/([^/]+)/i);
+        if(m){
+          const id=m[1];
+          const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
+          url.searchParams.set("format","csv");
+          return url.toString();
+        }
+      }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
+    /* =========================================
+       COUNTRY NAME NORMALIZATION
+       - Add aliases here if your sheet uses alternates
+       ========================================= */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"], ["u.s.a.","united states"], ["u.s.","united states"], ["us","united states"], ["united states of america","united states"],
       ["uk","united kingdom"], ["england","united kingdom"], ["scotland","united kingdom"], ["wales","united kingdom"], ["northern ireland","united kingdom"],
@@ -336,6 +410,11 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
+    /* =========================================
+       MANUAL CENTROID FIXES
+       - If a country dot looks off, add/adjust here
+       - Format: ["normalized-country-name",[lat, lng]]
+       ========================================= */
     const CENTROID_OVERRIDES = new Map([
       ["norway",[60.4720, 8.4689]],
       ["russia",[61.5240, 105.3188]],
@@ -353,6 +432,7 @@
       ["japan",[36.2048, 138.2529]]
     ]);
 
+    /* ===== Small helpers you probably won’t need to change ===== */
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
       const n = parseInt(hex.replace('#',''),16);
@@ -385,22 +465,26 @@
     }
     const isMobile = () => window.matchMedia('(max-width: 720px)').matches;
 
-    /* ---------- Map ---------- */
+    /* =========================================
+       MAP SETUP
+       ========================================= */
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
+    /* Layer groups (dots and optional network lines) */
     const dotsImpLayer = L.layerGroup().addTo(map);
     const dotsDevLayer = L.layerGroup().addTo(map);
     const linesImpLayer = L.layerGroup().addTo(map);
     const linesDevLayer = L.layerGroup().addTo(map);
 
-    let outlineLayer = null;
-    let shadeLayer = null;
-    let hitLayer = null;
+    /* Country outline / shading / hit layers */
+    let outlineLayer = null;       // thin mint outlines
+    let shadeLayer = null;         // implemented shading (auto on)
+    let hitLayer = null;           // invisible hit layer for taps
 
-    // UI refs
+    /* UI refs */
     const drawer = document.getElementById('drawer');
     const drawerClose = document.getElementById('drawerClose');
     const drawerRefresh = document.getElementById('drawerRefresh');
@@ -423,7 +507,7 @@
     const lastUpdated = document.getElementById('lastUpdated');
     const updatedTop = document.getElementById('updatedTop');
 
-    // Burger toggle
+    /* Burger open/close (desktop & mobile) */
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
     burger.addEventListener('click', (e)=>{
@@ -434,14 +518,14 @@
       if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none';
     });
 
-    // Stats chip opens drawer
+    /* Stats chip opens overview panel */
     const statsChip = document.getElementById('statsChip');
     const statsChipText = document.getElementById('statsChipText');
     statsChip.addEventListener('click', ()=> drawer.classList.add('open'));
     drawerClose.addEventListener('click', ()=> drawer.classList.remove('open'));
     drawerRefresh.addEventListener('click', ()=> location.reload());
 
-    // Set chip text per device
+    /* Change chip wording for mobile/desktop automatically */
     function setChipLabel(){
       statsChipText.textContent = `Digital ID Stats — ${isMobile() ? 'tap' : 'click'} to view`;
     }
@@ -449,7 +533,7 @@
     window.addEventListener('resize', setChipLabel);
     window.addEventListener('orientationchange', setChipLabel);
 
-    // state
+    /* Data state */
     let implementedCoords = [];
     let devCoords = [];
     let entries = [];
@@ -460,6 +544,7 @@
     let geoRef = null;
     let centroidByKey = {};
 
+    /* Opens the info popup for a given country */
     function openCountryPopup(countryKey){
       const rows = entries.filter(e=>e.key===countryKey);
       if (!rows.length){
@@ -490,8 +575,14 @@
         .openOn(map);
     }
 
+    /* =========================================
+       BUILD PIPELINE
+       1) load polygons
+       2) load sheet
+       3) normalize, count, draw
+       ========================================= */
     (async function init(){
-      // 1) polygons
+      /* 1) WORLD POLYGONS (fallback chain of sources) */
       let geo=null, lastErr=null;
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -508,6 +599,7 @@
       if(!geo){ dbg('Failed to load world polygons.'); console.error(lastErr); return; }
       geoRef = geo;
 
+      /* Helper: choose name + region from varying schemas */
       function getName(props){
         if (!props) return null;
         if (typeof props.name === 'string') return props.name;
@@ -529,6 +621,7 @@
             if (feature.geometry.type==='Polygon'){
               coords=feature.geometry.coordinates;
             } else {
+              /* For multipolygons, pick the largest area ring to label inside */
               let best=null,bestA=-1;
               for (const poly of feature.geometry.coordinates){
                 const a=turf.area(turf.polygon(poly));
@@ -540,6 +633,7 @@
             return L.latLng(p[1], p[0]);
           }
         }catch(e){}
+        /* Fallbacks if polylabel fails */
         try {
           const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
           return L.latLng(c[1], c[0]);
@@ -547,6 +641,7 @@
         return L.geoJSON(feature).getBounds().getCenter();
       }
 
+      /* Build centroid + region lookup tables */
       centroidByKey = {};
       regionMap = {};
       L.geoJSON(geo).eachLayer(l=>{
@@ -564,22 +659,17 @@
         allRegions.add(reg);
       });
 
-      [...[...allRegions].sort()].forEach(r=>{
-        const opt=document.createElement('option');
-        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
-      });
-
-      // outline layer
+      /* Outline layer (subtle) */
       outlineLayer = L.geoJSON(geo, {
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // implemented shading (always on)
+      /* Implemented shading (auto-on; fill toggling done in applyFilters()) */
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // interactive layer
+      /* Clickable invisible layer to open popups by country area */
       hitLayer = L.geoJSON(geo, {
         style: { color:'#0000', weight:0, fillOpacity:0 },
         onEachFeature: (f, layer) => {
@@ -589,7 +679,7 @@
         }
       }).addTo(map);
 
-      // 2) sheet
+      /* 2) SHEET DATA */
       let rawRows;
       try{
         const res = await fetch(`${CSV_URL}${CSV_URL.includes('?') ? '&' : '?'}cb=${Date.now()}`, { cache:'no-store' });
@@ -603,7 +693,7 @@
         rawRows = parsed.data;
       }catch(e){ dbg("Failed to load/parse CSV."); console.error(e); return; }
 
-      // 3) normalize + collect years
+      /* 3) NORMALIZE ROWS INTO `entries` + COUNT STATUS */
       entries = [];
       const counts={imp:0, dev:0};
       const unmatched = new Set();
@@ -611,6 +701,7 @@
       let yMin=Infinity, yMax=-Infinity;
 
       function pickYear(row){
+        /* Checks several column names for a 4-digit year */
         const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
         for (const k of keys){
           if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
@@ -632,6 +723,7 @@
           const key = normalizeCountry(raw);
           let pt = centroidByKey[key];
           if (!pt){
+            /* tiny fallback: drop leading “Republic of …” etc. */
             const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
             pt = centroidByKey[alt];
           }
@@ -651,7 +743,17 @@
         }
       }
 
-      // UI: pie + counters
+      /* Populate the region selector WITHOUT an “All regions” option.
+         - First blank option means “no filter” */
+      const optionBlank = document.createElement('option');
+      optionBlank.value = ""; optionBlank.textContent = "Region (optional)";
+      regionSelect.appendChild(optionBlank);
+      [...[...allRegions].sort()].forEach(r=>{
+        const opt=document.createElement('option');
+        opt.value=r; opt.textContent=r; regionSelect.appendChild(opt);
+      });
+
+      /* Counters + pie */
       document.getElementById('c-imp').textContent = counts.imp;
       document.getElementById('c-dev').textContent = counts.dev;
       const total = Math.max(1, counts.imp + counts.dev);
@@ -678,9 +780,11 @@
         }
       });
 
+      /* Autocomplete list for search */
       const uniqueCountries = [...new Set(entries.map(e=>e.country))].sort();
-      document.getElementById('countryList').innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
+      dataList.innerHTML = uniqueCountries.map(c=>`<option value="${c}">`).join('');
 
+      /* Show year slider only if data actually has year values */
       if (isFinite(yMin) && isFinite(yMax) && yMin<=yMax){
         yearRow.style.display='flex';
         yearMin.min = yMin; yearMin.max = yMax; yearMin.value = yMin;
@@ -688,6 +792,7 @@
         yearMin.addEventListener('input', ()=>{ yearMinVal.textContent = yearMin.value; applyFilters(); });
       }
 
+      /* UI listeners */
       showImpDots.addEventListener('change', applyFilters);
       showDevDots.addEventListener('change', applyFilters);
       regionSelect.addEventListener('change', applyFilters);
@@ -696,6 +801,7 @@
       kNeighborsInput.addEventListener('change', applyNetworks);
       btnExport.addEventListener('click', exportCurrent);
 
+      /* Search behavior */
       function runSearch(){
         const q = (searchInput.value||'').trim().toLowerCase();
         if (!q) return;
@@ -707,18 +813,23 @@
       searchBtn.addEventListener('click', runSearch);
       searchInput.addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
 
+      /* Initial draw */
       applyFilters();
 
+      /* Show unmatched country strings in the debug box so you can add an alias */
       if (unmatched.size){
         dbg(`<b>Unmatched country tokens (add aliases or fix sheet):</b><br>${[...unmatched].sort().join(', ')}`);
         console.warn("Unmatched:", [...unmatched].sort());
       }
     })();
 
+    /* =======================
+       FILTERING + RENDERING
+       ======================= */
     function currentFilters(){
       const showImp = document.getElementById('showImpDots').checked;
       const showDev = document.getElementById('showDevDots').checked;
-      const region = document.getElementById('regionSelect').value || '__all';
+      const region = document.getElementById('regionSelect').value || ""; // empty = no region filter
       const hasYearUI = document.getElementById('yearRow').style.display !== 'none';
       const minYear = hasYearUI ? parseInt(document.getElementById('yearMin').value||'-9999') : -9999;
       return {showImp, showDev, region, minYear, hasYearUI};
@@ -732,8 +843,9 @@
 
       const red = getCSS('--red'), orange=getCSS('--orange');
 
+      /* Apply simple filters */
       const filt = e => {
-        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (region && (e.region||'Other') !== region) return false;   // blank region = no filter
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
         if (e.isDev && !showDev) return false;
@@ -759,6 +871,7 @@
         else if (e.isDev) { devPts.push([e.lat,e.lng]); }
       }
 
+      /* Lightly shade only implemented countries that pass filters */
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -769,6 +882,7 @@
         });
       }
 
+      /* Rebuild optional network lines */
       rebuildNetworksWithPoints(impPts, devPts);
     }
 
@@ -779,14 +893,12 @@
       if (netImp.checked && impPts.length>1) buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, k, .35, 1.2);
       if (netDev.checked && devPts.length>1) buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, k, .30, 1.1);
     }
-    function applyNetworks(){ applyFilters(); }
-
     function buildLocalNetwork(coords, color, layer, k=4, opacity=.35, weight=1.2){
       const n=coords.length; if(n<2) return;
       const seen=new Set();
       for(let i=0;i<n;i++){
         const dists=[];
-        for(let j=0;j<n+j;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
+        for(let j=0;j<n;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
         dists.sort((a,b)=>a.d-b.d);
         const limit=Math.min(k, dists.length);
         for(let t=0;t<limit;t++){
@@ -796,10 +908,11 @@
       }
     }
 
+    /* Export current filtered view as CSV (quick download) */
     function exportCurrent(){
       const {showImp, showDev, region, minYear, hasYearUI} = currentFilters();
       const rows = entries.filter(e=>{
-        if (region !== '__all' && (e.region||'Other') !== region) return false;
+        if (region && (e.region||'Other') !== region) return false;
         if (hasYearUI && Number.isInteger(e.year) && e.year < minYear) return false;
         if (e.isImplemented && !showImp) return false;
         if (e.isDev && !showDev) return false;
@@ -826,21 +939,28 @@
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    /* ===== Dynamic placement: bar -> map + chip ===== */
-    const mapEl = document.getElementById('map');
+    /* =========================================
+       DYNAMIC LAYOUT: keep map and chip below bar
+       ========================================= */
     const topbar = document.getElementById('topbar');
     function placeMap(){
       const h = topbar.offsetHeight;
       document.documentElement.style.setProperty('--dynBarH', h+'px');
-      // Force Leaflet to recalc control positions after layout changes
-      setTimeout(()=> map.invalidateSize(), 0);
+      setTimeout(()=> map.invalidateSize(), 0); // refresh Leaflet layout
     }
     window.addEventListener('load', placeMap);
     window.addEventListener('resize', placeMap);
     window.addEventListener('orientationchange', placeMap);
     if (document.fonts) { document.fonts.ready.then(placeMap); }
-    // Observe bar height changes (burger open/close, wrapping, etc.)
     new ResizeObserver(placeMap).observe(topbar);
+
+    /* =========================================
+       QUALITY OF LIFE:
+       - Close drawer with ESC
+       ========================================= */
+    document.addEventListener('keydown', e=>{
+      if (e.key === 'Escape') drawer.classList.remove('open');
+    });
   </script>
 </body>
 </html>
