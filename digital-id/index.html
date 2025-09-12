@@ -15,7 +15,11 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Turf for basic centroids -->
+  <!-- Charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+  <!-- Turf -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
   <style>
@@ -49,15 +53,22 @@
       backdrop-filter: blur(2px);
       display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-    #brandRow{ display:flex; align-items:center; gap:10px; white-space:nowrap; }
-    #brandText{ display:flex; align-items:center; gap:8px; }
+
+    /* Brand row: stack title lines; burger sits to the right on desktop */
+    #brandRow{
+      display:flex; align-items:center; gap:10px; white-space:nowrap;
+    }
+    #brandText{
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      text-align:center;
+    }
     #brandText .msn{ color:var(--matrix) }
-    #brandText .sep{ opacity:.6; color:#c3ffe6 }
     #pageTitle{ color:#ffffff }
     .live{
       font-size:11px; color:#ffffff; background:var(--red);
-      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; margin-left:8px
+      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; margin-top:4px;
     }
+
     #subRow{
       display:flex; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;
       font-size:12px;
@@ -65,26 +76,18 @@
     .updated{ color:#ffffff; opacity:.9 }
     .inline-hint{ opacity:.85 }
 
-    /* Burger (desktop position) */
-    #barRight{
-      position:absolute; right:12px; top:50%; transform:translateY(-50%);
-      display:flex; align-items:center; gap:8px;
-    }
+    /* Burger button lives inside the row (to the right of the text on desktop) */
     #burgerMenu{
-      width:40px; height:40px; border-radius:10px;
+      width:40px; height:40px; border-radius:10px; margin-left:10px;
       background:#062015; border:1px solid #1b5a3e; color:#fff;
       font-size:18px; font-weight:800; cursor:pointer;
     }
 
     @media (max-width: 720px){
-      #brandRow{ flex-direction:column; gap:6px; }
-      #brandText{ gap:6px; }
-      #brandText .sep{ display:none; }
-      #pageTitle{ display:block; text-align:center; }
-      #barRight{ display:none; }
+      /* Still stacked; burger visible on mobile (fixed bottom-right) */
       #burgerMenu{
         position:fixed; right:12px; bottom:12px; z-index:1150;
-        width:48px; height:48px; border-radius:12px;
+        width:48px; height:48px; border-radius:12px; margin-left:0;
       }
     }
 
@@ -163,17 +166,15 @@
     <div id="brandRow">
       <div id="brandText">
         <span class="msn">Matrix Solutions Network</span>
-        <span class="sep">—</span>
         <span id="pageTitle">Digital ID Status</span>
         <span class="live" id="livePill">LIVE</span>
       </div>
+      <!-- Burger sits right of the text on desktop -->
+      <button id="burgerMenu" aria-label="Open menu">≡</button>
     </div>
     <div id="subRow">
       <div class="inline-hint">• Click any dot for details</div>
       <div class="updated" id="updatedTop">Updated: …</div>
-    </div>
-    <div id="barRight">
-      <button id="burgerMenu" aria-label="Open menu">≡</button>
     </div>
   </div>
 
@@ -194,7 +195,7 @@
     <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
   </div>
 
-  <!-- ===== DRAWER (minimal) ===== -->
+  <!-- ===== DRAWER (with pie) ===== -->
   <div id="drawer" role="dialog" aria-modal="false" aria-label="Digital ID overview panel">
     <div class="drawer-head">
       <div style="width:26px;height:26px;"></div>
@@ -204,7 +205,11 @@
         <button id="drawerClose" class="icon-btn" title="Close panel">✕</button>
       </div>
     </div>
-    <!-- Just the counts -->
+
+    <!-- Pie chart -->
+    <canvas id="statusPie" width="300" height="185" style="margin-top:8px;"></canvas>
+
+    <!-- Counts -->
     <div class="row"><span class="sw" style="background:var(--red)"></span> Implemented <span class="count" id="c-imp">0</span></div>
     <div class="row"><span class="sw" style="background:var(--orange)"></span> In development / discussion <span class="count" id="c-dev">0</span></div>
 
@@ -279,24 +284,25 @@
     let outlineLayer = null;
 
     // Data/state
-    let mapReady=false, dataReady=false;
+    let mapReady=false, dataReady=false, worldGeo=null;
     let centroidByKey = {};
     let entries = [];
     let impCount = 0, devCount = 0;
+    let pieChart = null;
 
-    // Burger
+    /* ===== Burger ===== */
     const burger = document.getElementById('burgerMenu');
     const mobileMenu = document.getElementById('mobileMenu');
     burger.addEventListener('click', (e)=>{ e.stopPropagation(); mobileMenu.style.display = (mobileMenu.style.display === 'block') ? 'none' : 'block'; });
     document.addEventListener('click', (e)=>{ if (!mobileMenu.contains(e.target) && e.target !== burger) mobileMenu.style.display = 'none'; });
 
-    // Stats chip / drawer
+    /* ===== Stats chip / drawer ===== */
     const drawer = document.getElementById('drawer');
     document.getElementById('statsChip').addEventListener('click', ()=> drawer.classList.add('open'));
     document.getElementById('drawerClose').addEventListener('click', ()=> drawer.classList.remove('open'));
     document.getElementById('drawerRefresh').addEventListener('click', ()=> location.reload());
 
-    // Layout: keep map under bar
+    /* ===== Layout: keep map under bar ===== */
     const topbar = document.getElementById('topbar');
     function placeMap(){
       const h = topbar.offsetHeight;
@@ -308,7 +314,7 @@
     if (document.fonts) { document.fonts.ready.then(placeMap); }
     new ResizeObserver(placeMap).observe(topbar);
 
-    // Helper: country centroid
+    /* ===== Helpers ===== */
     function centroidInside(feature){
       try {
         const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
@@ -316,8 +322,6 @@
       }catch(e){}
       return L.geoJSON(feature).getBounds().getCenter();
     }
-
-    // Popup from entry
     function popupHTML(country, rows){
       const list = rows.map(r=>{
         const bits=[];
@@ -329,63 +333,6 @@
       }).join('');
       return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>${list}</div>`;
     }
-
-    // Draw markers once both map + data are ready
-    function forceDotsRedraw(){
-      map.invalidateSize();
-      // Touch the map to ensure canvas paints
-      map.fire('zoomend'); map.fire('moveend');
-      requestAnimationFrame(()=> map.invalidateSize());
-    }
-
-    function firstDraw(){
-      // Clear any existing vector layers (we only use outlines + markers)
-      if (outlineLayer) outlineLayer.remove();
-
-      // Draw outlines
-      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
-
-      // Draw dots
-      impCount = 0; devCount = 0;
-      for (const [countryKey, rows] of groupByCountry(entries)){
-        const pt = centroidByKey[countryKey];
-        if (!pt) continue;
-
-        const isImplemented = rows.some(r=>r.isImplemented);
-        const isDev = rows.some(r=>r.isDev);
-
-        const color = isImplemented ? getCSS('--red') : getCSS('--orange');
-        if (isImplemented) impCount++; else if (isDev) devCount++;
-
-        const m = L.circleMarker([pt.lat, pt.lng], {
-          renderer: dotsRenderer,  // CRITICAL
-          radius: 6.5,
-          color: darken(color,30),
-          weight: 1.2,
-          fillColor: color,
-          fillOpacity: 0.95
-        })
-        .bindTooltip(`${rows[0].country}: ${rows[0].status||''}`, {direction:'top', offset:[0,-6]})
-        .on('click', ()=> {
-          L.popup({autoClose:true, closeOnClick:true})
-            .setLatLng(pt)
-            .setContent(popupHTML(rows[0].country, rows))
-            .openOn(map);
-        })
-        .addTo(map);
-
-        if (m.bringToFront) m.bringToFront();
-      }
-
-      document.getElementById('c-imp').textContent = impCount;
-      document.getElementById('c-dev').textContent = devCount;
-
-      // Nudge canvases to paint on first load across browsers
-      forceDotsRedraw();
-      setTimeout(forceDotsRedraw, 0);
-      requestAnimationFrame(forceDotsRedraw);
-    }
-
     function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
     function darken(hex, amt){
       const n = parseInt(hex.replace('#',''),16);
@@ -393,7 +340,6 @@
       r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
       return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
     }
-
     function* groupByCountry(arr){
       const map = new Map();
       for (const e of arr){
@@ -402,9 +348,44 @@
       }
       for (const [k,v] of map) yield [k,v];
     }
+    function forceDotsRedraw(){
+      map.invalidateSize(); map.fire('zoomend'); map.fire('moveend');
+      requestAnimationFrame(()=> map.invalidateSize());
+    }
+    function drawPie(){
+      const ctx = document.getElementById('statusPie');
+      if (!ctx) return;
+      const total = Math.max(1, impCount + devCount);
+      if (!pieChart){
+        Chart.register(ChartDataLabels);
+        pieChart = new Chart(ctx, {
+          type:'pie',
+          data:{
+            labels:['Implemented','In development'],
+            datasets:[{
+              data:[impCount, devCount],
+              backgroundColor:[getCSS('--red'), getCSS('--orange')],
+              borderColor:'rgba(0,0,0,.45)', borderWidth:1
+            }]
+          },
+          options:{
+            responsive:true,
+            plugins:{
+              legend:{ position:'bottom', labels:{ color:'#ffffff', boxWidth:12, boxHeight:12, font:{size:12} } },
+              datalabels:{
+                color:'#0b0f12', font:{weight:'700', size:11},
+                formatter:(v)=> `${v} (${Math.round((v/total)*100)}%)`
+              }
+            }
+          }
+        });
+      } else {
+        pieChart.data.datasets[0].data = [impCount, devCount];
+        pieChart.update();
+      }
+    }
 
-    // Ready gates
-    let worldGeo = null;
+    /* ===== Ready gates ===== */
     tiles.once('load', ()=>{ mapReady = true; maybeStart(); });
     map.whenReady(()=>{ mapReady = true; maybeStart(); });
 
@@ -412,7 +393,7 @@
       if (mapReady && dataReady && worldGeo) firstDraw();
     }
 
-    // ===== Load polygons (world) =====
+    /* ===== Load polygons (world) ===== */
     (async function loadWorld(){
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -429,7 +410,7 @@
       }
       if(!worldGeo){ showDbg('Failed to load world polygons.'); console.error(lastErr); return; }
 
-      // Build centroid lookup (simple centerOfMass + overrides)
+      // Build centroid lookup (centerOfMass + overrides)
       centroidByKey = {};
       L.geoJSON(worldGeo).eachLayer(l=>{
         let nmRaw = (l.feature && l.feature.properties) ? (
@@ -449,7 +430,7 @@
       maybeStart();
     })();
 
-    // ===== Load sheet =====
+    /* ===== Load sheet ===== */
     (async function loadSheet(){
       let rawRows;
       try{
@@ -512,6 +493,53 @@
       dataReady = true;
       maybeStart();
     })();
+
+    /* ===== First draw ===== */
+    function firstDraw(){
+      if (outlineLayer) outlineLayer.remove();
+      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
+
+      impCount = 0; devCount = 0;
+
+      for (const [countryKey, rows] of groupByCountry(entries)){
+        const pt = centroidByKey[countryKey];
+        if (!pt) continue;
+
+        const isImplemented = rows.some(r=>r.isImplemented);
+        const isDev = rows.some(r=>r.isDev);
+
+        // if both exist, prefer implemented color
+        const color = isImplemented ? getCSS('--red') : getCSS('--orange');
+        if (isImplemented) impCount++; else if (isDev) devCount++;
+
+        const m = L.circleMarker([pt.lat, pt.lng], {
+          renderer: dotsRenderer,  // CRITICAL
+          radius: 6.5,
+          color: darken(color,30),
+          weight: 1.2,
+          fillColor: color,
+          fillOpacity: 0.95
+        })
+        .bindTooltip(`${rows[0].country}: ${rows[0].status||''}`, {direction:'top', offset:[0,-6]})
+        .on('click', ()=> {
+          L.popup({autoClose:true, closeOnClick:true})
+            .setLatLng(pt)
+            .setContent(popupHTML(rows[0].country, rows))
+            .openOn(map);
+        })
+        .addTo(map);
+
+        if (m.bringToFront) m.bringToFront();
+      }
+
+      document.getElementById('c-imp').textContent = impCount;
+      document.getElementById('c-dev').textContent = devCount;
+
+      drawPie();           // build/update pie
+      forceDotsRedraw();   // paint on first load across browsers
+      setTimeout(forceDotsRedraw, 0);
+      requestAnimationFrame(forceDotsRedraw);
+    }
 
     function showDbg(html){
       const dbg = document.getElementById('debug');
