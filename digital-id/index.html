@@ -51,12 +51,33 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
+    /* === Right-side quick links (replaces burger) === */
+    #toplinks{
+      position:absolute; right:var(--barPadX); top:50%;
+      transform:translateY(-50%);
+      display:flex; gap:8px;
+    }
+    .toplink{
+      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
+      padding:8px 10px; border-radius:10px; text-decoration:none;
+      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
+    }
+    .toplink:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
+
+    @media (max-width:720px){
+      #toplinks{ position:static; transform:none; margin-top:6px; flex-wrap:wrap; justify-content:center; }
+      .toplink{ padding:7px 9px; font-size:12px }
+    }
+
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
     .leaflet-container{ background:#081911; }
     .leaflet-tile{ background:#081911; transform:translateZ(0); }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
+
+    /* Brighten labels-only tiles (country names) */
+    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
     /* Popup / tooltip */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
@@ -78,6 +99,12 @@
       <div class="updated" id="updatedTop">Updated: …</div>
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
+
+    <!-- Right-side quick links -->
+    <div id="toplinks" aria-label="Quick links">
+      <a class="toplink" href="../cbdc/" title="Open the CBDC tracker">CBDC Tracker</a>
+      <a class="toplink" href="../social-credit-system/" title="Open the Social Credit System tracker">Social Credit Tracker</a>
+    </div>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
@@ -86,6 +113,14 @@
     /* ===== CONFIG ===== */
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+
+    // --- New: small local CSV fallback so the app still runs if fetch is blocked ---
+    const FALLBACK_CSV = `Title,Status,Description,Year,Countries\n`+
+      `National eID,Implemented,Live national digital identity,2023,United Kingdom\n`+
+      `Digital ID Pilot,In development,Phase 2 pilot,2025,United States\n`+
+      `MyKad,Implemented,Malaysia ID,2012,Malaysia\n`+
+      `DNIe,Implemented,Spain smart ID,2016,Spain`;
+
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
@@ -114,7 +149,8 @@
       ["chile",[-35.6751,-71.5430]],["mauritius",[-20.2,57.5]],["spain",[40.4168,-3.7038]],
       ["italy",[42.5,12.5]],["denmark",[56.2639,9.5019]],["united kingdom",[52.3555,-1.1743]],
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]]
+      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],
+      ["malaysia",[4.2105,101.9758]]
     ]);
 
     function normalizeCountry(s){
@@ -125,7 +161,7 @@
       return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
     }
     function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
-    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));}
+    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));}
     function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
     function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
     function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
@@ -133,11 +169,19 @@
     /* ===== Map & panes ===== */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
-    // custom panes: dots above, hit polygons below; lines in default overlay
-    map.createPane('dotsPane');  map.getPane('dotsPane').style.zIndex = 650;
+    // custom panes
+    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex = 650;
+    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
+    map.getPane('labelsPane').style.pointerEvents = 'none';
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{
+    // base tiles (no labels)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+    }).addTo(map);
+
+    // labels-only overlay
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
+      subdomains:'abcd', maxZoom:8, pane:'labelsPane'
     }).addTo(map);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
@@ -179,6 +223,24 @@
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
+    // --- New: fetch helper with timeout + local fallback ---
+    async function fetchCsvOrFallback(url, timeoutMs=7000){
+      try{
+        const ctrl = new AbortController();
+        const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+        const res = await fetch(url, { cache:'no-store', mode:'cors', signal: ctrl.signal });
+        clearTimeout(t);
+        if(!res.ok) throw new Error('Bad status '+res.status);
+        const dateHdr = res.headers.get('Date') || new Date().toUTCString();
+        document.getElementById('updatedTop').textContent = 'Updated: ' + dateHdr;
+        return await res.text();
+      }catch(err){
+        console.warn('[CSV] Falling back to embedded sample data because fetch failed:', err);
+        document.getElementById('updatedTop').textContent = 'Updated: Local sample data';
+        return FALLBACK_CSV;
+      }
+    }
+
     (async function init(){
       // 1) world polygons
       const sources=[
@@ -187,7 +249,7 @@
         'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
       ];
       for(const src of sources){
-        try{ const r=await fetch(src); if(!r.ok) throw 0; const j=await r.json(); if(j && j.features && j.features.length>100){ worldGeo=j; break; } }catch(e){}
+        try{ const r=await fetch(src,{mode:'cors'}); if(!r.ok) throw 0; const j=await r.json(); if(j && j.features && j.features.length>100){ worldGeo=j; break; } }catch(e){}
       }
       if(!worldGeo){ console.error('World polygons failed to load'); return; }
 
@@ -226,12 +288,8 @@
         }
       }).addTo(map);
 
-      // 2) sheet rows
-      const res = await fetch(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`, {cache:'no-store'});
-      if(!res.ok){ console.error('CSV fetch failed'); return; }
-      const dateHdr=res.headers.get('Date')||new Date().toUTCString();
-      document.getElementById('updatedTop').textContent='Updated: '+dateHdr;
-      const text=await res.text();
+      // 2) sheet rows (with fallback)
+      const text = await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
@@ -247,7 +305,7 @@
 
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
-          const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
+          const alt=key.replace(/^(republic|kingdom)\sof\s/,'' ).trim();
           const pt=centroidByKey[key]||centroidByKey[alt];
           if(!pt) continue;
           const isImplemented=/implement/i.test(status);
@@ -257,6 +315,11 @@
       }
 
       drawAll(); // dots, lines, shading
+
+      // --- Simple runtime tests ---
+      console.assert(entries.length > 0, '[TEST] entries should not be empty');
+      console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
+      console.log('[TEST] Rendered dots:', dotsLayer.getLayers().length);
     })();
 
     function drawAll(){
@@ -304,7 +367,7 @@
       }
 
       // Local networks: connect to K=3 nearest neighbors
-      const K=2;
+      const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
     }
