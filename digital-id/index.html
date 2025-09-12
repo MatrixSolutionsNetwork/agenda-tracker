@@ -33,7 +33,9 @@
       --red:#ff3333;
       --mint:#7be2b1;
       --matrix:#21ff9d;
-      --barPadY:12px; /* desktop bar padding will be larger */
+      --barPadY:16px;
+      --barPadX:16px;
+      --dynBarH: 92px; /* JS updates this */
     }
     html,body{
       height:100%;margin:0;
@@ -42,21 +44,18 @@
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== Top brand bar (centered) ===== */
+    /* ===== Top brand bar ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
-      display:flex; flex-direction:column; align-items:center; gap:6px;
+      padding:var(--barPadY) var(--barPadX);
       background:linear-gradient(180deg,rgba(10,30,20,.86),rgba(8,22,16,.98));
       border-bottom:1px solid var(--panelEdge);
-      padding:var(--barPadY) 16px;
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(2px);
-    }
-    /* desktop: make bar a bit bigger */
-    @media (min-width: 721px){
-      :root{ --barPadY:16px; }
+      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
 
+    /* Header rows */
     #brandRow{
       display:flex; align-items:center; gap:10px; white-space:nowrap;
     }
@@ -65,10 +64,14 @@
       background:radial-gradient(circle at 40% 40%,#6cffbf,var(--matrix));
       box-shadow:0 0 10px var(--matrix),0 0 24px rgba(33,255,157,.45)
     }
-    #brandRow h1{margin:0; font-size:20px; letter-spacing:.4px; text-align:center}
-    #brandRow .msn{color:var(--matrix)}
-    #brandRow .sep{opacity:.6; margin:0 6px; color:#c3ffe6}
-    #brandRow .page{color:#ffffff}
+    #brandText{
+      display:flex; align-items:center; gap:8px;
+    }
+    #brandText .msn{color:var(--matrix)}
+    #brandText .sep{opacity:.6; color:#c3ffe6}
+
+    #pageTitle{ color:#ffffff }
+
     .live{font-size:11px;color:#ffffff;background:var(--red);
       padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b; margin-left:8px}
 
@@ -79,7 +82,7 @@
     .updated{color:#ffffff; opacity:.9}
     .inline-hint{opacity:.85}
 
-    /* Burger (right aligned but not part of centered flow) */
+    /* Burger area (floats right) */
     #barRight{
       position:absolute; right:12px; top:50%; transform:translateY(-50%);
       display:flex; align-items:center; gap:8px;
@@ -90,9 +93,20 @@
       font-size:18px; font-weight:800;
     }
 
-    /* Dropdown menu (mobile & desktop) */
+    /* Mobile stack: center, each on own line */
+    @media (max-width: 720px){
+      #brandRow{ flex-direction:column; gap:6px; }
+      #brandText{ gap:6px; }
+      /* Make "MSN" and "Digital ID Status" separate lines */
+      #brandText .sep{ display:none; }
+      #pageTitle{ display:block; text-align:center; }
+      .live{ margin-left:0; }
+      #barRight{ right:10px; }
+    }
+
+    /* Dropdown menu */
     #mobileMenu{
-      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH,80px) + 8px);
+      position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
       background:#0b1e16; border:1px solid #144832; border-radius:12px;
       padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
     }
@@ -105,17 +119,18 @@
     }
     .btn:hover{box-shadow:0 0 18px rgba(33,255,157,.20)}
 
-    /* ===== Map ===== */
+    /* ===== Map (sits below dynamic bar) ===== */
     #map{
-      position:absolute; left:0; right:0; top:80px; bottom:0; /* JS will update this */
+      position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0;
     }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
-    .leaflet-top{ top:8px; }
+    /* Keep zoom controls clear of the bar */
+    .leaflet-top{ top:12px; }
 
-    /* ===== Centered stats chip below bar ===== */
+    /* ===== Centered stats chip right under the bar ===== */
     #statsChip{
       position:absolute; left:50%; transform:translateX(-50%);
-      top:calc(var(--dynBarH,80px) + 8px);
+      top:calc(var(--dynBarH) + 10px);
       z-index:1002;
       display:inline-flex; align-items:center; gap:10px;
       background:var(--chip); border:1px solid var(--chipEdge); color:var(--text);
@@ -123,11 +138,14 @@
       font-weight:700; font-size:13px;
       box-shadow:0 6px 18px rgba(0,0,0,.45); user-select:none;
     }
+    @media (max-width:420px){
+      #statsChip{ font-size:12px; padding:8px 10px; }
+    }
 
-    /* ===== Drawer ===== */
+    /* ===== Drawer (stats panel) ===== */
     #drawer{
       position:absolute; left:12px; right:12px;
-      top:calc(var(--dynBarH,80px) + 56px); bottom:16px;
+      top:calc(var(--dynBarH) + 56px); bottom:16px;
       z-index:1110;
       width:auto; max-width:720px; margin:0 auto;
       background:linear-gradient(180deg,rgba(10,30,20,.94),rgba(8,22,16,.96));
@@ -165,24 +183,19 @@
       background:#062015;border:1px solid #1b5a3e;border-radius:8px;color:#ffffff;
       padding:6px 10px;font:700 13px "Share Tech Mono",ui-monospace; cursor:pointer;
     }
-
-    /* Prevent chip overlap with Leaflet controls on tiny screens */
-    @media (max-width: 420px){
-      #statsChip{ top:calc(var(--dynBarH,80px) + 10px); font-size:12px; padding:8px 10px; }
-    }
   </style>
 </head>
 <body>
-  <!-- ===== Top bar (centered content) ===== -->
+  <!-- ===== Top bar ===== -->
   <div id="topbar" role="navigation" aria-label="Map header">
     <div id="brandRow">
       <span class="dot" aria-hidden="true"></span>
-      <h1>
+      <div id="brandText">
         <span class="msn">Matrix Solutions Network</span>
         <span class="sep">—</span>
-        <span class="page">Digital ID Status</span>
+        <span id="pageTitle">Digital ID Status</span>
         <span class="live" id="livePill">LIVE</span>
-      </h1>
+      </div>
     </div>
     <div id="subRow">
       <div class="inline-hint">• Click any dot for details</div>
@@ -205,7 +218,7 @@
   <!-- Map -->
   <div id="map" aria-label="Digital ID world map"></div>
 
-  <!-- Centered stats chip below the bar -->
+  <!-- Centered stats chip -->
   <div id="statsChip" aria-label="Open stats panel">
     <span id="statsChipText">Digital ID <b>Stats</b> — click to view</span>
   </div>
@@ -323,7 +336,6 @@
       ["republic of serbia","serbia"], ["canada (ca)","canada"], ["united states (us)","united states"]
     ]);
 
-    /* Targeted centroid fixes */
     const CENTROID_OVERRIDES = new Map([
       ["norway",[60.4720, 8.4689]],
       ["russia",[61.5240, 105.3188]],
@@ -562,7 +574,7 @@
         style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false, className:'country-hover' }
       }).addTo(map);
 
-      // implemented shading (always on, controlled by filters later)
+      // implemented shading (always on)
       shadeLayer = L.geoJSON(geo, {
         style: f => ({ color:'#00000000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
@@ -774,7 +786,7 @@
       const seen=new Set();
       for(let i=0;i<n;i++){
         const dists=[];
-        for(let j=0;j<n;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
+        for(let j=0;j<n+j;j++){ if(i===j) continue; dists.push({j, d:haversine(coords[i],coords[j])}); }
         dists.sort((a,b)=>a.d-b.d);
         const limit=Math.min(k, dists.length);
         for(let t=0;t<limit;t++){
@@ -814,19 +826,21 @@
       document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
     }
 
-    /* ===== Map & chip placement below dynamic bar ===== */
+    /* ===== Dynamic placement: bar -> map + chip ===== */
     const mapEl = document.getElementById('map');
     const topbar = document.getElementById('topbar');
     function placeMap(){
       const h = topbar.offsetHeight;
-      mapEl.style.top = (h) + 'px';
       document.documentElement.style.setProperty('--dynBarH', h+'px');
-      // also reposition stats chip (CSS uses var)
+      // Force Leaflet to recalc control positions after layout changes
+      setTimeout(()=> map.invalidateSize(), 0);
     }
     window.addEventListener('load', placeMap);
     window.addEventListener('resize', placeMap);
     window.addEventListener('orientationchange', placeMap);
     if (document.fonts) { document.fonts.ready.then(placeMap); }
+    // Observe bar height changes (burger open/close, wrapping, etc.)
+    new ResizeObserver(placeMap).observe(topbar);
   </script>
 </body>
 </html>
