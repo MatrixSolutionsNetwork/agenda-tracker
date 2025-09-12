@@ -15,32 +15,19 @@
   <!-- CSV -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 
-  <!-- Turf -->
+  <!-- Turf (for robust centroids; you can remove if you prefer bounds center) -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
   <style>
     :root{
-      --bg:#07100b;
-      --text:#ffffff;
-      --chip:#061c13; --chipEdge:#10402b;
-      --panel:#06130d; --panelEdge:#0b2a1c;
-      --orange:#ff9900;
-      --red:#ff3333;
-      --mint:#7be2b1;
-      --matrix:#21ff9d;
-      --countryText:#dfffe9;  /* slightly brighter than default, not pure white */
-      --barPadY:16px;
-      --barPadX:16px;
-      --dynBarH: 92px; /* updated in JS */
+      --bg:#07100b; --text:#ffffff;
+      --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
+      --countryText:#dfffe9;
+      --barPadY:16px; --barPadX:16px;
+      --dynBarH: 92px;
     }
-    html,body{
-      height:100%;margin:0;
-      background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
-      color:var(--text);
-      font-family:"Share Tech Mono",ui-monospace,monospace;
-    }
-
-    /* ===== TOP BAR (slightly transparent) ===== */
+    html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);color:var(--text);font-family:"Share Tech Mono",ui-monospace,monospace;}
+    /* ===== TOP BAR ===== */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
@@ -50,61 +37,27 @@
       backdrop-filter: blur(3px);
       display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-
-    /* Brand row with stacked lines; burger sits to the right on desktop */
-    #brandRow{
-      display:flex; align-items:center; gap:10px; white-space:nowrap;
-    }
-    #brandText{
-      display:flex; flex-direction:column; align-items:center; gap:6px;
-      text-align:center;
-    }
+    #brandRow{display:flex; align-items:center; gap:10px; white-space:nowrap;}
+    #brandText{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
     #brandText .msn{ color:var(--matrix); }
-
-    /* "Digital ID Status" with LIVE to its right */
     #statusRow{ display:flex; align-items:center; gap:8px; }
     #pageTitle{ color:#ffffff }
-    .live{
-      font-size:11px; color:#ffffff; background:var(--red);
-      padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b;
-    }
+    .live{ font-size:11px; color:#ffffff; background:var(--red); padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; }
+    #metaCol{ display:flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; }
+    .updated{ color:#ffffff; opacity:.9 } .inline-hint{ opacity:.85 }
 
-    /* Updated + hint stacked beneath */
-    #metaCol{
-      display:flex; flex-direction:column; align-items:center; gap:4px;
-      font-size:12px;
-    }
-    .updated{ color:#ffffff; opacity:.9 }
-    .inline-hint{ opacity:.85 }
-
-    /* Burger button */
-    #burgerMenu{
-      width:40px; height:40px; border-radius:10px; margin-left:10px;
-      background:#062015; border:1px solid #1b5a3e; color:#fff;
-      font-size:18px; font-weight:800; cursor:pointer;
-    }
+    #burgerMenu{ width:40px; height:40px; border-radius:10px; margin-left:10px; background:#062015; border:1px solid #1b5a3e; color:#fff; font-size:18px; font-weight:800; cursor:pointer; }
     @media (max-width: 720px){
-      #burgerMenu{
-        position:fixed; right:12px; bottom:12px; z-index:1150;
-        width:48px; height:48px; border-radius:12px; margin-left:0;
-      }
+      #burgerMenu{ position:fixed; right:12px; bottom:12px; z-index:1150; width:48px; height:48px; border-radius:12px; margin-left:0; }
     }
 
-    /* ===== BURGER DROPDOWN ===== */
     #mobileMenu{
       position:fixed; left:8px; right:8px; top:calc(var(--dynBarH) + 8px);
-      background:rgba(11,30,22,.92);
-      border:1px solid #144832; border-radius:12px;
-      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55);
-      backdrop-filter: blur(2px);
+      background:rgba(11,30,22,.92); border:1px solid #144832; border-radius:12px;
+      padding:10px; z-index:1101; display:none; box-shadow:0 12px 28px rgba(0,0,0,.55); backdrop-filter: blur(2px);
     }
     #mobileMenu a{ display:block; margin:6px 0; text-decoration:none; }
-    .btn{
-      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
-      padding:8px 10px; border-radius:10px; text-decoration:none;
-      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
-      display:inline-block;
-    }
+    .btn{ background:#062015; border:1px solid #1b5a3e; color:#ffffff; padding:8px 10px; border-radius:10px; text-decoration:none; white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px; display:inline-block; }
     .btn:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
 
     /* ===== MAP ===== */
@@ -112,13 +65,13 @@
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Popup & tooltip styles (country text slightly brighter) */
+    /* Popup & tooltip text */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
     .leaflet-popup-content h3{ color:var(--countryText) !important; }
 
-    .country-hit { cursor:pointer; }
+    .country-hit{ cursor:pointer; }
   </style>
 </head>
 <body>
@@ -127,21 +80,15 @@
     <div id="brandRow">
       <div id="brandText">
         <span class="msn">Matrix Solutions Network</span>
-
-        <!-- Status line with LIVE just to the right -->
         <div id="statusRow">
           <span id="pageTitle">Digital ID Status</span>
           <span class="live" id="livePill">LIVE</span>
         </div>
-
-        <!-- Updated then hint, stacked -->
         <div id="metaCol">
           <div class="updated" id="updatedTop">Updated: …</div>
           <div class="inline-hint">• Click any dot or country for details</div>
         </div>
       </div>
-
-      <!-- Burger sits to the right of the text on desktop -->
       <button id="burgerMenu" aria-label="Open menu">≡</button>
     </div>
   </div>
@@ -152,7 +99,6 @@
     <a class="btn" href="https://www.notion.so/Matrix-Solutions-Network-Dashboard-264f848a73ef8089a7edf4149ea664a5?source=copy_link" target="_blank" rel="noopener">MSN Dashboard ↗</a>
     <a class="btn" href="../cbdc/">Open CBDC Map</a>
     <a class="btn" href="../social-credit-system/">Open Social Credit Map</a>
-    <a class="btn" href="https://pickled-prose-789.notion.site/21cf848a73ef805c9f53ee8d066d67ef?pvs=105" target="_blank" rel="noopener">Submit feedback ✍️</a>
   </div>
 
   <!-- MAP -->
@@ -209,29 +155,24 @@
     }
     function titleCase(s){ return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' '); }
     function escapeHtml(str){ return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[s])); }
-    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
-    function darken(hex, amt){
-      const n = parseInt(hex.replace('#',''),16);
-      let r=(n>>16)+(-amt), g=((n>>8)&255)+(-amt), b=(n&255)+(-amt);
-      r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
-      return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');
-    }
 
     /* ========= MAP ========= */
-    // Use preferCanvas so dots are fast; we will force SVG for the country hit layer explicitly.
     const map = L.map('map', { zoomControl:true, preferCanvas:true }).setView([20,0], 2);
+
+    // Create explicit panes so order & events are stable across refreshes
+    map.createPane('hitPane');  map.getPane('hitPane').style.zIndex = 590;   // below markers
+    map.createPane('dotsPane'); map.getPane('dotsPane').style.zIndex = 610;  // above markers
+    // (Leaflet default: overlayPane 400, markerPane 600, tooltip 650, popup 700)
 
     const tiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png', {
       attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
     }).addTo(map);
 
-    // Dots live on Canvas in markerPane (always above polygons)
-    const dotsRenderer = L.canvas({ pane: 'markerPane', padding: 0.3 });
-
-    // Force SVG for polygon hit layer in overlayPane (so it never conflicts with dots)
-    const hitRenderer = L.svg({ pane: 'overlayPane' });
+    const dotsRenderer = L.canvas({ pane: 'dotsPane', padding: 0.3 }); // dots on canvas (top)
+    const hitRenderer  = L.svg({ pane: 'hitPane' });                    // country clicks on svg (under)
 
     // Layers
+    const dotsLayer = L.layerGroup().addTo(map);
     let outlineLayer = null;
     let hitLayer = null;
 
@@ -248,11 +189,7 @@
 
     /* ===== Layout: keep map under bar ===== */
     const topbar = document.getElementById('topbar');
-    function placeMap(){
-      const h = topbar.offsetHeight;
-      document.documentElement.style.setProperty('--dynBarH', h+'px');
-      setTimeout(()=> map.invalidateSize(), 0);
-    }
+    function placeMap(){ const h = topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=> map.invalidateSize(), 0); }
     window.addEventListener('load', placeMap);
     window.addEventListener('resize', placeMap);
     if (document.fonts) { document.fonts.ready.then(placeMap); }
@@ -260,11 +197,8 @@
 
     /* ===== Helpers ===== */
     function centroidInside(feature){
-      try {
-        const c=turf.centerOfMass(feature).geometry.coordinates; // [lng,lat]
-        return L.latLng(c[1], c[0]);
-      }catch(e){}
-      return L.geoJSON(feature).getBounds().getCenter();
+      try { const c=turf.centerOfMass(feature).geometry.coordinates; return L.latLng(c[1], c[0]); }
+      catch(e){ return L.geoJSON(feature).getBounds().getCenter(); }
     }
     function popupHTML(country, rows){
       const list = rows.map(r=>{
@@ -275,23 +209,23 @@
         if (r.notes)  bits.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
         return `<div style="margin-bottom:8px">${bits.join('<br>')}</div>`;
       }).join('');
-      return `<div style="min-width:240px">
-                <h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>
-                ${list}
-              </div>`;
+      return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;">${escapeHtml(country)}</h3>${list}</div>`;
     }
-    function* groupByCountry(arr){
-      const m = new Map();
-      for (const e of arr){ if (!m.has(e.key)) m.set(e.key, []); m.get(e.key).push(e); }
-      for (const [k,v] of m) yield [k,v];
-    }
-    function forceDotsRedraw(){
-      map.invalidateSize();
-      map.fire('zoomend'); map.fire('moveend');
-      requestAnimationFrame(()=> map.invalidateSize());
+    function getCSS(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+    function darken(hex, amt){ const n=parseInt(hex.replace('#',''),16); let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt; r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b)); return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0'); }
+    function* groupByCountry(arr){ const m=new Map(); for(const e of arr){ if(!m.has(e.key)) m.set(e.key,[]); m.get(e.key).push(e);} for(const kv of m) yield kv; }
+    function forceDotsRedraw(){ map.invalidateSize(); requestAnimationFrame(()=>{ map.fire('zoomend'); map.fire('moveend'); }); }
+
+    function openCountryPopup(countryKey){
+      if (!countryKey) return;
+      const rows = entries.filter(e=>e.key===countryKey);
+      const pt = centroidByKey[countryKey];
+      if (!pt) return;
+      const html = rows.length ? popupHTML(rows[0].country, rows) : `<div style="min-width:240px;">No record in dataset.</div>`;
+      L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    /* ===== Data loaders ===== */
+    /* ===== Data loaders — IMPORTANT: world FIRST, then sheet ===== */
     async function loadWorld(){
       const SOURCES=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
@@ -308,23 +242,16 @@
       }
       if(!geo) throw new Error('World polygons failed to load');
 
-      // Build centroid lookup + annotate features with _key
       centroidByKey = {};
       L.geoJSON(geo).eachLayer(l=>{
-        let nmRaw = (l.feature && l.feature.properties) ? (
-          l.feature.properties.name || l.feature.properties.NAME || l.feature.properties.NAME_EN || l.feature.properties.ADMIN || l.feature.properties.SOVEREIGNT
-        ) : null;
-        if (!nmRaw) return;
+        const p=l.feature&&l.feature.properties||{};
+        const nmRaw=p.name||p.NAME||p.NAME_EN||p.ADMIN||p.SOVEREIGNT;
+        if(!nmRaw) return;
         const nm = normalizeCountry(nmRaw);
-        if (CENTROID_OVERRIDES.has(nm)){
-          const [lat,lng] = CENTROID_OVERRIDES.get(nm);
-          centroidByKey[nm] = L.latLng(lat,lng);
-        } else {
-          centroidByKey[nm] = centroidInside(l.feature);
-        }
+        if (CENTROID_OVERRIDES.has(nm)){ const [lat,lng]=CENTROID_OVERRIDES.get(nm); centroidByKey[nm]=L.latLng(lat,lng); }
+        else { centroidByKey[nm]=centroidInside(l.feature); }
         if (l.feature && l.feature.properties) l.feature.properties._key = nm;
       });
-
       return geo;
     }
 
@@ -338,14 +265,10 @@
       const parsed = Papa.parse(text, { header:true, skipEmptyLines:true });
       const rawRows = parsed.data;
 
-      const out=[];
-      const unmatched = new Set();
-
+      const out=[]; const unmatched=new Set();
       function pickYear(row){
-        const keys = ["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
-        for (const k of keys){
-          if (row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]);
-        }
+        const keys=["Year","Start year","Start Year","Go live year","Go-live year","Go Live Year"];
+        for(const k of keys){ if(row[k] && /^\d{4}$/.test(String(row[k]).trim())) return parseInt(row[k]); }
         return null;
       }
 
@@ -354,58 +277,52 @@
         const status = String(row["Status"]||"").trim();
         const notes  = String(row["Description"]||"").trim();
         const yr     = pickYear(row);
-
         const countriesCell = String(row["Countries"]||"").trim();
         if (!countriesCell) continue;
 
         for (const raw of splitCountries(countriesCell)){
           const key = normalizeCountry(raw);
-          const pt = centroidByKey[key] || centroidByKey[key.replace(/^(republic|kingdom)\sof\s/,'').trim()];
+          const alt = key.replace(/^(republic|kingdom)\sof\s/,'').trim();
+          const pt = centroidByKey[key] || centroidByKey[alt];
           if (!pt){ unmatched.add(raw); continue; }
-
           const isImplemented = /implement/i.test(status);
           const isDev = /develop|discussion|pilot|trial|poc|concept/i.test(status);
-
-          out.push({
-            key, country:titleCase(key), lat:pt.lat, lng:pt.lng,
-            status, isImplemented, isDev, title, notes, year: yr
-          });
+          out.push({ key, country:titleCase(key), lat:pt.lat, lng:pt.lng, status, isImplemented, isDev, title, notes, year:yr });
         }
       }
-
       if (unmatched.size) console.warn("Unmatched country tokens:", [...unmatched].sort());
       return out;
     }
 
-    /* ===== Init ===== */
-    map.whenReady(async ()=>{
+    /* ===== Init sequence: deterministic ===== */
+    (async function init(){
       try{
-        const [geo, rows] = await Promise.all([loadWorld(), loadSheet()]);
-        worldGeo = geo;
-        entries = rows;
+        // 1) world first
+        worldGeo = await loadWorld();
+
+        // 2) sheet after centroids exist
+        entries = await loadSheet();
+
+        // 3) draw
         drawAll();
       }catch(e){
         console.error(e);
       }
-    });
+    })();
 
     function drawAll(){
-      // Outline layer
+      // outline
       if (outlineLayer) outlineLayer.remove();
-      outlineLayer = L.geoJSON(worldGeo, {
-        style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
-      }).addTo(map);
+      outlineLayer = L.geoJSON(worldGeo, { style: { color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false } }).addTo(map);
 
-      // Dots
+      // dots
+      dotsLayer.clearLayers();
       for (const [countryKey, rows] of groupByCountry(entries)){
-        const pt = centroidByKey[countryKey];
-        if (!pt) continue;
-
+        const pt = centroidByKey[countryKey]; if (!pt) continue;
         const isImplemented = rows.some(r=>r.isImplemented);
         const color = isImplemented ? getCSS('--red') : getCSS('--orange');
-
         const m = L.circleMarker([pt.lat, pt.lng], {
-          renderer: dotsRenderer,  /* Canvas on markerPane */
+          renderer: dotsRenderer,
           radius: 6.5,
           color: darken(color,30),
           weight: 1.2,
@@ -414,48 +331,29 @@
         })
         .bindTooltip(`${rows[0].country}`, {direction:'top', offset:[0,-6]})
         .on('click', ()=> openCountryPopup(countryKey))
-        .addTo(map);
-
+        .addTo(dotsLayer);
         if (m.bringToFront) m.bringToFront();
       }
 
-      // Country hit layer (SVG on overlayPane)
+      // country hit layer (SVG, lower pane)
       if (hitLayer) hitLayer.remove();
       hitLayer = L.geoJSON(worldGeo, {
-        renderer: hitRenderer,
-        pane: 'overlayPane',
-        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.012, fillColor:'#000' }, // tiny fill for reliable hit-test
+        renderer: hitRenderer, pane: 'hitPane',
+        style: { color:'#0000', weight:0, fill:true, fillOpacity:0.012, fillColor:'#000' },
         interactive: true,
         onEachFeature: (f, layer) => {
           const key = (f.properties && f.properties._key) || '';
           layer.on('mouseover', () => layer.setStyle({weight:1, color:getCSS('--mint'), opacity:.6}));
           layer.on('mouseout',  () => layer.setStyle({weight:0, color:'#0000'}));
           layer.on('click',     () => openCountryPopup(key));
-          if (layer.getElement) { // add hover cursor
-            const el = layer.getElement();
-            if (el) el.classList.add('country-hit');
-          }
+          if (layer.getElement){ const el=layer.getElement(); if (el) el.classList.add('country-hit'); }
         }
       }).addTo(map);
 
-      // Nudge first paint across browsers
-      map.once('idle', () => { forceDotsRedraw(); });
+      // nudge first paint
+      map.once('idle', forceDotsRedraw);
       requestAnimationFrame(forceDotsRedraw);
       setTimeout(forceDotsRedraw, 0);
-    }
-
-    // Open popup by country key (used by both dots and hit layer)
-    function openCountryPopup(countryKey){
-      if (!countryKey) return;
-      const rows = entries.filter(e=>e.key===countryKey);
-      const pt = centroidByKey[countryKey];
-      if (!pt) return;
-      const html = rows.length ? popupHTML(rows[0].country, rows)
-                               : `<div style="min-width:240px; color:#fff;">No record in dataset.</div>`;
-      L.popup({autoClose:true, closeOnClick:true})
-        .setLatLng(pt)
-        .setContent(html)
-        .openOn(map);
     }
   </script>
 </body>
