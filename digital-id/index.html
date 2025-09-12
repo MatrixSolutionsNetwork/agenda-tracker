@@ -51,22 +51,29 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* === Right-side quick links (replaces burger) === */
-    #toplinks{
-      position:absolute; right:var(--barPadX); top:50%;
-      transform:translateY(-50%);
-      display:flex; gap:8px;
+    /* Right-side vertical button stack */
+    #navStack{
+      position:absolute; right:16px; top:50%; transform:translateY(-50%);
+      display:flex; flex-direction:column; gap:8px; align-items:flex-end;
     }
-    .toplink{
-      background:#062015; border:1px solid #1b5a3e; color:#ffffff;
-      padding:8px 10px; border-radius:10px; text-decoration:none;
-      white-space:nowrap; font-weight:700; letter-spacing:.3px; font-size:13px;
+    .btnLink{
+      display:inline-block;
+      padding:6px 10px;
+      border-radius:10px;
+      border:1px solid #1b5a3e;
+      background:#062015;
+      color:#ffffff;
+      text-decoration:none;
+      font-weight:700; letter-spacing:.2px; font-size:12px;
+      box-shadow:0 4px 12px rgba(0,0,0,.25);
+      white-space:nowrap;
     }
-    .toplink:hover{ box-shadow:0 0 18px rgba(33,255,157,.20) }
-
-    @media (max-width:720px){
-      #toplinks{ position:static; transform:none; margin-top:6px; flex-wrap:wrap; justify-content:center; }
-      .toplink{ padding:7px 9px; font-size:12px }
+    .btnLink:hover{ box-shadow:0 0 18px rgba(33,255,157,.20); }
+    .btnActive{
+      color:#0a1; /* deeper green text for contrast */
+      color:var(--matrix);
+      border-color:#2ae89f;
+      background:rgba(33,255,157,.10);
     }
 
     /* ===== Map ===== */
@@ -86,6 +93,14 @@
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+
+    /* Small screens: tuck buttons under the title to avoid overlap */
+    @media (max-width: 720px){
+      #navStack{
+        position:static; transform:none; margin-top:6px;
+        flex-direction:row; gap:8px; justify-content:center;
+      }
+    }
   </style>
 </head>
 <body>
@@ -100,10 +115,11 @@
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
 
-    <!-- Right-side quick links -->
-    <div id="toplinks" aria-label="Quick links">
-      <a class="toplink" href="../cbdc/" title="Open the CBDC tracker">CBDC Tracker</a>
-      <a class="toplink" href="../social-credit-system/" title="Open the Social Credit System tracker">Social Credit Tracker</a>
+    <!-- Right-side stacked buttons -->
+    <div id="navStack" aria-label="Other trackers">
+      <a class="btnLink btnActive" href="./" title="You are here">Digital ID</a>
+      <a class="btnLink" href="../cbdc/" title="Open the CBDC map">CBDC Tracker</a>
+      <a class="btnLink" href="../social-credit-system/" title="Open the Social Credit System map">Social Credit Tracker</a>
     </div>
   </div>
 
@@ -114,12 +130,12 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // --- New: small local CSV fallback so the app still runs if fetch is blocked ---
-    const FALLBACK_CSV = `Title,Status,Description,Year,Countries\n`+
-      `National eID,Implemented,Live national digital identity,2023,United Kingdom\n`+
-      `Digital ID Pilot,In development,Phase 2 pilot,2025,United States\n`+
-      `MyKad,Implemented,Malaysia ID,2012,Malaysia\n`+
-      `DNIe,Implemented,Spain smart ID,2016,Spain`;
+    // Small local CSV fallback so the app still runs if fetch is blocked
+    const FALLBACK_CSV = `Title,Status,Description,Year,Countries
+National eID,Implemented,Live national digital identity,2023,United Kingdom
+Digital ID Pilot,In development,Phase 2 pilot,2025,United States
+MyKad,Implemented,Malaysia ID,2012,Malaysia
+DNIe,Implemented,Spain smart ID,2016,Spain`;
 
     function toCsvUrl(u){
       if (!u) return u;
@@ -223,7 +239,7 @@
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    // --- New: fetch helper with timeout + local fallback ---
+    // fetch helper with timeout + local fallback
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
         const ctrl = new AbortController();
@@ -316,10 +332,9 @@
 
       drawAll(); // dots, lines, shading
 
-      // --- Simple runtime tests ---
+      // simple runtime checks
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
-      console.log('[TEST] Rendered dots:', dotsLayer.getLayers().length);
     })();
 
     function drawAll(){
