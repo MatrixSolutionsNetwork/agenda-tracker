@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Matrix Solutions Network — Digital ID</title>
+  <title>Matrix Solutions Network — Social Credit</title>
 
   <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
@@ -18,22 +18,74 @@
   <!-- Turf (centroid fallback) -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
-  <style>/* (identical CSS as above) */</style>
+  <style>
+    :root{
+      --bg:#07100b; --text:#ffffff;
+      --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
+      --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
+      --countryText:#dfffe9;
+    }
+
+    html,body{
+      height:100%;margin:0;
+      background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
+      color:var(--text);
+      font-family:"Share Tech Mono",ui-monospace,monospace;
+    }
+
+    /* ===== Top bar (centered) ===== */
+    #topbar{
+      position:fixed; z-index:1100; left:0; right:0; top:0;
+      padding:var(--barPadY) var(--barPadX);
+      background:linear-gradient(180deg,rgba(10,30,20,.70),rgba(8,22,16,.86));
+      border-bottom:1px solid rgba(11,42,28,.6);
+      box-shadow:0 10px 28px rgba(0,0,0,.45);
+      backdrop-filter: blur(3px);
+      display:flex; flex-direction:column; align-items:center; gap:8px;
+      pointer-events:none; /* let map drag under the bar */
+    }
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; pointer-events:auto;}
+    .msn{color:var(--matrix)}
+    #rowStatus{display:flex; align-items:center; gap:8px}
+    #pageTitle{color:#fff}
+    .live{font-size:11px;color:#ffffff;background:var(--red);padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
+    .updated{opacity:.9;font-size:12px}
+    .inline-hint{opacity:.85;font-size:12px}
+
+    /* ===== Map ===== */
+    #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
+    /* If tiles fail, show neutral black instead of green */
+    .leaflet-container{ background:#000; }
+    .leaflet-tile{ background:transparent; transform:translateZ(0); }
+    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+    .leaflet-top{ top:12px; }
+
+    /* Labels-only pane brighter */
+    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
+
+    /* Popup / tooltip */
+    .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
+    .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
+    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
+
+    /* Hit polygons must accept events */
+    .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+  </style>
 </head>
 <body>
   <div id="topbar">
     <div id="brandWrap">
       <div class="msn">Matrix Solutions Network</div>
       <div id="rowStatus">
-        <span id="pageTitle">Digital ID Status</span>
+        <span id="pageTitle">Social Credit Status</span>
         <span class="live">LIVE</span>
       </div>
       <div class="updated" id="updatedTop">Updated: …</div>
-      <div class="inline-hint">• Click any dot or country for details</div>
+      <div class="inline-hint">• Click any dot or country for social credit details</div>
     </div>
   </div>
 
-  <div id="map" aria-label="Digital ID world map"></div>
+  <div id="map" aria-label="Social Credit world map"></div>
 
   <script>
     /* ===== PAGE VARS (only change these two for each tracker) ===== */
@@ -62,8 +114,6 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
-    /* ===== rest of JS is identical to cbdc.html ===== */
-
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"],["u.s.a.","united states"],["u.s.","united states"],["us","united states"],["united states of america","united states"],
       ["uk","united kingdom"],["england","united kingdom"],["scotland","united kingdom"],["wales","united kingdom"],["northern ireland","united kingdom"],
@@ -86,63 +136,133 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
       ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],["malaysia",[4.2105,101.9758]]
     ]);
 
+    function normalizeCountry(s){
+      const k=String(s||"").normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/gi,' ').replace(/\s+/g,' ').toLowerCase().trim();
+      return COUNTRY_ALIASES.get(k)||k;
+    }
+    function splitCountries(cell){
+      return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
+    }
     function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
     function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));}
     function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
     function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
     function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
-    function splitCountries(cell){return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);}
-    function normalizeCountry(s){
-      const k=String(s||"").normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/gi,' ').replace(/\s+/g,' ').toLowerCase().trim();
-      return COUNTRY_ALIASES.get(k)||k;
-    }
 
+    /* ===== Map & panes ===== */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
-    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none';
-    map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500;
-    map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600;
-    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650;
 
-    const TILE_OPTS = { subdomains: 'abcd', maxZoom: 8, errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' };
-    let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
-    let labelsOnly  = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS,pane:'labelsPane'}).addTo(map);
+    // custom panes (ordered low -> high)
+    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none';
+    map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500; // clickable polygons
+    map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600; // local network lines
+    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650; // markers
+
+    // --- Robust basemap with fallbacks to avoid the “green map” ---
+    const TILE_OPTS = {
+      subdomains: 'abcd',
+      maxZoom: 8,
+      // Transparent 1x1 so missing tiles don’t show a color
+      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+    };
+
+    // Primary: no-labels + labels overlay (best look)
+    let baseNoLabels = L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
+      { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+    ).addTo(map);
+
+    let labelsOnly = L.tileLayer(
+      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
+      { ...TILE_OPTS, pane: 'labelsPane' }
+    ).addTo(map);
+
     installTileFallback(baseNoLabels, labelsOnly);
+
     function installTileFallback(primary, overlay) {
-      let switched=false;
-      function switchToFallback(){
-        if (switched) return; switched=true;
-        try{ if(map.hasLayer(primary)) map.removeLayer(primary); if(overlay&&map.hasLayer(overlay)) map.removeLayer(overlay);}catch(e){}
-        const fallback1=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{...TILE_OPTS,attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
-        let switched2=false;
-        fallback1.on('tileerror',()=>{ if(switched2) return; switched2=true; try{ if(map.hasLayer(fallback1)) map.removeLayer(fallback1);}catch(e){} L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{...TILE_OPTS,attribution:'&copy; OpenStreetMap contributors'}).addTo(map); });
-        setTimeout(()=>{ if(!switched2 && Object.keys(fallback1._tiles||{}).length===0){ fallback1.fire('tileerror'); } },3000);
+      let switched = false;
+
+      function switchToFallback() {
+        if (switched) return;
+        switched = true;
+        try{
+          if (map.hasLayer(primary)) map.removeLayer(primary);
+          if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
+        }catch(e){}
+
+        // Fallback #1: single dark_all tiles
+        const fallback1 = L.tileLayer(
+          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+          { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
+        ).addTo(map);
+
+        // Fallback #2: plain OSM if even Carto dark_all is blocked
+        let switched2 = false;
+        fallback1.on('tileerror', () => {
+          if (switched2) return;
+          switched2 = true;
+          try{ if (map.hasLayer(fallback1)) map.removeLayer(fallback1); }catch(e){}
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            ...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(map);
+        });
+
+        // If fallback1 never starts (ad-block), force-switch after 3s
+        setTimeout(() => {
+          if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
+            fallback1.fire('tileerror');
+          }
+        }, 3000);
       }
-      primary.on('tileerror',switchToFallback);
-      if(overlay) overlay.on('tileerror',switchToFallback);
-      setTimeout(()=>{ const loaded=Object.keys(primary._tiles||{}).length + (overlay?Object.keys(overlay._tiles||{}).length:0); if(!switched && loaded===0) switchToFallback(); },3500);
+
+      // Switch on any tile error
+      primary.on('tileerror', switchToFallback);
+      if (overlay) overlay.on('tileerror', switchToFallback);
+
+      // Guard against silent failures: if nothing loads in 3.5s, fallback.
+      setTimeout(() => {
+        const loaded =
+          Object.keys(primary._tiles || {}).length +
+          (overlay ? Object.keys(overlay._tiles || {}).length : 0);
+        if (!switched && loaded === 0) switchToFallback();
+      }, 3500);
     }
 
-    const dotsRenderer=L.canvas({pane:'dotsPane',padding:0.3});
-    const linesRenderer=L.canvas({pane:'linesPane',padding:0.3});
-    const linesImpLayer=L.layerGroup([], {pane:'linesPane'}).addTo(map);
-    const linesDevLayer=L.layerGroup([], {pane:'linesPane'}).addTo(map);
-    const dotsLayer=L.layerGroup([], {pane:'dotsPane'}).addTo(map);
+    // Canvas renderers (better perf)
+    const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.3 });
+    const linesRenderer = L.canvas({ pane:'linesPane', padding:0.3 });
+
+    // Layers
+    const linesImpLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map);
+    const linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map);
+    const dotsLayer     = L.layerGroup([], {pane:'dotsPane'}).addTo(map);
     let outlineLayer=null, shadeLayer=null, hitLayer=null;
 
+    /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
     window.addEventListener('load',placeMap);
     window.addEventListener('resize',placeMap);
     if(document.fonts){document.fonts.ready.then(placeMap);}
     new ResizeObserver(placeMap).observe(topbar);
-    window.addEventListener('orientationchange',()=>setTimeout(placeMap,250),{passive:true});
-    document.addEventListener('visibilitychange',()=>{ if(!document.hidden) setTimeout(placeMap,150); });
+    window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150); });
 
+    /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
 
-    function centroidInside(feature){ try{ const c=turf.centerOfMass(feature).geometry.coordinates; return L.latLng(c[1],c[0]); } catch(e){ return L.geoJSON(feature).getBounds().getCenter(); } }
+    function centroidInside(feature){
+      try{ const c=turf.centerOfMass(feature).geometry.coordinates; return L.latLng(c[1],c[0]); }
+      catch(e){ return L.geoJSON(feature).getBounds().getCenter(); }
+    }
     function popupHTML(country, rows){
-      const list=rows.map(r=>{ const b=[]; if(r.title)b.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`); if(r.status)b.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`); if(Number.isInteger(r.year))b.push(`<strong>Year:</strong> ${r.year}`); if(r.notes)b.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`); return `<div style="margin-bottom:8px">${b.join('<br>')}</div>`; }).join('');
+      const list = rows.map(r=>{
+        const b=[]; if(r.title)b.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
+        if(r.status)b.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
+        if(Number.isInteger(r.year))b.push(`<strong>Year:</strong> ${r.year}`);
+        if(r.notes)b.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
+        return `<div style="margin-bottom:8px">${b.join('<br>')}</div>`;
+      }).join('');
       return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;color:${getCSS('--countryText')}">${escapeHtml(country)}</h3>${list}</div>`;
     }
     function openCountryPopup(countryKey){
@@ -154,24 +274,26 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
+    // fetch CSV with timeout + embedded fallback
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
-        const ctrl=new AbortController();
-        const t=setTimeout(()=>ctrl.abort(),timeoutMs);
-        const res=await fetch(url,{cache:'no-store',mode:'cors',signal:ctrl.signal});
+        const ctrl = new AbortController();
+        const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+        const res = await fetch(url, { cache:'no-store', mode:'cors', signal: ctrl.signal });
         clearTimeout(t);
         if(!res.ok) throw new Error('Bad status '+res.status);
-        const dateHdr=res.headers.get('Date') || new Date().toUTCString();
-        document.getElementById('updatedTop').textContent='Updated: '+dateHdr;
+        const dateHdr = res.headers.get('Date') || new Date().toUTCString();
+        document.getElementById('updatedTop').textContent = 'Updated: ' + dateHdr;
         return await res.text();
       }catch(err){
-        console.warn('[CSV] Falling back to embedded sample data because fetch failed:',err);
-        document.getElementById('updatedTop').textContent='Updated: Local sample data';
+        console.warn('[CSV] Falling back to embedded sample data because fetch failed:', err);
+        document.getElementById('updatedTop').textContent = 'Updated: Local sample data';
         return FALLBACK_CSV;
       }
     }
 
     (async function init(){
+      // 1) world polygons
       const sources=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
@@ -182,6 +304,7 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
       }
       if(!worldGeo){ console.error('World polygons failed to load'); return; }
 
+      // build centroid map + normalized key on features
       centroidByKey={};
       L.geoJSON(worldGeo).eachLayer(l=>{
         const p=l.feature&&l.feature.properties||{};
@@ -192,13 +315,22 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
         if(l.feature.properties) l.feature.properties._key=nm;
       });
 
-      outlineLayer=L.geoJSON(worldGeo,{pane:'hitPane',style:{color:getCSS('--mint'),weight:0.6,opacity:0.35,fill:false}}).addTo(map);
-
-      shadeLayer=L.geoJSON(worldGeo,{pane:'hitPane',style:f=>({color:'#0000',weight:0,fillColor:getCSS('--red'),fillOpacity:0})}).addTo(map);
-
-      hitLayer=L.geoJSON(worldGeo,{
+      // outlines (thin) for context
+      outlineLayer = L.geoJSON(worldGeo, {
         pane:'hitPane',
-        style:{className:'country-hit',stroke:false,fill:true,fillColor:'#000',fillOpacity:0.01},
+        style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
+      }).addTo(map);
+
+      // shading (implemented only; style set after we know which)
+      shadeLayer = L.geoJSON(worldGeo, {
+        pane:'hitPane',
+        style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
+      }).addTo(map);
+
+      // hit polygons (transparent but clickable)
+      hitLayer = L.geoJSON(worldGeo, {
+        pane:'hitPane',
+        style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
         interactive:true,
         onEachFeature:(f,layer)=>{
           const key=(f.properties&&f.properties._key)||'';
@@ -210,18 +342,21 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
         }
       }).addTo(map);
 
-      const text=await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
+      // 2) sheet rows (with fallback)
+      const text = await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
+      // 3) normalize
       entries=[];
       for(const row of rows){
         const title=String(row["Title"]||"").trim();
         const status=String(row["Status"]||"").trim();
-        const notes=String(row["Description"]||"").trim();
-        const year=/^\d{4}$/.test(String(row["Year"]||"").trim())?parseInt(row["Year"]):null;
+        const notes =String(row["Description"]||"").trim();
+        const year  =/^\d{4}$/.test(String(row["Year"]||"").trim())?parseInt(row["Year"]):null;
         const countriesCell=String(row["Countries"]||"").trim();
         if(!countriesCell) continue;
+
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
           const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
@@ -233,28 +368,33 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
         }
       }
 
-      drawAll();
+      drawAll(); // dots, lines, shading
 
+      // sanity checks
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
 
     function drawAll(){
+      // Clear
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
 
       const red=getCSS('--red'), orange=getCSS('--orange');
 
+      // Deduplicate per country; prefer implemented if both exist
       const bestByKey=new Map();
       for(const e of entries){
         const prev=bestByKey.get(e.key);
         if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
 
+      // Separate lists for lines
       const impPts=[], devPts=[];
-      const implementedShown=new Set();
+      const implementedShown = new Set();
 
+      // Draw dots
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
@@ -269,44 +409,48 @@ Rewards program,In development,Credit multipliers,2025,Canada`;
         else               { devPts.push([e.lat,e.lng]); }
       }
 
+      // Shade implemented countries that have dots
       if (shadeLayer){
-        const fill=getCSS('--red');
+        const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
           const k=(f.properties&&f.properties._key)||'';
-          return implementedShown.has(k)?{fillColor:fill,fillOpacity:0.14,color:'#0000',weight:0}:{fillOpacity:0,color:'#0000',weight:0};
+          return implementedShown.has(k)
+            ? {fillColor:fill, fillOpacity:0.14, color:'#0000', weight:0}
+            : {fillOpacity:0, color:'#0000', weight:0};
         });
       }
 
+      // Local networks: connect to K=3 nearest neighbors (Canvas + non-interactive for perf)
       const K=3;
-      buildLocalNetwork(impPts,getCSS('--red'),linesImpLayer,K,.35,1.2);
-      buildLocalNetwork(devPts,getCSS('--orange'),linesDevLayer,K,.30,1.1);
+      buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
+      buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
     }
 
-    function buildLocalNetwork(coords,color,layer,k=3,opacity=.35,weight=1.2){
+    function buildLocalNetwork(coords, color, layer, k=3, opacity=.35, weight=1.2){
       const n=coords.length; if(n<2) return;
       const seen=new Set();
       for(let i=0;i<n;i++){
         const dists=[];
         for(let j=0;j<n;j++){
           if(i===j) continue;
-          dists.push({j,d:haversine(coords[i],coords[j])});
+          dists.push({j, d:haversine(coords[i],coords[j])});
         }
         dists.sort((a,b)=>a.d-b.d);
-        const limit=Math.min(k,dists.length);
+        const limit=Math.min(k, dists.length);
         for(let t=0;t<limit;t++){
           const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key);
-          L.polyline([coords[i],coords[j]],{pane:'linesPane',renderer:linesRenderer,interactive:false,color,weight,opacity,smoothFactor:1.0}).addTo(layer);
+          L.polyline([coords[i], coords[j]], {
+            pane:'linesPane', renderer:linesRenderer, interactive:false,
+            color, weight, opacity, smoothFactor:1.0
+          }).addTo(layer);
         }
       }
     }
 
+    /* ===== Smooth zoom: fade lines during zoom to hide jitter ===== */
     const linesPane = map.getPane('linesPane');
     map.on('zoomstart', () => { if (linesPane) linesPane.style.opacity = '0.05'; });
     map.on('zoomend',   () => { if (linesPane) linesPane.style.opacity = '1';   });
   </script>
-
-  <style>
-  /* Keeping CSS inline-minimized note at top to keep this block short */
-  </style>
 </body>
 </html>
