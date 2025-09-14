@@ -24,14 +24,13 @@
       --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
       --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
       --countryText:#dfffe9;
-
-      /* nav */
-      --navW: 160px; --navGap: 10px;
+      --navW: 160px;
     }
 
     html,body{
-      height:100%; margin:0; color:var(--text);
+      height:100%;margin:0;
       background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
+      color:var(--text);
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
@@ -43,68 +42,55 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:grid;
-      grid-template-columns: 1fr max-content max-content 1fr; /* 1|center|buttons|1 */
-      align-items:center;
-      column-gap:16px;
-      row-gap:8px;
+      /* Center brand; nav sits just to its right */
+      display:grid; grid-template-columns: 1fr max-content max-content 1fr; align-items:center; column-gap:16px;
     }
     #brandWrap{
       grid-column:2;
-      display:flex; flex-direction:column; align-items:center;
-      gap:6px; text-align:center;
+      display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
     }
-    .msn{ color:var(--matrix); }
-    #rowStatus{ display:flex; align-items:center; gap:8px; }
-    #pageTitle{ color:#fff; }
-    .live{ font-size:11px; color:#ffffff; background:var(--red); padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; }
-    .updated{ opacity:.9; font-size:12px; }
-    .inline-hint{ opacity:.85; font-size:12px; }
+    .msn{color:var(--matrix)}
+    #rowStatus{display:flex; align-items:center; gap:8px}
+    #pageTitle{color:#fff}
+    .live{font-size:11px;color:#ffffff;background:var(--red);padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
+    .updated{opacity:.9;font-size:12px}
+    .inline-hint{opacity:.85;font-size:12px}
 
-    /* Right-side stacked nav buttons */
+    /* Right-side stacked nav */
     #navStack{
       grid-column:3;
-      justify-self:start; /* sit just right of the centered block */
-      display:flex; flex-direction:column; gap:var(--navGap);
+      display:flex; flex-direction:column; gap:8px; align-items:stretch;
     }
     .nav-btn{
-      background:rgba(6,32,21,.85);
-      border:1px solid #1b5a3e;
-      color:#ffffff; text-decoration:none; font-weight:700; font-size:12px;
-      border-radius:10px; padding:6px 12px;
-      display:flex; align-items:center; justify-content:center;
-      width:var(--navW); height:30px; white-space:nowrap;
-      transition:transform .12s ease;
+      background:rgba(6,32,21,.85); border:1px solid #1b5a3e; color:#ffffff;
+      padding:6px 12px; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px;
+      display:flex; justify-content:center; align-items:center; width:var(--navW); height:28px; white-space:nowrap;
     }
-    .nav-btn:hover{ transform:translateY(-1px); }
-    /* Active page: white border + underline text */
     .nav-btn.active{ border-color:#ffffff; }
     .nav-btn.active > span{ text-decoration:underline; text-underline-offset:2px; }
 
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    /* Never show green if tiles fail */
+    /* If tiles fail, show neutral black instead of green */
     .leaflet-container{ background:#000; }
     .leaflet-tile{ background:transparent; transform:translateZ(0); }
+    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
-    /* Brighten labels-only tiles (country names) */
-    .leaflet-labelsPane-pane img { filter: brightness(1.5) contrast(1.2); }
+    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
-    /* Popup / tooltip */
-    .leaflet-popup-content-wrapper{ background:#0a1c14; color:#ffffff; border:1px solid #174d35; }
-    .leaflet-popup-tip{ background:#0a1c14; border:1px solid #174d35; }
-    .leaflet-tooltip{ background:#0a1c14; border:1px solid #174d35; color:var(--countryText) !important; }
+    .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
+    .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
+    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
 
-    /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
 
-    /* Mobile: keep layout compact, buttons still to the right of center block */
+    /* Mobile: brand left, buttons right, still stacked */
     @media (max-width: 720px){
       #topbar{ grid-template-columns: 1fr max-content; }
       #brandWrap{ grid-column:1; }
-      #navStack{ grid-column:2; justify-self:start; }
-      .nav-btn{ width:140px; height:30px; }
+      #navStack{ grid-column:2; }
+      .nav-btn{ width:140px; }
     }
   </style>
 </head>
@@ -145,7 +131,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
       if (/\/pubhtml/i.test(u)){ const url=new URL(u); url.pathname=url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single")) url.searchParams.set("single","true"); return url.toString(); }
-      if (/\/spreadsheets\/d\//i.test(u)){ const m=u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(\`https://docs.google.com/spreadsheets/d/\${id}/export\`); url.searchParams.set("format","csv"); return url.toString(); } }
+      if (/\/spreadsheets\/d\//i.test(u)){ const m=u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
@@ -197,69 +183,47 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     const TILE_OPTS = {
       subdomains: 'abcd',
       maxZoom: 8,
-      // Transparent 1x1 so missing tiles don’t show a color
+      // Transparent 1x1 so missing tiles don’t flash a color
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     };
 
     // Primary: no-labels + labels overlay (best look)
-    const baseNoLabels = L.tileLayer(
+    let baseNoLabels = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
       { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
     ).addTo(map);
 
-    const labelsOnly = L.tileLayer(
+    let labelsOnly = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
       { ...TILE_OPTS, pane: 'labelsPane' }
     ).addTo(map);
 
-    installTileFallback(baseNoLabels, labelsOnly);
-
-    function installTileFallback(primary, overlay) {
+    // Fallbacks
+    (function installTileFallback(primary, overlay){
       let switched = false;
-
-      function switchToFallback() {
-        if (switched) return;
-        switched = true;
+      function switchToFallback(){
+        if (switched) return; switched = true;
         if (map.hasLayer(primary)) map.removeLayer(primary);
         if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
-
-        // Fallback #1: single dark_all tiles
-        const fallback1 = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
-          { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
-        ).addTo(map);
-
-        // Fallback #2: plain OSM if even Carto dark_all is blocked
+        const fallback = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
+          { ...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
         let switched2 = false;
-        fallback1.on('tileerror', () => {
-          if (switched2) return;
-          switched2 = true;
-          if (map.hasLayer(fallback1)) map.removeLayer(fallback1);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            ...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'
-          }).addTo(map);
+        fallback.on('tileerror', ()=> {
+          if (switched2) return; switched2 = true;
+          if (map.hasLayer(fallback)) map.removeLayer(fallback);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            { ...TILE_OPTS, attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
         });
-
-        // If fallback1 never starts (e.g., ad-block), force-switch after 3s
-        setTimeout(() => {
-          if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
-            fallback1.fire('tileerror');
-          }
-        }, 3000);
+        // Force-switch if ad-block prevents starting
+        setTimeout(()=>{ if (!switched2 && Object.keys(fallback._tiles||{}).length===0) fallback.fire('tileerror'); }, 3000);
       }
-
-      // Switch on any tile error
       primary.on('tileerror', switchToFallback);
       if (overlay) overlay.on('tileerror', switchToFallback);
-
-      // Guard against silent failures: if nothing loads in 3.5s, fallback.
-      setTimeout(() => {
-        const loaded =
-          Object.keys(primary._tiles || {}).length +
-          (overlay ? Object.keys(overlay._tiles || {}).length : 0);
-        if (!switched && loaded === 0) switchToFallback();
+      setTimeout(()=>{ // silent fail guard
+        const loaded = Object.keys(primary._tiles||{}).length + (overlay?Object.keys(overlay._tiles||{}).length:0);
+        if (!switched && loaded===0) switchToFallback();
       }, 3500);
-    }
+    })(baseNoLabels, labelsOnly);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
 
@@ -271,16 +235,11 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
     /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
-    function placeMap(){
-      const h=topbar.offsetHeight;
-      document.documentElement.style.setProperty('--dynBarH', h+'px');
-      setTimeout(()=>map.invalidateSize(), 0);
-    }
+    function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
     window.addEventListener('load',placeMap);
     window.addEventListener('resize',placeMap);
-    if(document.fonts){ document.fonts.ready.then(placeMap); }
+    if(document.fonts){document.fonts.ready.then(placeMap);}
     new ResizeObserver(placeMap).observe(topbar);
-    // Mobile resilience
     window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
     document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150); });
 
@@ -409,25 +368,21 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     })();
 
     function drawAll(){
-      // Clear
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
 
       const red=getCSS('--red'), orange=getCSS('--orange');
 
-      // Deduplicate per country; prefer implemented if both exist
       const bestByKey=new Map();
       for(const e of entries){
         const prev=bestByKey.get(e.key);
         if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
 
-      // Separate lists for lines
       const impPts=[], devPts=[];
       const implementedShown = new Set();
 
-      // Draw dots
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
@@ -441,7 +396,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         else               { devPts.push([e.lat,e.lng]); }
       }
 
-      // Shade implemented countries that have dots
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -452,7 +406,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         });
       }
 
-      // Local networks: connect to K=3 nearest neighbors
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
