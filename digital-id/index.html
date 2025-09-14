@@ -24,6 +24,7 @@
       --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
       --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
       --countryText:#dfffe9;
+      --navW: 156px; --navGap: 12px;
     }
 
     html,body{
@@ -41,9 +42,10 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:flex; flex-direction:column; align-items:center; gap:8px;
+      /* Grid ensures the bar grows to fit the taller of center text or the nav stack */
+      display:grid; grid-template-columns: 1fr max-content max-content 1fr; align-items:center; row-gap:8px;
     }
-    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; grid-column:2; }
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
     #pageTitle{color:#fff}
@@ -51,19 +53,33 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* ===== Map ===== */
-    #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    .leaflet-container{ background:#081911; }
-    .leaflet-tile{ background:#081911; transform:translateZ(0); }
+    #map{  position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
+    .leaflet-container{ background:#000; }
+    .leaflet-tile{ background:transparent; transform:translateZ(0); }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
+    /* Brighten labels-only tiles (country names) */
+    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
+
+    /* Popup / tooltip */
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
-    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
-
-    /* Make sure country hit polygons accept events */
+    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}/* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+
+    /* Responsive: on narrow screens keep buttons tucked to the right to avoid overlap */
+    @media (max-width: 720px){
+  /* On narrow screens use two columns: center + right */
+  #topbar{ grid-template-columns: 1fr max-content; }
+  #brandWrap{ grid-column:1; }
+  #navStack{ grid-column:2; justify-self:start; margin-left:12px; }
+  .nav-btn{ width:144px; }
+}
+    }
+      #navStack{ left:auto; right:16px; top:0; }
+      .nav-btn{ width:144px; }
+    }
   </style>
 </head>
 <body>
@@ -86,12 +102,12 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Local CSV fallback so the app still runs if fetch is blocked
-    const FALLBACK_CSV = `Title,Status,Description,Year,Countries
-National eID,Implemented,Live national digital identity,2023,United Kingdom
-Digital ID Pilot,In development,Phase 2 pilot,2025,United States
-MyKad,Implemented,Malaysia ID,2012,Malaysia
-DNIe,Implemented,Spain smart ID,2016,Spain`;
+    // --- New: small local CSV fallback so the app still runs if fetch is blocked ---
+    const FALLBACK_CSV = `Title,Status,Description,Year,Countries\n`+
+      `National eID,Implemented,Live national digital identity,2023,United Kingdom\n`+
+      `Digital ID Pilot,In development,Phase 2 pilot,2025,United States\n`+
+      `MyKad,Implemented,Malaysia ID,2012,Malaysia\n`+
+      `DNIe,Implemented,Spain smart ID,2016,Spain`;
 
     function toCsvUrl(u){
       if (!u) return u;
@@ -121,7 +137,8 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       ["chile",[-35.6751,-71.5430]],["mauritius",[-20.2,57.5]],["spain",[40.4168,-3.7038]],
       ["italy",[42.5,12.5]],["denmark",[56.2639,9.5019]],["united kingdom",[52.3555,-1.1743]],
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
-      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],["malaysia",[4.2105,101.9758]]
+      ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],
+      ["malaysia",[4.2105,101.9758]]
     ]);
 
     function normalizeCountry(s){
@@ -138,25 +155,20 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
 
     /* ===== Map & panes ===== */
-    const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
+    const map = L.map('map',{zoomControl:true}).setView([20,0],2);
 
     // custom panes
-    map.createPane('dotsPane');    map.getPane('dotsPane').style.zIndex = 650;    // dots on canvas
-    map.createPane('labelsPane');  map.getPane('labelsPane').style.zIndex = 450;  // labels under dots
+    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex = 650;
+    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
     map.getPane('labelsPane').style.pointerEvents = 'none';
-    map.createPane('hitPane');     map.getPane('hitPane').style.zIndex = 700;     // << always on top for taps
 
     // base tiles (no labels)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
-      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/$1, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     }).addTo(map);
 
     // labels-only overlay
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
-      subdomains:'abcd', maxZoom:8, pane:'labelsPane'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/$1, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=', pane:'labelsPane'
     }).addTo(map);
-
-    const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
 
     // Layers
     const linesImpLayer = L.layerGroup().addTo(map);
@@ -195,7 +207,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    // Fetch with timeout + local fallback
+    // --- New: fetch helper with timeout + local fallback ---
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
         const ctrl = new AbortController();
@@ -246,17 +258,15 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // --- hit polygons ABOVE everything, always tappable ---
+      // hit polygons (transparent but clickable)
       hitLayer = L.geoJSON(worldGeo, {
-        pane: 'hitPane',
-        style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.001 },
+        style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
         interactive:true,
         onEachFeature:(f,layer)=>{
           const key=(f.properties&&f.properties._key)||'';
           const open=()=>openCountryPopup(key);
           layer.on('click',open);
           layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open();});
-          // hover outline for desktop
           layer.on('mouseover',()=>layer.setStyle({stroke:true,color:getCSS('--mint'),weight:1,opacity:.6}));
           layer.on('mouseout', ()=>layer.setStyle({stroke:false}));
         }
@@ -267,7 +277,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
-      // 3) normalize & stash entries
+      // 3) normalize
       entries=[];
       for(const row of rows){
         const title=String(row["Title"]||"").trim();
@@ -279,7 +289,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
         for(const raw of splitCountries(countriesCell)){
           const key=normalizeCountry(raw);
-          const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
+          const alt=key.replace(/^(republic|kingdom)\sof\s/,'' ).trim();
           const pt=centroidByKey[key]||centroidByKey[alt];
           if(!pt) continue;
           const isImplemented=/implement/i.test(status);
@@ -290,12 +300,14 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       drawAll(); // dots, lines, shading
 
-      // smoke tests
+      // --- Simple runtime tests (so we "always add tests") ---
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
+      console.log('[TEST] Rendered dots:', dotsLayer.getLayers().length);
     })();
 
     function drawAll(){
+      // Clear
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
@@ -309,16 +321,18 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
 
+      // Separate lists for lines
       const impPts=[], devPts=[];
       const implementedShown = new Set();
 
-      // Dots (still rendered; tapping anywhere in the country works via hitLayer)
+      // Draw dots
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
-          renderer:dotsRenderer, radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
+          pane:'dotsPane', radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
         })
         .bindTooltip(`${e.country}`,{direction:'top',offset:[0,-6]})
+        .on('click',()=>openCountryPopup(key))
         .addTo(dotsLayer);
 
         if(e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(key); }
@@ -336,7 +350,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         });
       }
 
-      // Local networks: connect to K nearest neighbors
+      // Local networks: connect to K=3 nearest neighbors
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
