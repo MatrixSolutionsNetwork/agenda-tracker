@@ -24,7 +24,6 @@
       --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
       --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
       --countryText:#dfffe9;
-      --navW: 160px;
     }
 
     html,body{
@@ -42,13 +41,9 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      /* Center brand; nav sits just to its right */
-      display:grid; grid-template-columns: 1fr max-content max-content 1fr; align-items:center; column-gap:16px;
+      display:flex; flex-direction:column; align-items:center; gap:8px;
     }
-    #brandWrap{
-      grid-column:2;
-      display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
-    }
+    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
     .msn{color:var(--matrix)}
     #rowStatus{display:flex; align-items:center; gap:8px}
     #pageTitle{color:#fff}
@@ -56,42 +51,19 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* Right-side stacked nav */
-    #navStack{
-      grid-column:3;
-      display:flex; flex-direction:column; gap:8px; align-items:stretch;
-    }
-    .nav-btn{
-      background:rgba(6,32,21,.85); border:1px solid #1b5a3e; color:#ffffff;
-      padding:6px 12px; border-radius:10px; text-decoration:none; font-weight:700; font-size:12px;
-      display:flex; justify-content:center; align-items:center; width:var(--navW); height:28px; white-space:nowrap;
-    }
-    .nav-btn.active{ border-color:#ffffff; }
-    .nav-btn.active > span{ text-decoration:underline; text-underline-offset:2px; }
-
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    /* If tiles fail, show neutral black instead of green */
-    .leaflet-container{ background:#000; }
-    .leaflet-tile{ background:transparent; transform:translateZ(0); }
+    .leaflet-container{ background:#081911; }
+    .leaflet-tile{ background:#081911; transform:translateZ(0); }
     .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
-
-    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
     .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
 
+    /* Make sure country hit polygons accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
-
-    /* Mobile: brand left, buttons right, still stacked */
-    @media (max-width: 720px){
-      #topbar{ grid-template-columns: 1fr max-content; }
-      #brandWrap{ grid-column:1; }
-      #navStack{ grid-column:2; }
-      .nav-btn{ width:140px; }
-    }
   </style>
 </head>
 <body>
@@ -105,12 +77,6 @@
       <div class="updated" id="updatedTop">Updated: …</div>
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
-
-    <nav id="navStack" aria-label="Other trackers">
-      <a class="nav-btn active" href="/digital-id/" aria-current="page"><span>Digital ID</span></a>
-      <a class="nav-btn" href="/cbdc/"><span>CBDC Tracker</span></a>
-      <a class="nav-btn" href="/social-credit-system/"><span>Social Credit Tracker</span></a>
-    </nav>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
@@ -175,55 +141,20 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
     // custom panes
-    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex = 650;
-    map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450;
+    map.createPane('dotsPane');    map.getPane('dotsPane').style.zIndex = 650;    // dots on canvas
+    map.createPane('labelsPane');  map.getPane('labelsPane').style.zIndex = 450;  // labels under dots
     map.getPane('labelsPane').style.pointerEvents = 'none';
+    map.createPane('hitPane');     map.getPane('hitPane').style.zIndex = 700;     // << always on top for taps
 
-    // --- Robust basemap with fallbacks to avoid the “green map” ---
-    const TILE_OPTS = {
-      subdomains: 'abcd',
-      maxZoom: 8,
-      // Transparent 1x1 so missing tiles don’t flash a color
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
-    };
+    // base tiles (no labels)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{
+      attribution:'&copy; OpenStreetMap &copy; CARTO', subdomains:'abcd', maxZoom:8
+    }).addTo(map);
 
-    // Primary: no-labels + labels overlay (best look)
-    let baseNoLabels = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
-      { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
-    ).addTo(map);
-
-    let labelsOnly = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
-      { ...TILE_OPTS, pane: 'labelsPane' }
-    ).addTo(map);
-
-    // Fallbacks
-    (function installTileFallback(primary, overlay){
-      let switched = false;
-      function switchToFallback(){
-        if (switched) return; switched = true;
-        if (map.hasLayer(primary)) map.removeLayer(primary);
-        if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
-        const fallback = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
-          { ...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO' }).addTo(map);
-        let switched2 = false;
-        fallback.on('tileerror', ()=> {
-          if (switched2) return; switched2 = true;
-          if (map.hasLayer(fallback)) map.removeLayer(fallback);
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-            { ...TILE_OPTS, attribution:'&copy; OpenStreetMap contributors' }).addTo(map);
-        });
-        // Force-switch if ad-block prevents starting
-        setTimeout(()=>{ if (!switched2 && Object.keys(fallback._tiles||{}).length===0) fallback.fire('tileerror'); }, 3000);
-      }
-      primary.on('tileerror', switchToFallback);
-      if (overlay) overlay.on('tileerror', switchToFallback);
-      setTimeout(()=>{ // silent fail guard
-        const loaded = Object.keys(primary._tiles||{}).length + (overlay?Object.keys(overlay._tiles||{}).length:0);
-        if (!switched && loaded===0) switchToFallback();
-      }, 3500);
-    })(baseNoLabels, labelsOnly);
+    // labels-only overlay
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{
+      subdomains:'abcd', maxZoom:8, pane:'labelsPane'
+    }).addTo(map);
 
     const dotsRenderer = L.canvas({ pane:'dotsPane', padding:0.3 });
 
@@ -236,12 +167,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
-    window.addEventListener('load',placeMap);
-    window.addEventListener('resize',placeMap);
-    if(document.fonts){document.fonts.ready.then(placeMap);}
-    new ResizeObserver(placeMap).observe(topbar);
-    window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150); });
+    window.addEventListener('load',placeMap); window.addEventListener('resize',placeMap); if(document.fonts){document.fonts.ready.then(placeMap);} new ResizeObserver(placeMap).observe(topbar);
 
     /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
@@ -269,7 +195,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    // fetch CSV with timeout + embedded fallback
+    // Fetch with timeout + local fallback
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
         const ctrl = new AbortController();
@@ -320,15 +246,17 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // hit polygons (transparent but clickable)
+      // --- hit polygons ABOVE everything, always tappable ---
       hitLayer = L.geoJSON(worldGeo, {
-        style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
+        pane: 'hitPane',
+        style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.001 },
         interactive:true,
         onEachFeature:(f,layer)=>{
           const key=(f.properties&&f.properties._key)||'';
           const open=()=>openCountryPopup(key);
           layer.on('click',open);
           layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open();});
+          // hover outline for desktop
           layer.on('mouseover',()=>layer.setStyle({stroke:true,color:getCSS('--mint'),weight:1,opacity:.6}));
           layer.on('mouseout', ()=>layer.setStyle({stroke:false}));
         }
@@ -339,7 +267,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
-      // 3) normalize
+      // 3) normalize & stash entries
       entries=[];
       for(const row of rows){
         const title=String(row["Title"]||"").trim();
@@ -362,7 +290,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       drawAll(); // dots, lines, shading
 
-      // sanity checks
+      // smoke tests
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
@@ -374,6 +302,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
       const red=getCSS('--red'), orange=getCSS('--orange');
 
+      // Deduplicate per country; prefer implemented if both exist
       const bestByKey=new Map();
       for(const e of entries){
         const prev=bestByKey.get(e.key);
@@ -383,19 +312,20 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       const impPts=[], devPts=[];
       const implementedShown = new Set();
 
+      // Dots (still rendered; tapping anywhere in the country works via hitLayer)
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
           renderer:dotsRenderer, radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
         })
         .bindTooltip(`${e.country}`,{direction:'top',offset:[0,-6]})
-        .on('click',()=>openCountryPopup(key))
         .addTo(dotsLayer);
 
         if(e.isImplemented){ impPts.push([e.lat,e.lng]); implementedShown.add(key); }
         else               { devPts.push([e.lat,e.lng]); }
       }
 
+      // Shade implemented countries that have dots
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -406,6 +336,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         });
       }
 
+      // Local networks: connect to K nearest neighbors
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
