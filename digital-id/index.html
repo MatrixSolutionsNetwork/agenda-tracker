@@ -24,12 +24,14 @@
       --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
       --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
       --countryText:#dfffe9;
+
+      /* nav */
+      --navW: 160px; --navGap: 10px;
     }
 
     html,body{
-      height:100%;margin:0;
+      height:100%; margin:0; color:var(--text);
       background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
-      color:var(--text);
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
@@ -41,34 +43,69 @@
       border-bottom:1px solid rgba(11,42,28,.6);
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
-      display:flex; flex-direction:column; align-items:center; gap:8px;
+      display:grid;
+      grid-template-columns: 1fr max-content max-content 1fr; /* 1|center|buttons|1 */
+      align-items:center;
+      column-gap:16px;
+      row-gap:8px;
     }
-    #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
-    .msn{color:var(--matrix)}
-    #rowStatus{display:flex; align-items:center; gap:8px}
-    #pageTitle{color:#fff}
-    .live{font-size:11px;color:#ffffff;background:var(--red);padding:3px 8px;border-radius:999px;border:1px solid #ff6b6b}
-    .updated{opacity:.9;font-size:12px}
-    .inline-hint{opacity:.85;font-size:12px}
+    #brandWrap{
+      grid-column:2;
+      display:flex; flex-direction:column; align-items:center;
+      gap:6px; text-align:center;
+    }
+    .msn{ color:var(--matrix); }
+    #rowStatus{ display:flex; align-items:center; gap:8px; }
+    #pageTitle{ color:#fff; }
+    .live{ font-size:11px; color:#ffffff; background:var(--red); padding:3px 8px; border-radius:999px; border:1px solid #ff6b6b; }
+    .updated{ opacity:.9; font-size:12px; }
+    .inline-hint{ opacity:.85; font-size:12px; }
+
+    /* Right-side stacked nav buttons */
+    #navStack{
+      grid-column:3;
+      justify-self:start; /* sit just right of the centered block */
+      display:flex; flex-direction:column; gap:var(--navGap);
+    }
+    .nav-btn{
+      background:rgba(6,32,21,.85);
+      border:1px solid #1b5a3e;
+      color:#ffffff; text-decoration:none; font-weight:700; font-size:12px;
+      border-radius:10px; padding:6px 12px;
+      display:flex; align-items:center; justify-content:center;
+      width:var(--navW); height:30px; white-space:nowrap;
+      transition:transform .12s ease;
+    }
+    .nav-btn:hover{ transform:translateY(-1px); }
+    /* Active page: white border + underline text */
+    .nav-btn.active{ border-color:#ffffff; }
+    .nav-btn.active > span{ text-decoration:underline; text-underline-offset:2px; }
 
     /* ===== Map ===== */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    /* If tiles fail, show neutral black instead of green */
+    /* Never show green if tiles fail */
     .leaflet-container{ background:#000; }
     .leaflet-tile{ background:transparent; transform:translateZ(0); }
-    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
 
     /* Brighten labels-only tiles (country names) */
-    .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
+    .leaflet-labelsPane-pane img { filter: brightness(1.5) contrast(1.2); }
 
     /* Popup / tooltip */
-    .leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
-    .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
-    .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
+    .leaflet-popup-content-wrapper{ background:#0a1c14; color:#ffffff; border:1px solid #174d35; }
+    .leaflet-popup-tip{ background:#0a1c14; border:1px solid #174d35; }
+    .leaflet-tooltip{ background:#0a1c14; border:1px solid #174d35; color:var(--countryText) !important; }
 
     /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+
+    /* Mobile: keep layout compact, buttons still to the right of center block */
+    @media (max-width: 720px){
+      #topbar{ grid-template-columns: 1fr max-content; }
+      #brandWrap{ grid-column:1; }
+      #navStack{ grid-column:2; justify-self:start; }
+      .nav-btn{ width:140px; height:30px; }
+    }
   </style>
 </head>
 <body>
@@ -82,6 +119,12 @@
       <div class="updated" id="updatedTop">Updated: …</div>
       <div class="inline-hint">• Click any dot or country for details</div>
     </div>
+
+    <nav id="navStack" aria-label="Other trackers">
+      <a class="nav-btn active" href="/digital-id/" aria-current="page"><span>Digital ID</span></a>
+      <a class="nav-btn" href="/cbdc/"><span>CBDC Tracker</span></a>
+      <a class="nav-btn" href="/social-credit-system/"><span>Social Credit Tracker</span></a>
+    </nav>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
@@ -102,7 +145,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
       if (/\/pubhtml/i.test(u)){ const url=new URL(u); url.pathname=url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single")) url.searchParams.set("single","true"); return url.toString(); }
-      if (/\/spreadsheets\/d\//i.test(u)){ const m=u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
+      if (/\/spreadsheets\/d\//i.test(u)){ const m=u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(\`https://docs.google.com/spreadsheets/d/\${id}/export\`); url.searchParams.set("format","csv"); return url.toString(); } }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
@@ -159,12 +202,12 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     };
 
     // Primary: no-labels + labels overlay (best look)
-    let baseNoLabels = L.tileLayer(
+    const baseNoLabels = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
       { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
     ).addTo(map);
 
-    let labelsOnly = L.tileLayer(
+    const labelsOnly = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
       { ...TILE_OPTS, pane: 'labelsPane' }
     ).addTo(map);
@@ -177,8 +220,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       function switchToFallback() {
         if (switched) return;
         switched = true;
-        console.warn('Basemap tiles failing → switching to fallback.');
-
         if (map.hasLayer(primary)) map.removeLayer(primary);
         if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
 
@@ -199,7 +240,7 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
           }).addTo(map);
         });
 
-        // If fallback1 never starts (ad-block), force-switch after 3s
+        // If fallback1 never starts (e.g., ad-block), force-switch after 3s
         setTimeout(() => {
           if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
             fallback1.fire('tileerror');
@@ -230,10 +271,14 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
     /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
-    function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
+    function placeMap(){
+      const h=topbar.offsetHeight;
+      document.documentElement.style.setProperty('--dynBarH', h+'px');
+      setTimeout(()=>map.invalidateSize(), 0);
+    }
     window.addEventListener('load',placeMap);
     window.addEventListener('resize',placeMap);
-    if(document.fonts){document.fonts.ready.then(placeMap);}
+    if(document.fonts){ document.fonts.ready.then(placeMap); }
     new ResizeObserver(placeMap).observe(topbar);
     // Mobile resilience
     window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
