@@ -2,3 +2,7 @@
 Context Snapshot for future chats:
 
 Project: “Matrix Solutions Network — Digital ID Status” interactive map. Live data (CSV): https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv Hosting: Static HTML (Leaflet + Chart.js). Embedded into Notion via a public URL (e.g., GitHub Pages/Netlify). UI defaults: - Branding header: “Matrix Solutions Network” (matrix green) over “Digital ID Status”. - Dots: Red = Implemented, Orange = In development; click opens popup. - Tap support: Clicking/tapping country polygons opens the same popup. - Mobile: Drawer (panel) starts CLOSED, smaller height; big green ✕ close button; top hint: “Tap a country or dot for details”. - Pie chart with counts + percentages. - Region filter dropdown; Year slider (if data has years). - Implemented country shading ON by default. - Local networks: Implemented ON, Dev OFF; K-nearest neighbors = 4. - Export CSV of current view. - Country centroid overrides: Spain, Italy, Denmark, UK, Serbia, United States, Canada, Costa Rica, Japan. - Known goal: keep dots same size; don’t scale up on mobile.
+
+Sources:
+CBDC: https://github.com/liquifi-org/cbdc-tracker
+https://cbdctracker.hrf.org/contact
