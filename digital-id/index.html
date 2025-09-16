@@ -85,16 +85,17 @@
   <script>
     /* ===== CONFIG ===== */
     const SHEET_PUBLISHED_LINK =
-      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
+      // NEW, rich sheet (gid=931610340)
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=931610340&single=true&output=csv";
 
-    // Local CSV fallback
-    const FALLBACK_CSV = `Title,Status,Description,Year,Countries,Source
-National eID,Implemented,Live national digital identity,2023,United Kingdom,https://www.gov.uk/government/collections/digital-identity
-Digital ID Pilot,In development,Phase 2 pilot,2025,United States,https://www.nist.gov/topics/identity-access-management
-MyKad,Implemented,Malaysia ID,2012,Malaysia,https://www.jpn.gov.my/mykad
-DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
+    // Local CSV fallback (kept minimal; used only if fetch fails)
+    const FALLBACK_CSV = `Country/Region,Last updated DD:MM:YY,Status of implementation,Digital ID name,URL,Collects or uses biometric data,Digital authentication function,Enables KYC packet collection for service provision,Authentication possible through a government portal,Identity act codifies digital ID legal status,National Data Protection Act exists,Processes to notify individuals about personal data leaks in place,Two or more sectoral use cases enabled
+United Kingdom,05:05:2025,Implemented,One Login,https://www.gov.uk/government/collections/digital-identity,Yes,Yes,Yes,Yes,Yes,Yes,Yes
+United States,11:06:2025,In development,Digital ID Pilot,https://www.nist.gov/topics/identity-access-management,No,Yes,Yes,Yes,Partial,Yes,Yes
+Malaysia,12:03:2024,Implemented,MyKad,https://www.jpn.gov.my/mykad,Yes,Yes,Yes,Yes,Yes,Yes,Yes
+Spain,18:04:2024,Implemented,DNIe,https://www.dnielectronico.es,Yes,Yes,Yes,Yes,Yes,Yes,Yes`;
 
-
+    /* ===== Helpers (unchanged + new) ===== */
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
@@ -118,11 +119,61 @@ DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
 
+    // Header resolver (for slightly different spellings/quotes)
+    function resolveHeaderKey(row, patterns){
+      const keys = Object.keys(row||{});
+      const norm = s => String(s||"").toLowerCase().replace(/\s+/g,' ').replace(/[^a-z0-9/ ]+/g,'').trim();
+      const targets = patterns.map(p => (p instanceof RegExp) ? p : new RegExp('^'+p+'$', 'i'));
+      for(const k of keys){
+        const nk = norm(k);
+        for(const pat of targets){
+          if (pat.test(k) || pat.test(nk)) return k;
+        }
+      }
+      return null;
+    }
+    function getField(row, patterns){
+      const k = resolveHeaderKey(row, patterns);
+      return k ? row[k] : "";
+    }
+
+    function toBoolLoose(v){
+      const s=String(v||"").trim().toLowerCase();
+      if(!s) return null;
+      if(/^(yes|true|y|1|present|enabled|available)$/i.test(s)) return true;
+      if(/^(no|false|n|0|absent|disabled|not available)$/i.test(s)) return false;
+      if(/^(partial|partially|in part|some)$/i.test(s)) return null; // treat as unknown/neutral
+      return null;
+    }
+    function parseDDMMYY(d){
+      const m=String(d||'').trim().match(/^(\d{1,2})[:/.\-](\d{1,2})[:/.\-](\d{2,4})$/);
+      if(!m) return null;
+      let [_,dd,mm,yy]=m; dd=+dd; mm=+mm-1; yy=+yy;
+      if(yy<100) yy += (yy>=70?1900:2000);
+      const dt=new Date(Date.UTC(yy,mm,dd));
+      return isNaN(+dt)?null:dt;
+    }
+    function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
+    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));}
+    function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+    function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
+    function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
+
+    // Make a safe, clickable URL
+    function normalizeUrl(input){
+      let u = String(input||"").trim();
+      if(!u) return "";
+      if(/^https?:\/\//i.test(u)) return u;
+      if(/^www\./i.test(u)) return "https://" + u;
+      if(/^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(u)) return "https://" + u;
+      return "";
+    }
+
+    /* Country normalization (unchanged) */
     const COUNTRY_ALIASES = new Map([
       ["usa","united states"],["u.s.a.","united states"],["u.s.","united states"],["us","united states"],["united states of america","united states"],
       ["uk","united kingdom"],["england","united kingdom"],["scotland","united kingdom"],["wales","united kingdom"],["northern ireland","united kingdom"],
-      ["uae","united arab emirates"],["u.a.e.","united arab emirates"],
-      ["türkiye","turkey"],["turkiye","turkey"],
+      ["uae","united arab emirates"],["türkiye","turkey"],["turkiye","turkey"],
       ["republic of korea","south korea"],["korea (republic of)","south korea"],
       ["ivory coast","cote d ivoire"],["côte d’ivoire","cote d ivoire"],["cote d'ivoire","cote d ivoire"],
       ["czech republic","czechia"],["swaziland","eswatini"],["burma","myanmar"],
@@ -139,7 +190,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
       ["serbia",[44.0165,21.0059]],["united states",[39.8283,-98.5795]],["canada",[56.1304,-106.3468]],
       ["costa rica",[9.7489,-83.7534]],["japan",[36.2048,138.2529]],["malaysia",[4.2105,101.9758]]
     ]);
-
     function normalizeCountry(s){
       const k=String(s||"").normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]+/gi,' ').replace(/\s+/g,' ').toLowerCase().trim();
       return COUNTRY_ALIASES.get(k)||k;
@@ -147,83 +197,38 @@ DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
     function splitCountries(cell){
       return String(cell).replace(/・/g,',').split(/\s*(?:,|;|\/|&|\band\b)\s*/i).map(s=>s.trim()).filter(Boolean);
     }
-    function titleCase(s){return String(s).split(' ').map(w=>w? w[0].toUpperCase()+w.slice(1):'').join(' ');}
-    function escapeHtml(str){return String(str).replace(/[&<>"']/g, s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));}
-    function getCSS(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
-    function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
-    function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
 
-    // Make a safe, clickable URL
-    function normalizeUrl(input){
-      let u = String(input||"").trim();
-      if(!u) return "";
-      if(/^https?:\/\//i.test(u)) return u;
-      if(/^www\./i.test(u)) return "https://" + u;
-      // bare domain or path
-      if(/^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(u)) return "https://" + u;
-      return ""; // reject javascript or invalid schemes
-    }
-
-    /* Map and panes */
+    /* Map + panes (unchanged) */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
-
     map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none';
     map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500;
     map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600;
     map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650;
 
-    const TILE_OPTS = {
-      subdomains: 'abcd',
-      maxZoom: 8,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
-    };
-
-    let baseNoLabels = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
-      { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
-    ).addTo(map);
-
-    let labelsOnly = L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
-      { ...TILE_OPTS, pane: 'labelsPane' }
-    ).addTo(map);
+    const TILE_OPTS = { subdomains: 'abcd', maxZoom: 8, errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' };
+    let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
+    let labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane: 'labelsPane'}).addTo(map);
 
     installTileFallback(baseNoLabels, labelsOnly);
-
     function installTileFallback(primary, overlay) {
       let switched = false;
       function switchToFallback() {
         if (switched) return;
         switched = true;
-        try{
-          if (map.hasLayer(primary)) map.removeLayer(primary);
-          if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
-        }catch(e){}
-        const fallback1 = L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
-          { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
-        ).addTo(map);
+        try{ if (map.hasLayer(primary)) map.removeLayer(primary); if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);}catch(e){}
+        const fallback1 = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO'}).addTo(map);
         let switched2 = false;
         fallback1.on('tileerror', () => {
-          if (switched2) return;
-          switched2 = true;
+          if (switched2) return; switched2 = true;
           try{ if (map.hasLayer(fallback1)) map.removeLayer(fallback1); }catch(e){}
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            ...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'
-          }).addTo(map);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'}).addTo(map);
         });
-        setTimeout(() => {
-          if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
-            fallback1.fire('tileerror');
-          }
-        }, 3000);
+        setTimeout(() => { if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) fallback1.fire('tileerror'); }, 3000);
       }
       primary.on('tileerror', switchToFallback);
       if (overlay) overlay.on('tileerror', switchToFallback);
       setTimeout(() => {
-        const loaded =
-          Object.keys(primary._tiles || {}).length +
-          (overlay ? Object.keys(overlay._tiles || {}).length : 0);
+        const loaded = Object.keys(primary._tiles || {}).length + (overlay ? Object.keys(overlay._tiles || {}).length : 0);
         if (!switched && loaded === 0) switchToFallback();
       }, 3500);
     }
@@ -294,6 +299,11 @@ DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
       }
     }
 
+    function yearFromDateCell(cell){
+      const dt = parseDDMMYY(cell);
+      return dt ? dt.getUTCFullYear() : null;
+    }
+
     (async function init(){
       // world polygons
       const sources=[
@@ -345,37 +355,57 @@ DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
         }
       }).addTo(map);
 
-      // sheet rows
+      // === Load the NEW rich sheet ===
       const text = await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
-      // normalize
+      // Normalize & map to your existing structure
       entries=[];
       for(const row of rows){
-        const title=String(row["Title"]||"").trim();
-        const status=String(row["Status"]||"").trim();
-        const notes =String(row["Description"]||"").trim();
-        const year  =/^\d{4}$/.test(String(row["Year"]||"").trim())?parseInt(row["Year"]):null;
-        const sourceRaw = String(row["Source"]||row["URL"]||row["Link"]||"").trim();
-        const sourceUrl = normalizeUrl(sourceRaw);
-        const countriesCell=String(row["Countries"]||"").trim();
-        if(!countriesCell) continue;
+        // Respect optional "DPI based digital ID (to count for Visualisation)" if present (only include truthy/blank = include-by-default)
+        const dpiFlag = toBoolLoose(getField(row, [/^DPI.*visual/i, /^DPI based digital ID/i])) ;
+        if (dpiFlag === false) continue;
 
-        for(const raw of splitCountries(countriesCell)){
+        const countryCell = getField(row, [/^Country\/Region$/i, /^Country/i, /^Region/i]);
+        if(!countryCell) continue;
+
+        const statusCell  = String(getField(row, [/^Status of implementation/i, /^Status$/i])).trim();
+        const titleCell   = String(getField(row, [/^Digital ID name/i, /^Name/i])).trim() || "National Digital ID";
+        const urlCell     = normalizeUrl(getField(row, [/^URL$/i, /link|source/i]));
+        const updatedCell = getField(row, [/^Last updated.*$/i, /^Updated/i]);
+        const year        = yearFromDateCell(updatedCell);
+
+        // Build a short description from key signals (optional)
+        const bits = [];
+        if(toBoolLoose(getField(row, [/^Collects or uses biometric data/i, /biometric/i]))===true) bits.push("Biometrics");
+        if(toBoolLoose(getField(row, [/^Digital authentication function/i]))===true) bits.push("Auth");
+        if(toBoolLoose(getField(row, [/^Enables KYC packet collection/i]))===true) bits.push("KYC");
+        if(toBoolLoose(getField(row, [/^Authentication possible through a government portal/i]))===true) bits.push("Gov portal");
+        if(toBoolLoose(getField(row, [/^Identity act codifies digital ID legal status/i]))===true) bits.push("Legal basis");
+        if(toBoolLoose(getField(row, [/^National Data Protection Act exists/i]))===true) bits.push("DPA");
+        if(toBoolLoose(getField(row, [/^Processes to notify individuals about personal data leaks/i]))===true) bits.push("Breach notice");
+        if(toBoolLoose(getField(row, [/^Two or more sectoral use cases enabled/i]))===true) bits.push("≥2 use cases");
+        const notes = bits.length ? bits.join(" • ") : "";
+
+        for(const raw of splitCountries(countryCell)){
           const key=normalizeCountry(raw);
           const alt=key.replace(/^(republic|kingdom)\sof\s/,'').trim();
           const pt=centroidByKey[key]||centroidByKey[alt];
           if(!pt) continue;
-          const isImplemented=/implement/i.test(status);
-          const isDev=/develop|discussion|pilot|trial|poc|concept/i.test(status);
+
+          const isImplemented=/implement|live|operational/i.test(statusCell);
+          const isDev=/develop|discussion|pilot|trial|poc|concept|in\s+progress|planned/i.test(statusCell);
+
           entries.push({
             key,
             country:titleCase(key),
             lat:pt.lat,lng:pt.lng,
-            status,isImplemented,isDev,
-            title,notes,year,
-            sourceUrl
+            status: statusCell || (isImplemented ? "Implemented" : isDev ? "In development" : ""),
+            isImplemented,isDev,
+            title:titleCell,
+            notes,year,
+            sourceUrl:urlCell
           });
         }
       }
