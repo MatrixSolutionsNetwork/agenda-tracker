@@ -33,7 +33,7 @@
       font-family:"Share Tech Mono",ui-monospace,monospace;
     }
 
-    /* ===== Top bar (centered) ===== */
+    /* Top bar */
     #topbar{
       position:fixed; z-index:1100; left:0; right:0; top:0;
       padding:var(--barPadY) var(--barPadX);
@@ -42,7 +42,7 @@
       box-shadow:0 10px 28px rgba(0,0,0,.45);
       backdrop-filter: blur(3px);
       display:flex; flex-direction:column; align-items:center; gap:8px;
-      pointer-events:none; /* let map drag under the bar */
+      pointer-events:none;
     }
     #brandWrap{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; pointer-events:auto;}
     .msn{color:var(--matrix)}
@@ -52,15 +52,11 @@
     .updated{opacity:.9;font-size:12px}
     .inline-hint{opacity:.85;font-size:12px}
 
-    /* ===== Map ===== */
+    /* Map */
     #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
-    /* If tiles fail, show neutral black instead of green */
     .leaflet-container{ background:#000; }
-    .leaflet-tile{ background:transparent; transform:translateZ(0); }
-    .leaflet-tile { filter: brightness(1.08) contrast(1.08) saturate(0.95); }
+    .leaflet-tile{ background:transparent; transform:translateZ(0); filter: brightness(1.08) contrast(1.08) saturate(0.95); }
     .leaflet-top{ top:12px; }
-
-    /* Labels-only pane brighter */
     .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
     /* Popup / tooltip */
@@ -68,7 +64,6 @@
     .leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
     .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
 
-    /* Hit polygons must accept events */
     .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
   </style>
 </head>
@@ -92,18 +87,33 @@
     const SHEET_PUBLISHED_LINK =
       "https://docs.google.com/spreadsheets/d/e/2PACX-1vSsoZwmLz701G4Q5zFjGsL_RO8yjfxe4jY0woh-YL_-ATX6Mc4Rzxf3cSP7LzLN9OCt5Is_s1FHHAWs/pub?gid=0&single=true&output=csv";
 
-    // Local CSV fallback so the app still runs if fetch is blocked
-    const FALLBACK_CSV = `Title,Status,Description,Year,Countries
-National eID,Implemented,Live national digital identity,2023,United Kingdom
-Digital ID Pilot,In development,Phase 2 pilot,2025,United States
-MyKad,Implemented,Malaysia ID,2012,Malaysia
-DNIe,Implemented,Spain smart ID,2016,Spain`;
+    // Local CSV fallback
+    const FALLBACK_CSV = `Title,Status,Description,Year,Countries,Source
+National eID,Implemented,Live national digital identity,2023,United Kingdom,https://www.gov.uk/government/collections/digital-identity
+Digital ID Pilot,In development,Phase 2 pilot,2025,United States,https://www.nist.gov/topics/identity-access-management
+MyKad,Implemented,Malaysia ID,2012,Malaysia,https://www.jpn.gov.my/mykad
+DNIe,Implemented,Spain smart ID,2016,Spain,https://www.dnielectronico.es`;
+
 
     function toCsvUrl(u){
       if (!u) return u;
       if (/output=csv/i.test(u)) return u;
-      if (/\/pubhtml/i.test(u)){ const url=new URL(u); url.pathname=url.pathname.replace(/\/pubhtml/i,"/pub"); url.searchParams.set("output","csv"); if(!url.searchParams.has("single")) url.searchParams.set("single","true"); return url.toString(); }
-      if (/\/spreadsheets\/d\//i.test(u)){ const m=u.match(/\/spreadsheets\/d\/([^/]+)/i); if(m){ const id=m[1]; const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`); url.searchParams.set("format","csv"); return url.toString(); } }
+      if (/\/pubhtml/i.test(u)){
+        const url=new URL(u);
+        url.pathname=url.pathname.replace(/\/pubhtml/i,"/pub");
+        url.searchParams.set("output","csv");
+        if(!url.searchParams.has("single")) url.searchParams.set("single","true");
+        return url.toString();
+      }
+      if (/\/spreadsheets\/d\//i.test(u)){
+        const m=u.match(/\/spreadsheets\/d\/([^/]+)/i);
+        if(m){
+          const id=m[1];
+          const url=new URL(`https://docs.google.com/spreadsheets/d/${id}/export`);
+          url.searchParams.set("format","csv");
+          return url.toString();
+        }
+      }
       return u;
     }
     const CSV_URL = toCsvUrl(SHEET_PUBLISHED_LINK);
@@ -143,24 +153,31 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     function darken(hex,amt){const n=parseInt(hex.replace('#',''),16);let r=(n>>16)-amt,g=((n>>8)&255)-amt,b=(n&255)-amt;r=Math.max(0,Math.min(255,r));g=Math.max(0,Math.min(255,g));b=Math.max(0,Math.min(255,b));return '#'+(b|(g<<8)|(r<<16)).toString(16).padStart(6,'0');}
     function haversine(a,b){const toRad=d=>d*Math.PI/180,R=6371;const dLat=toRad(b[0]-a[0]),dLng=toRad(b[1]-a[1]);const s1=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLng/2)**2;return 2*R*Math.asin(Math.sqrt(s1));}
 
-    /* ===== Map & panes ===== */
+    // Make a safe, clickable URL
+    function normalizeUrl(input){
+      let u = String(input||"").trim();
+      if(!u) return "";
+      if(/^https?:\/\//i.test(u)) return u;
+      if(/^www\./i.test(u)) return "https://" + u;
+      // bare domain or path
+      if(/^[a-z0-9.-]+\.[a-z]{2,}(?:\/.*)?$/i.test(u)) return "https://" + u;
+      return ""; // reject javascript or invalid schemes
+    }
+
+    /* Map and panes */
     const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2);
 
-    // custom panes (ordered low -> high)
     map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none';
-    map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500; // clickable polygons
-    map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600; // local network lines
-    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650; // markers
+    map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500;
+    map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600;
+    map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650;
 
-    // --- Robust basemap with fallbacks to avoid the “green map” ---
     const TILE_OPTS = {
       subdomains: 'abcd',
       maxZoom: 8,
-      // Transparent 1x1 so missing tiles don’t show a color
       errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
     };
 
-    // Primary: no-labels + labels overlay (best look)
     let baseNoLabels = L.tileLayer(
       'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
       { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
@@ -175,7 +192,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
 
     function installTileFallback(primary, overlay) {
       let switched = false;
-
       function switchToFallback() {
         if (switched) return;
         switched = true;
@@ -183,14 +199,10 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
           if (map.hasLayer(primary)) map.removeLayer(primary);
           if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
         }catch(e){}
-
-        // Fallback #1: single dark_all tiles
         const fallback1 = L.tileLayer(
           'https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png',
           { ...TILE_OPTS, attribution: '&copy; OpenStreetMap &copy; CARTO' }
         ).addTo(map);
-
-        // Fallback #2: plain OSM if even Carto dark_all is blocked
         let switched2 = false;
         fallback1.on('tileerror', () => {
           if (switched2) return;
@@ -200,20 +212,14 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
             ...TILE_OPTS, attribution: '&copy; OpenStreetMap contributors'
           }).addTo(map);
         });
-
-        // If fallback1 never starts (ad-block), force-switch after 3s
         setTimeout(() => {
           if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) {
             fallback1.fire('tileerror');
           }
         }, 3000);
       }
-
-      // Switch on any tile error
       primary.on('tileerror', switchToFallback);
       if (overlay) overlay.on('tileerror', switchToFallback);
-
-      // Guard against silent failures: if nothing loads in 3.5s, fallback.
       setTimeout(() => {
         const loaded =
           Object.keys(primary._tiles || {}).length +
@@ -222,17 +228,14 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       }, 3500);
     }
 
-    // Canvas renderers (better perf)
     const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.3 });
     const linesRenderer = L.canvas({ pane:'linesPane', padding:0.3 });
 
-    // Layers
     const linesImpLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map);
     const linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map);
     const dotsLayer     = L.layerGroup([], {pane:'dotsPane'}).addTo(map);
     let outlineLayer=null, shadeLayer=null, hitLayer=null;
 
-    /* ===== Layout (bar height -> map top) ===== */
     const topbar=document.getElementById('topbar');
     function placeMap(){ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0); }
     window.addEventListener('load',placeMap);
@@ -242,23 +245,29 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true});
     document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150); });
 
-    /* ===== Data + interactions ===== */
     let worldGeo=null, centroidByKey={}, entries=[];
 
     function centroidInside(feature){
       try{ const c=turf.centerOfMass(feature).geometry.coordinates; return L.latLng(c[1],c[0]); }
       catch(e){ return L.geoJSON(feature).getBounds().getCenter(); }
     }
+
     function popupHTML(country, rows){
       const list = rows.map(r=>{
-        const b=[]; if(r.title)b.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
-        if(r.status)b.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
-        if(Number.isInteger(r.year))b.push(`<strong>Year:</strong> ${r.year}`);
-        if(r.notes)b.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
+        const b=[];
+        if(r.title) b.push(`<strong>Program:</strong> ${escapeHtml(r.title)}`);
+        if(r.status) b.push(`<strong>Status:</strong> ${escapeHtml(r.status)}`);
+        if(Number.isInteger(r.year)) b.push(`<strong>Year:</strong> ${r.year}`);
+        if(r.notes) b.push(`<span style="opacity:.8">${escapeHtml(r.notes)}</span>`);
+        if(r.sourceUrl){
+          const safe = escapeHtml(r.sourceUrl);
+          b.push(`<strong>Source:</strong> <a href="${safe}" target="_blank" rel="noopener noreferrer">${safe}</a>`);
+        }
         return `<div style="margin-bottom:8px">${b.join('<br>')}</div>`;
       }).join('');
-      return `<div style="min-width:240px"><h3 style="margin:0 0 6px 0; font-size:16px;color:${getCSS('--countryText')}">${escapeHtml(country)}</h3>${list}</div>`;
+      return `<div style="min-width:260px"><h3 style="margin:0 0 6px 0; font-size:16px;color:${getCSS('--countryText')}">${escapeHtml(country)}</h3>${list}</div>`;
     }
+
     function openCountryPopup(countryKey){
       if(!countryKey) return;
       const rows=entries.filter(e=>e.key===countryKey);
@@ -268,7 +277,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       L.popup({autoClose:true, closeOnClick:true}).setLatLng(pt).setContent(html).openOn(map);
     }
 
-    // fetch CSV with timeout + embedded fallback
     async function fetchCsvOrFallback(url, timeoutMs=7000){
       try{
         const ctrl = new AbortController();
@@ -287,18 +295,22 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
     }
 
     (async function init(){
-      // 1) world polygons
+      // world polygons
       const sources=[
         'https://cdn.jsdelivr.net/npm/world-countries@4/countries.geo.json',
         'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
         'https://unpkg.com/@geo-maps/countries-land-1m@1.0.2/countries-land-1m.geo.json'
       ];
       for(const src of sources){
-        try{ const r=await fetch(src,{mode:'cors'}); if(!r.ok) throw 0; const j=await r.json(); if(j && j.features && j.features.length>100){ worldGeo=j; break; } }catch(e){}
+        try{
+          const r=await fetch(src,{mode:'cors'});
+          if(!r.ok) throw 0;
+          const j=await r.json();
+          if(j && j.features && j.features.length>100){ worldGeo=j; break; }
+        }catch(e){}
       }
       if(!worldGeo){ console.error('World polygons failed to load'); return; }
 
-      // build centroid map + normalized key on features
       centroidByKey={};
       L.geoJSON(worldGeo).eachLayer(l=>{
         const p=l.feature&&l.feature.properties||{};
@@ -309,19 +321,16 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         if(l.feature.properties) l.feature.properties._key=nm;
       });
 
-      // outlines (thin) for context
       outlineLayer = L.geoJSON(worldGeo, {
         pane:'hitPane',
         style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
       }).addTo(map);
 
-      // shading (implemented only; style set after we know which)
       shadeLayer = L.geoJSON(worldGeo, {
         pane:'hitPane',
         style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
       }).addTo(map);
 
-      // hit polygons (transparent but clickable)
       hitLayer = L.geoJSON(worldGeo, {
         pane:'hitPane',
         style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
@@ -336,18 +345,20 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         }
       }).addTo(map);
 
-      // 2) sheet rows (with fallback)
+      // sheet rows
       const text = await fetchCsvOrFallback(`${CSV_URL}${CSV_URL.includes('?')?'&':'?'}cb=${Date.now()}`);
       const parsed=Papa.parse(text,{header:true,skipEmptyLines:true});
       const rows=parsed.data;
 
-      // 3) normalize
+      // normalize
       entries=[];
       for(const row of rows){
         const title=String(row["Title"]||"").trim();
         const status=String(row["Status"]||"").trim();
         const notes =String(row["Description"]||"").trim();
         const year  =/^\d{4}$/.test(String(row["Year"]||"").trim())?parseInt(row["Year"]):null;
+        const sourceRaw = String(row["Source"]||row["URL"]||row["Link"]||"").trim();
+        const sourceUrl = normalizeUrl(sourceRaw);
         const countriesCell=String(row["Countries"]||"").trim();
         if(!countriesCell) continue;
 
@@ -358,37 +369,39 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
           if(!pt) continue;
           const isImplemented=/implement/i.test(status);
           const isDev=/develop|discussion|pilot|trial|poc|concept/i.test(status);
-          entries.push({key,country:titleCase(key),lat:pt.lat,lng:pt.lng,status,isImplemented,isDev,title,notes,year});
+          entries.push({
+            key,
+            country:titleCase(key),
+            lat:pt.lat,lng:pt.lng,
+            status,isImplemented,isDev,
+            title,notes,year,
+            sourceUrl
+          });
         }
       }
 
-      drawAll(); // dots, lines, shading
+      drawAll();
 
-      // sanity checks
       console.assert(entries.length > 0, '[TEST] entries should not be empty');
       console.assert(dotsLayer.getLayers().length > 0, '[TEST] dots should be rendered');
     })();
 
     function drawAll(){
-      // Clear
       dotsLayer.clearLayers();
       linesImpLayer.clearLayers();
       linesDevLayer.clearLayers();
 
       const red=getCSS('--red'), orange=getCSS('--orange');
 
-      // Deduplicate per country; prefer implemented if both exist
       const bestByKey=new Map();
       for(const e of entries){
         const prev=bestByKey.get(e.key);
         if(!prev || (e.isImplemented && !prev.isImplemented)) bestByKey.set(e.key,e);
       }
 
-      // Separate lists for lines
       const impPts=[], devPts=[];
       const implementedShown = new Set();
 
-      // Draw dots
       for(const [key,e] of bestByKey){
         const color=e.isImplemented?red:orange;
         L.circleMarker([e.lat,e.lng],{
@@ -403,7 +416,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         else               { devPts.push([e.lat,e.lng]); }
       }
 
-      // Shade implemented countries that have dots
       if (shadeLayer){
         const fill = getCSS('--red');
         shadeLayer.setStyle(f=>{
@@ -414,7 +426,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
         });
       }
 
-      // Local networks: connect to K=3 nearest neighbors (Canvas + non-interactive for perf)
       const K=3;
       buildLocalNetwork(impPts, getCSS('--red'),   linesImpLayer, K, .35, 1.2);
       buildLocalNetwork(devPts, getCSS('--orange'),linesDevLayer, K, .30, 1.1);
@@ -441,7 +452,6 @@ DNIe,Implemented,Spain smart ID,2016,Spain`;
       }
     }
 
-    /* ===== Smooth zoom: fade lines during zoom to hide jitter ===== */
     const linesPane = map.getPane('linesPane');
     map.on('zoomstart', () => { if (linesPane) linesPane.style.opacity = '0.05'; });
     map.on('zoomend',   () => { if (linesPane) linesPane.style.opacity = '1';   });
