@@ -1,0 +1,15 @@
+:root{--bg:#0f1116;--panel:#171a21;--ink:#e6e7ea;--muted:#a3a8b3;--line:#272b38;--link:#9ad3ff}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,Segoe UI,Roboto}
+.topbar{position:sticky;top:0;display:flex;gap:.6rem;align-items:center;padding:.8rem 1rem;background:rgba(23,26,33,.95);border-bottom:1px solid var(--line)}
+.topbar input, .topbar select{background:#11131a;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.4rem .6rem}
+.wrap{padding:1rem}
+.cards{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1rem}
+.card h4{margin:.2rem 0;font-size:1.05rem}
+.card a{color:var(--link);text-decoration:none}
+.meta{color:var(--muted);font-size:.85rem}
+.pager{display:flex;justify-content:center;gap:.3rem;margin:1rem 0}
+.pager button{background:#11131a;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.3rem .6rem;cursor:pointer}
+.pager button.active{background:#2f80ed;color:white;border-color:transparent}
+.foot{color:var(--muted);text-align:center;padding:1rem}
+
