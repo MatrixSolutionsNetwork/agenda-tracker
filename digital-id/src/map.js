@@ -6,19 +6,19 @@ let _entries = [], _centroids = {}
 export function init(){
   const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2)
 
-  // panes (countryPane is topmost so it always gets the click)
+  // panes (put UI on top so tooltips/popup never sit behind dots)
   map.createPane('labelsPane');  map.getPane('labelsPane').style.zIndex  = 450; map.getPane('labelsPane').style.pointerEvents='none'
   map.createPane('linesPane');   map.getPane('linesPane').style.zIndex   = 600
   map.createPane('dotsPane');    map.getPane('dotsPane').style.zIndex    = 650
-  map.createPane('countryPane'); map.getPane('countryPane').style.zIndex = 700
+  // the default Leaflet tooltip/popup panes already exist; we increased their z-index in CSS
 
   const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
   const baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
   const labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane:'labelsPane'}).addTo(map)
   installTileFallback(map, baseNoLabels, labelsOnly)
 
-  const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.3 })
-  const linesRenderer = L.canvas({ pane:'linesPane', padding:0.3 })
+  const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.25 })
+  const linesRenderer = L.canvas({ pane:'linesPane', padding:0.25 })
 
   _linesImpLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map)
   _linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map)
@@ -52,25 +52,24 @@ export function draw({ world, entries, centroids, cfg, map }){
 
   // thin outlines (non-interactive)
   L.geoJSON(world, {
-    pane:'countryPane',
+    pane:'dotsPane',   // under UI, above basemap
     interactive:false,
     style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
   }).addTo(map)
 
   // implemented shading (non-interactive)
   _shadeLayer = L.geoJSON(world, {
-    pane:'countryPane',
+    pane:'dotsPane',
     interactive:false,
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
-  // full-country hover + click targets (the important layer)
-  const baseFill = '#21ff9d'   // light mint used only for hover fill
-  const defaultStyle = { className:'country-hit', stroke:false, fill:true, fillColor:baseFill, fillOpacity:0.00 }
+  // full-country hover + click targets (live in tooltip pane)
+  const defaultStyle = { className:'country-hit', stroke:false, fill:true, fillColor:'#21ff9d', fillOpacity:0.00 }
   const hoverStyle   = { stroke:true, color:getCSS('--mint'), weight:1.2, opacity:.85, fillOpacity:0.16 }
 
   L.geoJSON(world, {
-    pane:'countryPane',
+    pane:'dotsPane',               // geometry sits with dots, but tooltips render in tooltip pane
     style: () => defaultStyle,
     interactive:true,
     bubblingMouseEvents:false,
@@ -78,23 +77,22 @@ export function draw({ world, entries, centroids, cfg, map }){
       const key=(f.properties&&f.properties._key)||''
       const label = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
 
-      // hover hint (and ensure it's visible)
+      // glassy tooltip (forced into tooltip pane which we raised in CSS)
       layer.bindTooltip(`${String(label||'').toUpperCase()} — click to view`, {
-        direction:'top', sticky:true, opacity:0.95, className:'country-tip'
+        direction:'top', sticky:true, opacity:0.98, className:'country-tip', pane:'tooltipPane'
       })
 
       const open=()=>openCountryPopup(key)
-
-      layer.on('click', e=>{
-        L.DomEvent.stopPropagation(e)
-        open()
-      })
+      layer.on('click', e=>{ L.DomEvent.stopPropagation(e); open() })
       layer.on('touchstart',e=>{ e.originalEvent.preventDefault(); open() })
 
+      let hovered=false
       layer.on('mouseover', ()=>{
+        if(hovered) return; hovered=true
         try{ layer.setStyle(hoverStyle); layer.bringToFront() }catch(e){}
       })
       layer.on('mouseout', ()=>{
+        hovered=false
         try{ layer.setStyle(defaultStyle) }catch(e){}
       })
     }
@@ -126,7 +124,7 @@ function redraw(cfg){
       renderer:_dotsLayer._renderer, pane:'dotsPane',
       radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
     })
-    .bindTooltip(`${e.country} — click to view`, {direction:'top',offset:[0,-6], className:'dot-tip'})
+    .bindTooltip(`${e.country} — click to view`, {direction:'top',offset:[0,-6], className:'dot-tip', pane:'tooltipPane'})
     .on('click',()=>openCountryPopup(key))
     .addTo(_dotsLayer)
 
@@ -144,9 +142,10 @@ function redraw(cfg){
     })
   }
 
-  const K=3
-  buildLocalNetwork(impPts, red,   _linesImpLayer, K, .35, 1.2)
-  buildLocalNetwork(devPts, orange,_linesDevLayer, K, .30, 1.1)
+  // small perf win: fewer edges + lighter smoothing
+  const K_IMP=3, K_DEV=2
+  buildLocalNetwork(impPts, red,   _linesImpLayer, K_IMP, .32, 1.1)
+  buildLocalNetwork(devPts, orange,_linesDevLayer, K_DEV, .28, 1.0)
 }
 
 export function openCountryPopup(countryKey){
@@ -192,7 +191,7 @@ function buildLocalNetwork(coords, color, layer, k=3, opacity=.35, weight=1.2){
       const j=dists[t].j, key=i<j?`${i}-${j}`:`${j}-${i}`; if(seen.has(key)) continue; seen.add(key)
       L.polyline([coords[i], coords[j]], {
         pane:'linesPane', renderer:layer._renderer, interactive:false,
-        color, weight, opacity, smoothFactor:1.0
+        color, weight, opacity, smoothFactor:0.7
       }).addTo(layer)
     }
   }
