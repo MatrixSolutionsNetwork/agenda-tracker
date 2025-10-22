@@ -39,11 +39,11 @@ html,body{
 .leaflet-top{ top:12px; }
 .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
-/* Popup panel: white bg + dark text */
+/* Popup: white panel + dark text */
 .leaflet-popup-content-wrapper{background:#ffffff;color:#111;border:1px solid #174d35;}
 .leaflet-popup-tip{background:#ffffff;border:1px solid #174d35;}
 
-/* Tooltips: use dark pill with mint text */
+/* Tooltips */
 .leaflet-tooltip{border:1px solid #174d35;}
 .leaflet-tooltip.country-tip,
 .leaflet-tooltip.dot-tip{
@@ -54,7 +54,7 @@ html,body{
   border-radius:4px;
 }
 
-/* Ensure country polygons receive pointer events */
+/* Ensure polygons are interactive and show pointer cursor */
 .country-hit.leaflet-interactive{
   pointer-events:auto !important;
   cursor:pointer;
