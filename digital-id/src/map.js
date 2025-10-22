@@ -6,15 +6,15 @@ let _entries = [], _centroids = {}
 export function init(){
   const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2)
 
+  // panes (order matters)
   map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none'
-  map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500
+  map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 640   // sit just under dots (650)
   map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600
   map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650
 
   const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
   let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
   let labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane:'labelsPane'}).addTo(map)
-
   installTileFallback(map, baseNoLabels, labelsOnly)
 
   const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.3 })
@@ -24,6 +24,7 @@ export function init(){
   _linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map)
   _dotsLayer     = L.layerGroup([], {pane:'dotsPane'}).addTo(map)
 
+  // responsive top bar offset
   const topbar=document.getElementById('topbar')
   const placeMap=()=>{ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0) }
   window.addEventListener('load',placeMap)
@@ -49,28 +50,29 @@ export function draw({ world, entries, centroids, cfg, map }){
   _entries = entries
   _centroids = centroids
 
-  // subtle outlines
+  // thin outlines
   L.geoJSON(world, {
     pane:'hitPane',
     style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
   }).addTo(map)
 
-  // implemented-country shading
+  // shading for implemented
   _shadeLayer = L.geoJSON(world, {
     pane:'hitPane',
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
-  // FULL-COUNTRY HOVER + CLICK TARGETS
+  // country hover + click targets
   L.geoJSON(world, {
     pane:'hitPane',
     style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.02 },
     interactive:true,
+    bubblingMouseEvents: true,
     onEachFeature:(f,layer)=>{
       const key=(f.properties&&f.properties._key)||''
-      const display = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
-      // hover label so users know they can click the country
-      layer.bindTooltip(String(display||'').toUpperCase(), {direction:'top', sticky:true, opacity:0.9})
+      const label = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
+      // hover hint
+      layer.bindTooltip(String(label||'').toUpperCase(), {direction:'top', sticky:true, opacity:0.9})
       const open=()=>openCountryPopup(key)
       layer.on('click',open)
       layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open()})
@@ -150,7 +152,6 @@ function popupHTML(country, rows){
     }
     return `<div style="margin-bottom:8px">${b.join('<br>')}</div>`
   }).join('')
-  // title color now uses --popupTitle to read well on white
   return `<div style="min-width:260px">
     <h3 style="margin:0 0 6px 0; font-size:16px; color:${getCSS('--popupTitle')}">${escapeHtml(country)}</h3>
     ${list}
