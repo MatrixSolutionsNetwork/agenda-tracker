@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <link rel="stylesheet" href="./assets/style.css?v=10" />
+  <link rel="stylesheet" href="./assets/style.css?v=11" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -28,13 +28,40 @@
 
   <div id="map" aria-label="Digital ID world map"></div>
 
+  <!-- Simple loader + error surface so a bad import never leaves a blank page -->
+  <div id="bootOverlay" style="
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      background:rgba(5,16,12,.85);color:#dfffe9;z-index:20000;font-family:'Share Tech Mono',ui-monospace,monospace;">
+    <div id="bootMsg" style="text-align:center">
+      <div style="font-size:18px;margin-bottom:6px">Loading Digital ID map…</div>
+      <div style="opacity:.85;font-size:13px">If this stays here, a script error occurred.</div>
+    </div>
+  </div>
+
   <script type="module">
-    import cfg from './src/config.digitalid.js?v=10'
-    import { start } from './src/app.js?v=10'
-    start(cfg)
+    const bootMsg = s => { const el=document.getElementById('bootMsg'); if(el) el.innerHTML = s }
+    const hideBoot = () => { const o=document.getElementById('bootOverlay'); if(o) o.remove() }
+
+    // Show any runtime/import error on screen (no more silent blanks)
+    window.addEventListener('error', e => {
+      bootMsg(`<div style="color:#ffb4b4">Error</div><pre style="text-align:left;white-space:pre-wrap">${(e.error&&e.error.stack)||e.message||e.toString()}</pre>`)
+    })
+    window.addEventListener('unhandledrejection', e => {
+      bootMsg(`<div style="color:#ffb4b4">Unhandled Promise</div><pre style="text-align:left;white-space:pre-wrap">${(e.reason&&e.reason.stack)||e.reason||''}</pre>`)
+    })
+
+    // Normal boot (with cache-busting)
+    try{
+      const cfgMod = await import('./src/config.digitalid.js?v=11')
+      const appMod = await import('./src/app.js?v=11')
+      await appMod.start(cfgMod.default)
+      hideBoot()
+    }catch(err){
+      bootMsg(`<div style="color:#ffb4b4">Boot failed</div><pre style="text-align:left;white-space:pre-wrap">${err.stack||err}</pre>`)
+    }
   </script>
 
-  <!-- Force "Updated:" to show date only, even if app.js writes a full timestamp -->
+  <!-- Force “Updated:” to show date only -->
   <script>
     (function(){
       const el = document.getElementById('updatedTop');
@@ -43,7 +70,6 @@
         try{
           const dt = new Date(d);
           if (isNaN(+dt)) return d;
-          // Example: Wed, 22 Oct 2025
           return dt.toLocaleDateString(undefined,{weekday:'short', day:'2-digit', month:'short', year:'numeric'});
         }catch(_){ return d; }
       };
@@ -52,11 +78,13 @@
         if(!raw) return;
         el.textContent = 'Updated: ' + fmt(raw);
       };
-      // Run now and whenever the text changes in the future
       const mo = new MutationObserver(apply);
       mo.observe(el, { characterData:true, childList:true, subtree:true });
       apply();
     })();
   </script>
+  <noscript style="position:fixed;left:0;right:0;top:0;background:#300;color:#fff;padding:8px;z-index:30000">
+    JavaScript is required to load the map.
+  </noscript>
 </body>
 </html>
