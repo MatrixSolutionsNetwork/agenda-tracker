@@ -6,14 +6,14 @@ let _entries = [], _centroids = {}
 export function init(){
   const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2)
 
-  const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
-  let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
-  let labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane:'labelsPane'}).addTo(map)
-
   map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none'
   map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 500
   map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600
   map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650
+
+  const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
+  let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
+  let labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane:'labelsPane'}).addTo(map)
 
   installTileFallback(map, baseNoLabels, labelsOnly)
 
@@ -24,7 +24,6 @@ export function init(){
   _linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map)
   _dotsLayer     = L.layerGroup([], {pane:'dotsPane'}).addTo(map)
 
-  // resize top bar offset
   const topbar=document.getElementById('topbar')
   const placeMap=()=>{ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0) }
   window.addEventListener('load',placeMap)
@@ -34,7 +33,6 @@ export function init(){
   window.addEventListener('orientationchange', () => setTimeout(placeMap, 250), {passive:true})
   document.addEventListener('visibilitychange', () => { if (!document.hidden) setTimeout(placeMap, 150) })
 
-  // expose
   _map = map
   _dotsLayer._renderer = dotsRenderer
   _linesImpLayer._renderer = linesRenderer
@@ -51,7 +49,7 @@ export function draw({ world, entries, centroids, cfg, map }){
   _entries = entries
   _centroids = centroids
 
-  const outlineLayer = L.geoJSON(world, {
+  L.geoJSON(world, {
     pane:'hitPane',
     style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
   }).addTo(map)
@@ -61,7 +59,7 @@ export function draw({ world, entries, centroids, cfg, map }){
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
-  const hitLayer = L.geoJSON(world, {
+  L.geoJSON(world, {
     pane:'hitPane',
     style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
     interactive:true,
