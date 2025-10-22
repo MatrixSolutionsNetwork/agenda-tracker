@@ -6,15 +6,21 @@ let _entries = [], _centroids = {}
 export function init(){
   const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2)
 
-  // panes (order matters)
+  // panes (set hitPane above dots so it always catches clicks)
   map.createPane('labelsPane'); map.getPane('labelsPane').style.zIndex = 450; map.getPane('labelsPane').style.pointerEvents='none'
-  map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 640   // sit just under dots (650)
   map.createPane('linesPane');  map.getPane('linesPane').style.zIndex  = 600
   map.createPane('dotsPane');   map.getPane('dotsPane').style.zIndex   = 650
+  map.createPane('hitPane');    map.getPane('hitPane').style.zIndex    = 700   // topmost for click targets
 
   const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
-  let baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
-  let labelsOnly   = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, pane:'labelsPane'}).addTo(map)
+  const baseNoLabels = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',
+    { ...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO' }
+  ).addTo(map)
+  const labelsOnly = L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/rastertiles/dark_only_labels/{z}/{x}/{y}{r}.png',
+    { ...TILE_OPTS, pane:'labelsPane' }
+  ).addTo(map)
   installTileFallback(map, baseNoLabels, labelsOnly)
 
   const dotsRenderer  = L.canvas({ pane:'dotsPane',  padding:0.3 })
@@ -24,7 +30,7 @@ export function init(){
   _linesDevLayer = L.layerGroup([], {pane:'linesPane'}).addTo(map)
   _dotsLayer     = L.layerGroup([], {pane:'dotsPane'}).addTo(map)
 
-  // responsive top bar offset
+  // keep map sized under topbar
   const topbar=document.getElementById('topbar')
   const placeMap=()=>{ const h=topbar.offsetHeight; document.documentElement.style.setProperty('--dynBarH', h+'px'); setTimeout(()=>map.invalidateSize(),0) }
   window.addEventListener('load',placeMap)
@@ -50,29 +56,33 @@ export function draw({ world, entries, centroids, cfg, map }){
   _entries = entries
   _centroids = centroids
 
-  // thin outlines
+  // thin outlines (drawn on hitPane but non-interactive)
   L.geoJSON(world, {
     pane:'hitPane',
+    interactive:false,
     style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
   }).addTo(map)
 
-  // shading for implemented
+  // shading for implemented countries
   _shadeLayer = L.geoJSON(world, {
     pane:'hitPane',
+    interactive:false,
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
-  // country hover + click targets
+  // country hover + click targets (the important part)
   L.geoJSON(world, {
     pane:'hitPane',
-    style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.02 },
+    style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.03 },
     interactive:true,
     bubblingMouseEvents: true,
     onEachFeature:(f,layer)=>{
       const key=(f.properties&&f.properties._key)||''
       const label = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
-      // hover hint
-      layer.bindTooltip(String(label||'').toUpperCase(), {direction:'top', sticky:true, opacity:0.9})
+      // show hint on hover
+      layer.bindTooltip(`${String(label||'').toUpperCase()} — click to view`, {
+        direction:'top', sticky:true, opacity:0.95, className:'country-tip'
+      })
       const open=()=>openCountryPopup(key)
       layer.on('click',open)
       layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open()})
@@ -107,7 +117,8 @@ function redraw(cfg){
       renderer:_dotsLayer._renderer, pane:'dotsPane',
       radius:6.5, color:darken(color,30), weight:1.2, fillColor:color, fillOpacity:.95
     })
-    .bindTooltip(`${e.country}`,{direction:'top',offset:[0,-6]})
+    // make the dot tooltip useful (no more empty box)
+    .bindTooltip(`${e.country} — click to view`, {direction:'top',offset:[0,-6], className:'dot-tip'})
     .on('click',()=>openCountryPopup(key))
     .addTo(_dotsLayer)
 
