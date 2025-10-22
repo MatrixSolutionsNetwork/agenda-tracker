@@ -39,16 +39,16 @@ html,body{
 .leaflet-top{ top:12px; }
 .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
-/* Raise built-in Leaflet panes so UI is always on top */
-.leaflet-tooltip-pane{ z-index: 800; }   /* above dots/lines */
-.leaflet-popup-pane{ z-index: 790; }      /* just under tooltips */
+/* ENSURE UI IS ALWAYS ON TOP */
+.leaflet-tooltip-pane{ z-index: 1000; } /* top-most so pills never hide */
+.leaflet-popup-pane{   z-index:  950; }
 
-/* Glassy POPUP: soft white w/ blur */
+/* Glassy popup */
 .leaflet-popup-content-wrapper{
   background: rgba(255,255,255,.78);
   color:#111;
   border:1px solid #cfe9dc;
-  box-shadow: 0 10px 28px rgba(0,0,0,.35);
+  box-shadow:0 10px 28px rgba(0,0,0,.35);
   backdrop-filter: blur(10px) saturate(1.05);
   -webkit-backdrop-filter: blur(10px) saturate(1.05);
   border-radius:12px;
@@ -58,10 +58,10 @@ html,body{
   border:1px solid #cfe9dc;
 }
 
-/* Glassy TOOLTIP pills (countries & dots): dark green w/ blur */
+/* Glassy tooltips (countries & dots) */
 .leaflet-tooltip.country-tip,
 .leaflet-tooltip.dot-tip{
-  background: rgba(10,28,20,.70);
+  background: rgba(10,28,20,.72);
   color:var(--countryText) !important;
   font-size:12px;
   padding:4px 8px;
@@ -71,7 +71,7 @@ html,body{
   -webkit-backdrop-filter: blur(6px) saturate(1.1);
 }
 
-/* Ensure polygons are interactive and show pointer cursor */
+/* Country polygons should always be clickable */
 .country-hit.leaflet-interactive{
   pointer-events:auto !important;
   cursor:pointer;
