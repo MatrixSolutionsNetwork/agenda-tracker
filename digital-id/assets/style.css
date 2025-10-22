@@ -3,13 +3,17 @@
   --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
   --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
   --countryText:#dfffe9;
+  --popupTitle:#0a1c14;        /* new: popup heading color */
 }
+
 html,body{
   height:100%;margin:0;
   background:radial-gradient(1200px 800px at 30% 10%, #0b2217 0%, #081911 35%, #06140f 70%, #05100c 100%);
   color:var(--text);
   font-family:"Share Tech Mono",ui-monospace,monospace;
 }
+
+/* Top bar */
 #topbar{
   position:fixed; z-index:1100; left:0; right:0; top:0;
   padding:var(--barPadY) var(--barPadX);
@@ -28,13 +32,17 @@ html,body{
 .updated{opacity:.9;font-size:12px}
 .inline-hint{opacity:.85;font-size:12px}
 
+/* Map */
 #map{ position:absolute; left:0; right:0; top:var(--dynBarH); bottom:0; }
 .leaflet-container{ background:#000; }
 .leaflet-tile{ background:transparent; transform:translateZ(0); filter: brightness(1.08) contrast(1.08) saturate(0.95); }
 .leaflet-top{ top:12px; }
 .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
-.leaflet-popup-content-wrapper{background:#0a1c14;color:#ffffff;border:1px solid #174d35;}
-.leaflet-popup-tip{background:#0a1c14;border:1px solid #174d35;}
+/* Popup panel: switch to white with dark text for readability */
+.leaflet-popup-content-wrapper{background:#ffffff;color:#111;border:1px solid #174d35;}
+.leaflet-popup-tip{background:#ffffff;border:1px solid #174d35;}
+/* Tooltip (hover labels) stay dark-green theme */
 .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
+
 .country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
