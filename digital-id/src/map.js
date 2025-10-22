@@ -6,11 +6,11 @@ let _entries = [], _centroids = {}
 export function init(){
   const map = L.map('map',{zoomControl:true,preferCanvas:true}).setView([20,0],2)
 
-  // Panes: dots/lines below, countries above, tooltips/popup handled by Leaflet panes (raised in CSS)
+  // panes: dots/lines below, countries above; popup/tooltip panes are raised in CSS
   map.createPane('labelsPane');   map.getPane('labelsPane').style.zIndex   = 450; map.getPane('labelsPane').style.pointerEvents='none'
   map.createPane('linesPane');    map.getPane('linesPane').style.zIndex    = 600
   map.createPane('dotsPane');     map.getPane('dotsPane').style.zIndex     = 650
-  map.createPane('countryPane');  map.getPane('countryPane').style.zIndex  = 900  // above dots, below tooltip/popup
+  map.createPane('countryPane');  map.getPane('countryPane').style.zIndex  = 900  // below popup/tooltip panes
 
   const TILE_OPTS = { subdomains:'abcd', maxZoom:8, errorTileUrl:'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=' }
   const baseNoLabels = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}{r}.png',{...TILE_OPTS, attribution:'&copy; OpenStreetMap &copy; CARTO'}).addTo(map)
@@ -64,7 +64,7 @@ export function draw({ world, entries, centroids, cfg, map }){
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
-  // Country hover + click targets (on their own pane above dots)
+  // full-country hover + click targets
   const defaultStyle = { className:'country-hit', stroke:false, fill:true, fillColor:'#21ff9d', fillOpacity:0.00 }
   const hoverStyle   = { stroke:true, color:getCSS('--mint'), weight:1.2, opacity:.85, fillOpacity:0.16 }
 
@@ -77,7 +77,6 @@ export function draw({ world, entries, centroids, cfg, map }){
       const key=(f.properties&&f.properties._key)||''
       const label = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
 
-      // tooltip forced into tooltip pane (raised via CSS)
       layer.bindTooltip(`${String(label||'').toUpperCase()} — click to view`, {
         direction:'top', sticky:true, opacity:0.98, className:'country-tip', pane:'tooltipPane'
       })
