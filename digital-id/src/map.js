@@ -194,4 +194,44 @@ function buildLocalNetwork(coords, color, layer, k = 3, opacity = .35, weight = 
     const limit = Math.min(k, dists.length);
     for (let t = 0; t < limit; t++) {
       const j = dists[t].j, key = i < j ? `${i}-${j}` : `${j}-${i}`;
-      if (seen.has(key
+      if (seen.has(key)) continue; seen.add(key);
+      L.polyline([coords[i], coords[j]], {
+        pane: "linesPane", renderer: layer._renderer, interactive: false,
+        color, weight, opacity, smoothFactor: 0.7
+      }).addTo(layer);
+    }
+  }
+}
+
+function installTileFallback(map, primary, overlay) {
+  let switched = false;
+  function switchToFallback() {
+    if (switched) return;
+    switched = true;
+    try {
+      if (map.hasLayer(primary)) map.removeLayer(primary);
+      if (overlay && map.hasLayer(overlay)) map.removeLayer(overlay);
+    } catch {}
+    const fallback1 = L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 8, attribution: "&copy; OpenStreetMap &copy; CARTO" }
+    ).addTo(map);
+    let switched2 = false;
+    fallback1.on("tileerror", () => {
+      if (switched2) return;
+      switched2 = true;
+      try { if (map.hasLayer(fallback1)) map.removeLayer(fallback1); } catch {}
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+        { maxZoom: 8, attribution: "&copy; OpenStreetMap contributors" }).addTo(map);
+    });
+    setTimeout(() => { if (!switched2 && Object.keys(fallback1._tiles || {}).length === 0) fallback1.fire("tileerror"); }, 3000);
+  }
+  primary.on("tileerror", switchToFallback);
+  if (overlay) overlay.on("tileerror", switchToFallback);
+  setTimeout(() => {
+    const loaded =
+      Object.keys(primary._tiles || {}).length +
+      (overlay ? Object.keys(overlay._tiles || {}).length : 0);
+    if (!switched && loaded === 0) switchToFallback();
+  }, 3500);
+}
