@@ -3,7 +3,7 @@
   --orange:#ff9900; --red:#ff3333; --mint:#7be2b1; --matrix:#21ff9d;
   --barPadY:16px; --barPadX:16px; --dynBarH: 92px;
   --countryText:#dfffe9;
-  --popupTitle:#0a1c14;        /* new: popup heading color */
+  --popupTitle:#0a1c14;
 }
 
 html,body{
@@ -39,10 +39,14 @@ html,body{
 .leaflet-top{ top:12px; }
 .leaflet-labelsPane-pane img { filter: brightness(1.6) contrast(1.25); }
 
-/* Popup panel: switch to white with dark text for readability */
+/* Popup panel: white bg + dark text for readability */
 .leaflet-popup-content-wrapper{background:#ffffff;color:#111;border:1px solid #174d35;}
 .leaflet-popup-tip{background:#ffffff;border:1px solid #174d35;}
-/* Tooltip (hover labels) stay dark-green theme */
+/* Hover labels stay dark-green */
 .leaflet-tooltip{background:#0a1c14;border:1px solid #174d35;color:var(--countryText) !important;}
 
-.country-hit.leaflet-interactive{ pointer-events:auto !important; cursor:pointer; }
+/* Make country polygons definite click targets even if nearly transparent */
+.country-hit.leaflet-interactive{
+  pointer-events:auto !important;
+  cursor:pointer;
+}
