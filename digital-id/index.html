@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Matrix Solutions Network — Digital ID</title>
 
-  <link rel="stylesheet" href="./assets/style.css?v=5" />
+  <link rel="stylesheet" href="./assets/style.css?v=10" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -18,20 +18,45 @@
     <div id="brandWrap">
       <div class="msn">Matrix Solutions Network</div>
       <div id="rowStatus">
-        <span id="pageTitle"></span>
+        <span id="pageTitle">Digital ID Status</span>
         <span class="live">LIVE</span>
       </div>
       <div class="updated" id="updatedTop">Updated: …</div>
-      <div class="inline-hint">• Click any dot or country for details</div>
+      <div class="inline-hint">Click any dot or country for details</div>
     </div>
   </div>
 
   <div id="map" aria-label="Digital ID world map"></div>
 
   <script type="module">
-    import cfg from './src/config.digitalid.js?v=5'
-    import { start } from './src/app.js?v=5'
+    import cfg from './src/config.digitalid.js?v=10'
+    import { start } from './src/app.js?v=10'
     start(cfg)
+  </script>
+
+  <!-- Force "Updated:" to show date only, even if app.js writes a full timestamp -->
+  <script>
+    (function(){
+      const el = document.getElementById('updatedTop');
+      if(!el) return;
+      const fmt = d => {
+        try{
+          const dt = new Date(d);
+          if (isNaN(+dt)) return d;
+          // Example: Wed, 22 Oct 2025
+          return dt.toLocaleDateString(undefined,{weekday:'short', day:'2-digit', month:'short', year:'numeric'});
+        }catch(_){ return d; }
+      };
+      const apply = () => {
+        const raw = (el.textContent || '').replace(/^Updated:\s*/i,'').trim();
+        if(!raw) return;
+        el.textContent = 'Updated: ' + fmt(raw);
+      };
+      // Run now and whenever the text changes in the future
+      const mo = new MutationObserver(apply);
+      mo.observe(el, { characterData:true, childList:true, subtree:true });
+      apply();
+    })();
   </script>
 </body>
 </html>
