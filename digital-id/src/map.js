@@ -49,22 +49,28 @@ export function draw({ world, entries, centroids, cfg, map }){
   _entries = entries
   _centroids = centroids
 
+  // subtle outlines
   L.geoJSON(world, {
     pane:'hitPane',
     style:{ color:getCSS('--mint'), weight:0.6, opacity:0.35, fill:false }
   }).addTo(map)
 
+  // implemented-country shading
   _shadeLayer = L.geoJSON(world, {
     pane:'hitPane',
     style: f => ({ color:'#0000', weight:0, fillColor:getCSS('--red'), fillOpacity:0 })
   }).addTo(map)
 
+  // FULL-COUNTRY HOVER + CLICK TARGETS
   L.geoJSON(world, {
     pane:'hitPane',
-    style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.01 },
+    style: { className:'country-hit', stroke:false, fill:true, fillColor:'#000', fillOpacity:0.02 },
     interactive:true,
     onEachFeature:(f,layer)=>{
       const key=(f.properties&&f.properties._key)||''
+      const display = (f.properties && (f.properties.name||f.properties.NAME||f.properties.ADMIN)) || ''
+      // hover label so users know they can click the country
+      layer.bindTooltip(String(display||'').toUpperCase(), {direction:'top', sticky:true, opacity:0.9})
       const open=()=>openCountryPopup(key)
       layer.on('click',open)
       layer.on('touchstart',e=>{e.originalEvent.preventDefault(); open()})
@@ -144,7 +150,11 @@ function popupHTML(country, rows){
     }
     return `<div style="margin-bottom:8px">${b.join('<br>')}</div>`
   }).join('')
-  return `<div style="min-width:260px"><h3 style="margin:0 0 6px 0; font-size:16px;color:${getCSS('--countryText')}">${escapeHtml(country)}</h3>${list}</div>`
+  // title color now uses --popupTitle to read well on white
+  return `<div style="min-width:260px">
+    <h3 style="margin:0 0 6px 0; font-size:16px; color:${getCSS('--popupTitle')}">${escapeHtml(country)}</h3>
+    ${list}
+  </div>`
 }
 
 function buildLocalNetwork(coords, color, layer, k=3, opacity=.35, weight=1.2){
